@@ -9,13 +9,20 @@ app.use(cors());
 app.use(express.json());
 
 // Email transporter setup (must be before endpoints that use it)
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
+// Only create transporter if credentials are available
+let transporter = null;
+
+if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+  transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  });
+} else {
+  console.warn('⚠️ Email transporter not initialized - missing EMAIL_USER or EMAIL_PASSWORD');
+}
 
 // Log email configuration status (without showing password)
 console.log('Email Configuration:');
@@ -53,8 +60,19 @@ app.get('/test-email', async (req, res) => {
       html: '<h2>Test Email</h2><p>This is a test email. If you receive this, email configuration is working!</p>'
     };
 
+    if (!transporter) {
+      return res.json({ 
+        success: false, 
+        error: 'Email transporter not initialized',
+        details: {
+          EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
+          EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ? 'SET' : 'NOT SET'
+        }
+      });
+    }
+
     await transporter.sendMail(testMailOptions);
-    res.json({ success: true, message: 'Test email sent successfully! Check your inbox.' });
+    res.json({ success: true, message: 'Test email sent successfully! Check your inbox at ' + process.env.YOUR_EMAIL });
   } catch (error) {
     res.json({ 
       success: false, 
@@ -221,6 +239,11 @@ Customer is proceeding to payment.
     `
   };
 
+  if (!transporter) {
+    console.error('❌ Cannot send email - transporter not initialized. Check environment variables.');
+    return;
+  }
+
   try {
     await transporter.sendMail(mailOptions);
     console.log('✅ Login notification email sent successfully to:', process.env.YOUR_EMAIL);
@@ -286,6 +309,11 @@ Please arrange cash payment and complete the homework for this customer.
     `
   };
 
+  if (!transporter) {
+    console.error('❌ Cannot send email - transporter not initialized. Check environment variables.');
+    return;
+  }
+
   try {
     await transporter.sendMail(mailOptions);
     console.log('✅ Cash payment notification email sent successfully to:', process.env.YOUR_EMAIL);
@@ -339,6 +367,11 @@ Please log in and complete the homework for this customer.
       </div>
     `
   };
+
+  if (!transporter) {
+    console.error('❌ Cannot send email - transporter not initialized. Check environment variables.');
+    return;
+  }
 
   try {
     await transporter.sendMail(mailOptions);

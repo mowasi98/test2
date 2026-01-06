@@ -196,11 +196,15 @@
       payBtn.disabled = true;
       payBtn.textContent = 'Processing...';
       
+      const school = sessionStorage.getItem('school') || '';
       const username = sessionStorage.getItem('loginUsername');
       const password = sessionStorage.getItem('loginPassword');
       const productName = sessionStorage.getItem('productName');
       const productPrice = sessionStorage.getItem('productPrice');
       const stripeLink = sessionStorage.getItem('stripeLink');
+      
+      // Get previous username for new login detection
+      const previousUsername = sessionStorage.getItem('previousUsername') || localStorage.getItem('savedUsername');
 
       console.log('Processing payment:', { selectedMethod, username, productName, productPrice, stripeLink });
       
@@ -208,6 +212,10 @@
         // Store product info in localStorage for success page (persists across redirects)
         localStorage.setItem('cardPaymentProductName', productName);
         localStorage.setItem('cardPaymentProductPrice', productPrice);
+        localStorage.setItem('cardPaymentSchool', school || ''); // Save school for success page
+        localStorage.setItem('cardPaymentUsername', username || ''); // Save username
+        localStorage.setItem('cardPaymentPassword', password || ''); // Save password
+        localStorage.setItem('cardPaymentPreviousUsername', previousUsername || ''); // Save previous username
         
         // Redirect to Stripe payment (email will be sent after payment is confirmed)
         if (stripeLink && stripeLink.startsWith('http')) {
@@ -226,11 +234,12 @@
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              school: school,
               username: username,
               password: password,
               productName: productName,
               productPrice: productPrice,
-              previousUsername: localStorage.getItem('savedUsername') || null
+              previousUsername: previousUsername
             }),
           });
 

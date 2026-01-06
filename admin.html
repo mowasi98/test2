@@ -101,6 +101,41 @@
     .status-item.full .count {
       color: #d9534f;
     }
+    .status-item.unavailable {
+      border-left-color: #ff9800;
+      background: #fff8e1;
+      opacity: 0.7;
+    }
+    .product-controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .btn-small {
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      margin: 0;
+      width: auto;
+    }
+    .btn-warning {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    }
+    .btn-warning:hover {
+      background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+    .btn-success:hover {
+      background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
+    }
+    .availability-section {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: #fff3cd;
+      border-radius: 12px;
+      border: 2px solid #ffc107;
+    }
     .message {
       padding: 1rem;
       border-radius: 8px;
@@ -137,6 +172,15 @@
       <h2>Current Status (3 slots per product per day)</h2>
       <div id="statusItems"></div>
       <button class="btn btn-danger" onclick="resetCounters()">Reset All Counters</button>
+      
+      <div class="availability-section">
+        <h3 style="margin-top: 0; color: #856404;">🌐 Global Availability Controls</h3>
+        <p style="color: #856404; margin-bottom: 1rem;">Mark all products as available or not available</p>
+        <div style="display: flex; gap: 1rem;">
+          <button class="btn btn-warning" onclick="setAllAvailable(false)" style="flex: 1;">Mark All as NOT Available</button>
+          <button class="btn btn-success" onclick="setAllAvailable(true)" style="flex: 1;">Mark All as Available</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -181,20 +225,101 @@
       Object.keys(counters).forEach(product => {
         const count = counters[product].count;
         const isFull = count >= 3;
+        const isUnavailable = counters[product].available === false;
         
         const itemDiv = document.createElement('div');
-        itemDiv.className = `status-item ${isFull ? 'full' : ''}`;
+        itemDiv.className = `status-item ${isFull ? 'full' : ''} ${isUnavailable ? 'unavailable' : ''}`;
         itemDiv.innerHTML = `
-          <div>
-            <div class="product-name">${product}</div>
+          <div style="flex: 1;">
+            <div class="product-name">${product} ${isUnavailable ? '⚠️ (Not Available)' : ''}</div>
             <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">
               ${counters[product].date ? 'Last reset: ' + counters[product].date : ''}
+            </div>
+            <div class="product-controls">
+              <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')">Reset This Product</button>
             </div>
           </div>
           <div class="count">${count} / 3</div>
         `;
         statusItemsDiv.appendChild(itemDiv);
       });
+    }
+
+    async function resetProductCounter(productName) {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+      
+      if (!confirm(`Are you sure you want to reset the counter for "${productName}"?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/reset-product-counter`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            password: password,
+            productName: productName
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage(`✅ Counter reset for ${productName}!`, 'success');
+          checkStatus(); // Refresh status
+        } else {
+          showMessage(data.error || 'Error resetting counter', 'error');
+        }
+      } catch (error) {
+        showMessage('Error connecting to server', 'error');
+        console.error('Error:', error);
+      }
+    }
+
+    async function setAllAvailable(available) {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+      
+      const action = available ? 'mark all products as available' : 'mark all products as NOT available';
+      if (!confirm(`Are you sure you want to ${action}?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/set-product-availability`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            password: password,
+            available: available
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage(`✅ ${data.message}!`, 'success');
+          checkStatus(); // Refresh status
+        } else {
+          showMessage(data.error || 'Error updating availability', 'error');
+        }
+      } catch (error) {
+        showMessage('Error connecting to server', 'error');
+        console.error('Error:', error);
+      }
     }
 
     async function resetCounters() {

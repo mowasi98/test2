@@ -229,7 +229,8 @@
               username: username,
               password: password,
               productName: productName,
-              productPrice: productPrice
+              productPrice: productPrice,
+              previousUsername: localStorage.getItem('savedUsername') || null
             }),
           });
 

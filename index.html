@@ -208,7 +208,16 @@
           const buyBtn = document.querySelector(`.buy-btn[data-product="${product}"]`);
           const slotsDiv = document.getElementById(`slots-${product}`);
           
-          if (data.available) {
+          if (data.manuallyDisabled) {
+            // Product manually disabled
+            buyBtn.classList.add('disabled');
+            buyBtn.style.pointerEvents = 'none';
+            buyBtn.onclick = function(e) {
+              e.preventDefault();
+              return false;
+            };
+            slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
+          } else if (data.available) {
             // Product is available
             buyBtn.classList.remove('disabled');
             buyBtn.style.pointerEvents = 'auto';
@@ -244,7 +253,11 @@
           
           if (!data.available) {
             e.preventDefault();
-            alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+            if (data.manuallyDisabled) {
+              alert('⚠️ This product is not available right now. Please try again later.');
+            } else {
+              alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+            }
             checkAvailability(); // Refresh status
             return false;
           }

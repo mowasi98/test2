@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - hwplug</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      color: #222;
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    .admin-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+    }
+    h1 {
+      color: #6C63FF;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .password-section {
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: #f8f9ff;
+      border-radius: 12px;
+      border: 2px solid #6C63FF;
+    }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #444;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.8rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    .btn {
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      color: #fff;
+      padding: 0.75rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    .btn:hover {
+      background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%);
+    }
+    .btn-danger:hover {
+      background: linear-gradient(135deg, #c9302c 0%, #a02623 100%);
+    }
+    .status-section {
+      margin-top: 2rem;
+    }
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: #f8f9ff;
+      border-radius: 8px;
+      border-left: 4px solid #6C63FF;
+    }
+    .status-item.full {
+      border-left-color: #d9534f;
+      background: #fff5f5;
+    }
+    .status-item .product-name {
+      font-weight: 700;
+      color: #333;
+    }
+    .status-item .count {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #6C63FF;
+    }
+    .status-item.full .count {
+      color: #d9534f;
+    }
+    .message {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <h1>🔐 Admin Panel - hwplug</h1>
+    
+    <div id="message" class="message"></div>
+    
+    <div class="password-section">
+      <div class="form-group">
+        <label>Admin Password</label>
+        <input type="password" id="adminPassword" placeholder="Enter admin password">
+      </div>
+      <button class="btn" onclick="checkStatus()">Check Counter Status</button>
+    </div>
+    
+    <div class="status-section" id="statusSection" style="display: none;">
+      <h2>Current Status (3 slots per product per day)</h2>
+      <div id="statusItems"></div>
+      <button class="btn btn-danger" onclick="resetCounters()">Reset All Counters</button>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
+
+    function showMessage(text, type) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.className = `message ${type}`;
+      messageDiv.style.display = 'block';
+      setTimeout(() => {
+        messageDiv.style.display = 'none';
+      }, 5000);
+    }
+
+    async function checkStatus() {
+      const password = document.getElementById('adminPassword').value;
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/counters-status`);
+        const data = await response.json();
+        
+        if (data.success) {
+          document.getElementById('statusSection').style.display = 'block';
+          displayStatus(data.counters);
+        } else {
+          showMessage('Error fetching status', 'error');
+        }
+      } catch (error) {
+        showMessage('Error connecting to server', 'error');
+        console.error('Error:', error);
+      }
+    }
+
+    function displayStatus(counters) {
+      const statusItemsDiv = document.getElementById('statusItems');
+      statusItemsDiv.innerHTML = '';
+      
+      Object.keys(counters).forEach(product => {
+        const count = counters[product].count;
+        const isFull = count >= 3;
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = `status-item ${isFull ? 'full' : ''}`;
+        itemDiv.innerHTML = `
+          <div>
+            <div class="product-name">${product}</div>
+            <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">
+              ${counters[product].date ? 'Last reset: ' + counters[product].date : ''}
+            </div>
+          </div>
+          <div class="count">${count} / 3</div>
+        `;
+        statusItemsDiv.appendChild(itemDiv);
+      });
+    }
+
+    async function resetCounters() {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to reset all counters? This will reset all products to 0.')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/reset-counters`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password: password }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage('✅ All counters reset successfully!', 'success');
+          checkStatus(); // Refresh status
+        } else {
+          showMessage(data.error || 'Error resetting counters', 'error');
+        }
+      } catch (error) {
+        showMessage('Error connecting to server', 'error');
+        console.error('Error:', error);
+      }
+    }
+  </script>
+</body>
+</html>

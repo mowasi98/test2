@@ -158,7 +158,8 @@
               sessionId: sessionId,
               productName: productName,
               productPrice: productPrice,
-              paymentMethod: 'card'
+              paymentMethod: 'card',
+              previousUsername: localStorage.getItem('savedUsername') || null
             }),
           });
 

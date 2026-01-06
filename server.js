@@ -8,6 +8,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Email transporter setup (must be before endpoints that use it)
+const transporter = nodemailer.createTransport({
+  service: process.env.EMAIL_SERVICE || 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
+
+// Log email configuration status (without showing password)
+console.log('Email Configuration:');
+console.log('- EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'gmail');
+console.log('- EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
+console.log('- YOUR_EMAIL:', process.env.YOUR_EMAIL || 'NOT SET');
+console.log('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'SET (hidden)' : 'NOT SET');
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.send('hwplug Backend Running! 🚀');
@@ -47,22 +63,6 @@ app.get('/test-email', async (req, res) => {
     });
   }
 });
-
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
-
-// Log email configuration status (without showing password)
-console.log('Email Configuration:');
-console.log('- EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'gmail');
-console.log('- EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
-console.log('- YOUR_EMAIL:', process.env.YOUR_EMAIL || 'NOT SET');
-console.log('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'SET (hidden)' : 'NOT SET');
 
 // Create Stripe Checkout Session
 app.post('/create-checkout-session', async (req, res) => {

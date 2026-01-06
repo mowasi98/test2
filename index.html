@@ -104,6 +104,28 @@
     .buy-btn:active {
       transform: scale(0.97);
     }
+    .buy-btn:disabled,
+    .buy-btn.disabled {
+      background: #ccc !important;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .slots-message {
+      color: #d9534f;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #f8d7da;
+      border-radius: 6px;
+      border: 1px solid #f5c6cb;
+    }
+    .slots-remaining {
+      color: #6C63FF;
+      font-size: 0.85rem;
+      margin-top: 0.3rem;
+      font-weight: 500;
+    }
     footer {
       text-align: center;
       padding: 1.5rem;
@@ -132,32 +154,36 @@
   </header>
 
   <section class="items">
-    <div class="item-card">
+    <div class="item-card" data-product="Sparx Reader">
       <div class="item-title">Sparx Reader</div>
       <div class="item-desc">Improve reading comprehension with interactive tasks</div>
       <div class="price">&pound;2</div>
-      <a href="login.html?product=Sparx%20Reader&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h" class="buy-btn">Buy Now</a>
+      <div id="slots-Sparx Reader"></div>
+      <a href="login.html?product=Sparx%20Reader&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h" class="buy-btn" data-product="Sparx Reader">Buy Now</a>
     </div>
     
-    <div class="item-card">
+    <div class="item-card" data-product="Sparx Maths">
       <div class="item-title">Sparx Maths</div>
       <div class="item-desc">Master maths with adaptive problem sets</div>
       <div class="price">&pound;2</div>
-      <a href="login.html?product=Sparx%20Maths&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F5kQ00b64c7j7g5IbSMcfK0g" class="buy-btn">Buy Now</a>
+      <div id="slots-Sparx Maths"></div>
+      <a href="login.html?product=Sparx%20Maths&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F5kQ00b64c7j7g5IbSMcfK0g" class="buy-btn" data-product="Sparx Maths">Buy Now</a>
     </div>
     
-    <div class="item-card">
+    <div class="item-card" data-product="Educate">
       <div class="item-title">Educate</div>
       <div class="item-desc">Explore science topics with engaging resources</div>
       <div class="price">&pound;2</div>
-      <a href="login.html?product=Educate&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2FfZubITfEM32R6v81e8cfK0i" class="buy-btn">Buy Now</a>
+      <div id="slots-Educate"></div>
+      <a href="login.html?product=Educate&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2FfZubITfEM32R6v81e8cfK0i" class="buy-btn" data-product="Educate">Buy Now</a>
     </div>
     
-    <div class="item-card">
+    <div class="item-card" data-product="Seneca">
       <div class="item-title">Seneca</div>
       <div class="item-desc">Learn smarter with bite-sized lessons and quizzes</div>
       <div class="price">&pound;2</div>
-      <a href="login.html?product=Seneca&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F6oUfZ978g1YNcTw6yscfK01" class="buy-btn">Buy Now</a>
+      <div id="slots-Seneca"></div>
+      <a href="login.html?product=Seneca&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F6oUfZ978g1YNcTw6yscfK01" class="buy-btn" data-product="Seneca">Buy Now</a>
     </div>
   </section>
 
@@ -165,5 +191,69 @@
     &copy; 2025 hwplug – All rights reserved
   </footer>
 
+  <script>
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
+
+    const products = ['Sparx Reader', 'Sparx Maths', 'Educate', 'Seneca'];
+
+    // Check availability for all products on page load
+    async function checkAvailability() {
+      for (const product of products) {
+        try {
+          const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
+          const data = await response.json();
+          
+          const buyBtn = document.querySelector(`.buy-btn[data-product="${product}"]`);
+          const slotsDiv = document.getElementById(`slots-${product}`);
+          
+          if (data.available) {
+            // Product is available
+            buyBtn.classList.remove('disabled');
+            buyBtn.style.pointerEvents = 'auto';
+            slotsDiv.innerHTML = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
+          } else {
+            // Slots finished
+            buyBtn.classList.add('disabled');
+            buyBtn.style.pointerEvents = 'none';
+            buyBtn.onclick = function(e) {
+              e.preventDefault();
+              return false;
+            };
+            slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
+          }
+        } catch (error) {
+          console.error(`Error checking availability for ${product}:`, error);
+          // On error, allow purchase (fail open)
+        }
+      }
+    }
+
+    // Check availability when page loads
+    window.addEventListener('DOMContentLoaded', checkAvailability);
+
+    // Also intercept buy button clicks to double-check
+    document.querySelectorAll('.buy-btn').forEach(btn => {
+      btn.addEventListener('click', async function(e) {
+        const product = this.getAttribute('data-product');
+        
+        try {
+          const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
+          const data = await response.json();
+          
+          if (!data.available) {
+            e.preventDefault();
+            alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+            checkAvailability(); // Refresh status
+            return false;
+          }
+        } catch (error) {
+          console.error('Error checking availability:', error);
+          // Allow navigation on error
+        }
+      });
+    });
+  </script>
 </body>
 </html>

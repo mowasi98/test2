@@ -166,6 +166,51 @@
       margin-top: 3.5rem;
       border-top: 1px solid #e1e1e1;
       font-size: 0.98rem;
+      position: relative;
+    }
+    .support-section {
+      text-align: left;
+      padding: 1rem 2rem;
+      background: #fff;
+      border-radius: 12px;
+      margin: 0 auto 1rem auto;
+      max-width: 1100px;
+      box-shadow: 0 2px 8px rgba(100,100,250,0.1);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .support-text {
+      flex: 1;
+      font-size: 0.95rem;
+      color: #555;
+    }
+    .support-text strong {
+      color: #6C63FF;
+    }
+    .snapchat-link {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #FFFC00;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #FFFC00 0%, #FFF700 100%);
+      border-radius: 8px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(255,252,0,0.3);
+    }
+    .snapchat-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(255,252,0,0.4);
+    }
+    .snapchat-link span {
+      color: #000;
+    }
+    .snapchat-icon {
+      font-size: 1.5rem;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
     }
     @media (max-width: 900px) {
       .items {
@@ -227,7 +272,18 @@
   </section>
 
   <footer>
-    &copy; 2025 hwplug – All rights reserved
+    <div class="support-section">
+      <div class="support-text">
+        <strong>Need Support?</strong> Contact us on Snapchat
+      </div>
+      <a href="https://snapchat.com/add/mo_wasi98" target="_blank" class="snapchat-link" rel="noopener noreferrer">
+        <span class="snapchat-icon">👻</span>
+        <span>mo_wasi98</span>
+      </a>
+    </div>
+    <div>
+      &copy; 2025 hwplug – All rights reserved
+    </div>
   </footer>
 
   <script>

@@ -10,10 +10,10 @@ app.use(express.json());
 
 // Daily purchase limit tracking (3 per product per day)
 const dailyLimits = {
-  'Sparx Reader': { count: 0, date: null },
-  'Sparx Maths': { count: 0, date: null },
-  'Educate': { count: 0, date: null },
-  'Seneca': { count: 0, date: null }
+  'Sparx Reader': { count: 0, date: null, available: true },
+  'Sparx Maths': { count: 0, date: null, available: true },
+  'Educate': { count: 0, date: null, available: true },
+  'Seneca': { count: 0, date: null, available: true }
 };
 
 const MAX_PURCHASES_PER_DAY = 3;
@@ -38,14 +38,29 @@ app.get('/check-product-availability', (req, res) => {
     return res.json({ available: false, error: 'Product not found' });
   }
   
-  const available = dailyLimits[productName].count < MAX_PURCHASES_PER_DAY;
-  const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - dailyLimits[productName].count);
+  const product = dailyLimits[productName];
+  
+  // Check if product is manually set as unavailable
+  if (!product.available) {
+    return res.json({
+      available: false,
+      remaining: 0,
+      count: product.count,
+      max: MAX_PURCHASES_PER_DAY,
+      manuallyDisabled: true
+    });
+  }
+  
+  // Check if slots are full
+  const available = product.count < MAX_PURCHASES_PER_DAY;
+  const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - product.count);
   
   res.json({
     available: available,
     remaining: remaining,
-    count: dailyLimits[productName].count,
-    max: MAX_PURCHASES_PER_DAY
+    count: product.count,
+    max: MAX_PURCHASES_PER_DAY,
+    manuallyDisabled: false
   });
 });
 
@@ -89,6 +104,51 @@ app.post('/admin/reset-counters', (req, res) => {
     success: true,
     message: 'All counters reset successfully',
     counters: dailyLimits
+  });
+});
+
+// Admin endpoint to reset individual product counter
+app.post('/admin/reset-product-counter', (req, res) => {
+  const { password, productName } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  dailyLimits[productName].count = 0;
+  dailyLimits[productName].date = new Date().toDateString();
+  
+  res.json({
+    success: true,
+    message: `Counter reset for ${productName}`,
+    product: productName,
+    counter: dailyLimits[productName]
+  });
+});
+
+// Admin endpoint to set product availability
+app.post('/admin/set-product-availability', (req, res) => {
+  const { password, available } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  // Update all products availability
+  Object.keys(dailyLimits).forEach(product => {
+    dailyLimits[product].available = available === true;
+  });
+  
+  res.json({
+    success: true,
+    message: `All products ${available ? 'marked as available' : 'marked as not available'}`,
+    availability: available
   });
 });
 
@@ -251,8 +311,13 @@ app.post('/submit-cash-payment', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
     
-    // Increment purchase count for this product
+    // Check if product is available
     resetDailyCountersIfNeeded();
+    if (productName && dailyLimits[productName] && !dailyLimits[productName].available) {
+      return res.status(400).json({ error: 'Product is not available right now' });
+    }
+    
+    // Increment purchase count for this product
     let remainingSlots = 0;
     if (productName && dailyLimits[productName]) {
       dailyLimits[productName].count++;

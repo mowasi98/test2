@@ -19,12 +19,21 @@ const emailPassword = process.env.EMAIL_PASSWORD
   : 'tjalngdhvgkdnyxp'; // Fallback password (remove this in production!)
 
 if (process.env.EMAIL_USER && (process.env.EMAIL_PASSWORD || emailPassword)) {
+  // Use explicit SMTP settings for Gmail (better connection reliability)
   transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
       pass: emailPassword
-    }
+    },
+    tls: {
+      rejectUnauthorized: false // For Render hosting compatibility
+    },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000
   });
 } else {
   console.warn('⚠️ Email transporter not initialized - missing EMAIL_USER or EMAIL_PASSWORD');

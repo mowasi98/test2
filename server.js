@@ -16,35 +16,54 @@ let transporter = null;
 // This should only be used if environment variable is not set
 const emailPassword = process.env.EMAIL_PASSWORD 
   ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') 
-  : 'tjalngdhvgkdnyxp'; // Fallback password (remove this in production!)
+  : 'cdaaxmziottplaqh'; // Outlook App Password fallback (remove this in production!)
 
 if (process.env.EMAIL_USER && (process.env.EMAIL_PASSWORD || emailPassword)) {
-  // Use explicit SMTP settings for Gmail - try port 465 (SSL) first
-  transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // true for 465 (SSL), false for 587 (TLS)
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: emailPassword
-    },
-    tls: {
-      rejectUnauthorized: false,
-      ciphers: 'SSLv3'
-    },
-    connectionTimeout: 20000, // 20 seconds
-    greetingTimeout: 20000,
-    socketTimeout: 30000,
-    debug: false, // Set to true for detailed logs
-    logger: false
-  });
+  // Outlook/Hotmail SMTP settings - works better with cloud hosting
+  const emailService = process.env.EMAIL_SERVICE || 'outlook';
+  
+  if (emailService === 'outlook' || emailService === 'hotmail') {
+    transporter = nodemailer.createTransport({
+      host: 'smtp-mail.outlook.com',
+      port: 587,
+      secure: false, // true for 465, false for 587 (TLS)
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: emailPassword
+      },
+      tls: {
+        ciphers: 'SSLv3',
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 30000
+    });
+  } else {
+    // Gmail fallback (if needed)
+    transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: emailPassword
+      },
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 30000
+    });
+  }
 } else {
   console.warn('⚠️ Email transporter not initialized - missing EMAIL_USER or EMAIL_PASSWORD');
 }
 
 // Log email configuration status (without showing password)
 console.log('Email Configuration:');
-console.log('- EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'gmail');
+console.log('- EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'outlook');
 console.log('- EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
 console.log('- YOUR_EMAIL:', process.env.YOUR_EMAIL || 'NOT SET');
 console.log('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'SET (hidden)' : 'NOT SET');
@@ -65,7 +84,7 @@ app.get('/test-email', async (req, res) => {
           EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
           EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ? 'SET' : 'NOT SET',
           YOUR_EMAIL: process.env.YOUR_EMAIL ? 'SET' : 'NOT SET',
-          EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail (default)'
+          EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'outlook (default)'
         }
       });
     }

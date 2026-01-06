@@ -8,6 +8,100 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Daily purchase limit tracking (3 per product per day)
+const dailyLimits = {
+  'Sparx Reader': { count: 0, date: null },
+  'Sparx Maths': { count: 0, date: null },
+  'Educate': { count: 0, date: null },
+  'Seneca': { count: 0, date: null }
+};
+
+const MAX_PURCHASES_PER_DAY = 3;
+
+// Reset counters if it's a new day
+function resetDailyCountersIfNeeded() {
+  const today = new Date().toDateString();
+  Object.keys(dailyLimits).forEach(product => {
+    if (dailyLimits[product].date !== today) {
+      dailyLimits[product].count = 0;
+      dailyLimits[product].date = today;
+    }
+  });
+}
+
+// Check product availability endpoint
+app.get('/check-product-availability', (req, res) => {
+  resetDailyCountersIfNeeded();
+  const productName = req.query.product;
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.json({ available: false, error: 'Product not found' });
+  }
+  
+  const available = dailyLimits[productName].count < MAX_PURCHASES_PER_DAY;
+  const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - dailyLimits[productName].count);
+  
+  res.json({
+    available: available,
+    remaining: remaining,
+    count: dailyLimits[productName].count,
+    max: MAX_PURCHASES_PER_DAY
+  });
+});
+
+// Increment product purchase count
+app.post('/increment-product-count', (req, res) => {
+  resetDailyCountersIfNeeded();
+  const { productName } = req.body;
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  if (dailyLimits[productName].count >= MAX_PURCHASES_PER_DAY) {
+    return res.status(400).json({ error: 'Daily limit reached for this product' });
+  }
+  
+  dailyLimits[productName].count++;
+  res.json({
+    success: true,
+    count: dailyLimits[productName].count,
+    remaining: MAX_PURCHASES_PER_DAY - dailyLimits[productName].count
+  });
+});
+
+// Admin endpoint to reset all counters
+app.post('/admin/reset-counters', (req, res) => {
+  const { password } = req.body;
+  // Simple password protection (you can change this password)
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  Object.keys(dailyLimits).forEach(product => {
+    dailyLimits[product].count = 0;
+    dailyLimits[product].date = new Date().toDateString();
+  });
+  
+  res.json({
+    success: true,
+    message: 'All counters reset successfully',
+    counters: dailyLimits
+  });
+});
+
+// Admin endpoint to get current counter status
+app.get('/admin/counters-status', (req, res) => {
+  resetDailyCountersIfNeeded();
+  res.json({
+    success: true,
+    counters: dailyLimits,
+    maxPerDay: MAX_PURCHASES_PER_DAY
+  });
+});
+
 // Resend email service setup
 const resend = process.env.RESEND_API_KEY 
   ? new Resend(process.env.RESEND_API_KEY)
@@ -157,6 +251,13 @@ app.post('/submit-cash-payment', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
     
+    // Increment purchase count for this product
+    resetDailyCountersIfNeeded();
+    if (productName && dailyLimits[productName]) {
+      dailyLimits[productName].count++;
+      console.log(`✅ Product "${productName}" purchase count: ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY}`);
+    }
+    
     // Send email notification for cash payment (non-blocking)
     // Also send updated login notification with payment method
     sendLoginNotification({
@@ -190,6 +291,13 @@ app.post('/submit-cash-payment', async (req, res) => {
 app.post('/submit-login-details', async (req, res) => {
   try {
     const { username, password, platform, sessionId, productName, productPrice, paymentMethod } = req.body;
+    
+    // Increment purchase count for this product
+    resetDailyCountersIfNeeded();
+    if (productName && dailyLimits[productName]) {
+      dailyLimits[productName].count++;
+      console.log(`✅ Product "${productName}" purchase count: ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY}`);
+    }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
     await sendLoginDetailsNotification({

@@ -100,7 +100,7 @@
 <body>
   <div class="login-box">
     <div class="logo">hwplug</div>
-    <h2>Login to Continue</h2>
+    <h2 id="loginTitle">Login to Continue</h2>
     
     <div id="errorMessage" class="error-message"></div>
     
@@ -131,6 +131,9 @@
       const savedPassword = localStorage.getItem('savedPassword');
       
       if (savedUsername && savedPassword) {
+        // Update title to "Switch Account"
+        document.getElementById('loginTitle').textContent = 'Switch Account';
+        
         // Auto-fill the form
         document.getElementById('username').value = savedUsername;
         document.getElementById('password').value = savedPassword;

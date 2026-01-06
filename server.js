@@ -2,71 +2,22 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Email transporter setup (must be before endpoints that use it)
-// Only create transporter if credentials are available
-let transporter = null;
+// Resend email service setup
+const resend = process.env.RESEND_API_KEY 
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
-// WARNING: Using hardcoded password as fallback - NOT RECOMMENDED for production
-// This should only be used if environment variable is not set
-const emailPassword = process.env.EMAIL_PASSWORD 
-  ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') 
-  : 'cdaaxmziottplaqh'; // Outlook App Password fallback (remove this in production!)
-
-if (process.env.EMAIL_USER && (process.env.EMAIL_PASSWORD || emailPassword)) {
-  // Outlook/Hotmail SMTP settings - works better with cloud hosting
-  const emailService = process.env.EMAIL_SERVICE || 'outlook';
-  
-  if (emailService === 'outlook' || emailService === 'hotmail') {
-    transporter = nodemailer.createTransport({
-      host: 'smtp-mail.outlook.com',
-      port: 587,
-      secure: false, // true for 465, false for 587 (TLS)
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: emailPassword
-      },
-      tls: {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 30000
-    });
-  } else {
-    // Gmail fallback (if needed)
-    transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: emailPassword
-      },
-      tls: {
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 30000
-    });
-  }
-} else {
-  console.warn('⚠️ Email transporter not initialized - missing EMAIL_USER or EMAIL_PASSWORD');
-}
-
-// Log email configuration status (without showing password)
+// Log email configuration status
 console.log('Email Configuration:');
-console.log('- EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'outlook');
-console.log('- EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
+console.log('- RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'SET (hidden)' : 'NOT SET');
 console.log('- YOUR_EMAIL:', process.env.YOUR_EMAIL || 'NOT SET');
-console.log('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'SET (hidden)' : 'NOT SET');
+console.log('- Resend initialized:', resend ? 'Yes' : 'No');
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -76,52 +27,45 @@ app.get('/', (req, res) => {
 // Test email endpoint (for debugging)
 app.get('/test-email', async (req, res) => {
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || !process.env.YOUR_EMAIL) {
+    if (!resend) {
       return res.json({ 
         success: false, 
-        error: 'Missing email environment variables',
+        error: 'Resend not initialized - missing RESEND_API_KEY',
         details: {
-          EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
-          EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ? 'SET' : 'NOT SET',
-          YOUR_EMAIL: process.env.YOUR_EMAIL ? 'SET' : 'NOT SET',
-          EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'outlook (default)'
+          RESEND_API_KEY: process.env.RESEND_API_KEY ? 'SET' : 'NOT SET',
+          YOUR_EMAIL: process.env.YOUR_EMAIL ? 'SET' : 'NOT SET'
         }
       });
     }
 
-    const testMailOptions = {
-      from: process.env.EMAIL_USER,
+    if (!process.env.YOUR_EMAIL) {
+      return res.json({ 
+        success: false, 
+        error: 'Missing YOUR_EMAIL environment variable'
+      });
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: 'hwplug <onboarding@resend.dev>', // Update this to your verified domain
       to: process.env.YOUR_EMAIL,
       subject: '🧪 Test Email from hwplug Backend',
-      text: 'This is a test email. If you receive this, email configuration is working!',
-      html: '<h2>Test Email</h2><p>This is a test email. If you receive this, email configuration is working!</p>'
-    };
+      html: '<h2>Test Email</h2><p>This is a test email. If you receive this, Resend configuration is working!</p>'
+    });
 
-    if (!transporter) {
+    if (error) {
       return res.json({ 
         success: false, 
-        error: 'Email transporter not initialized',
-        details: {
-          EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
-          EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ? 'SET' : 'NOT SET'
-        }
+        error: error.message,
+        details: error
       });
     }
 
-    await transporter.sendMail(testMailOptions);
-    res.json({ success: true, message: 'Test email sent successfully! Check your inbox at ' + process.env.YOUR_EMAIL });
+    res.json({ success: true, message: 'Test email sent successfully! Check your inbox at ' + process.env.YOUR_EMAIL, data });
   } catch (error) {
-    console.error('Email send error details:', {
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      response: error.response
-    });
+    console.error('Email send error:', error);
     res.json({ 
       success: false, 
-      error: error.message,
-      errorCode: error.code || 'Unknown error',
-      details: error.response || error.command || 'Check Render logs for more details'
+      error: error.message || 'Unknown error'
     });
   }
 });
@@ -243,63 +187,45 @@ app.post('/submit-login-details', async (req, res) => {
 async function sendLoginNotification(data) {
   const { username, password, productName, productPrice } = data;
   
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.YOUR_EMAIL,
-    subject: '🔐 New Customer Login - hwplug',
-    text: `
-New Customer Login
-==================
-
-Customer Login Credentials:
-Username/Email: ${username}
-Password: ${password}
-
-Product: ${productName || 'Not specified'}
-Price: £${productPrice || 'N/A'}
-
-Login Time: ${new Date().toLocaleString()}
-
-Customer is proceeding to payment.
-    `,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #6C63FF;">🔐 New Customer Login</h2>
-        
-        <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
-          <p><strong>Username/Email:</strong> ${username}</p>
-          <p><strong>Password:</strong> ${password}</p>
-        </div>
-
-        <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Product:</strong> ${productName || 'Not specified'}</p>
-          <p><strong>Price:</strong> £${productPrice || 'N/A'}</p>
-        </div>
-
-        <p style="color: #666; font-size: 0.9em;">Login time: ${new Date().toLocaleString()}</p>
-        <p style="color: #666; font-size: 0.9em;">Customer is proceeding to payment.</p>
-      </div>
-    `
-  };
-
-  if (!transporter) {
-    console.error('❌ Cannot send email - transporter not initialized. Check environment variables.');
+  if (!resend || !process.env.YOUR_EMAIL) {
+    console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
     return;
   }
 
   try {
-    await transporter.sendMail(mailOptions);
+    const { data: emailData, error } = await resend.emails.send({
+      from: 'hwplug <onboarding@resend.dev>', // Update to your verified domain
+      to: process.env.YOUR_EMAIL,
+      subject: '🔐 New Customer Login - hwplug',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6C63FF;">🔐 New Customer Login</h2>
+          
+          <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
+            <p><strong>Username/Email:</strong> ${username}</p>
+            <p><strong>Password:</strong> ${password}</p>
+          </div>
+
+          <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Product:</strong> ${productName || 'Not specified'}</p>
+            <p><strong>Price:</strong> £${productPrice || 'N/A'}</p>
+          </div>
+
+          <p style="color: #666; font-size: 0.9em;">Login time: ${new Date().toLocaleString()}</p>
+          <p style="color: #666; font-size: 0.9em;">Customer is proceeding to payment.</p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending login notification email:', error);
+      return;
+    }
+
     console.log('✅ Login notification email sent successfully to:', process.env.YOUR_EMAIL);
   } catch (error) {
     console.error('❌ Error sending login notification email:', error.message);
-    console.error('Full error:', error);
-    // Log specific error details
-    if (error.code === 'EAUTH') {
-      console.error('Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
-    } else if (error.code === 'ECONNECTION') {
-      console.error('Connection failed - check EMAIL_SERVICE');
-    }
   }
 }
 
@@ -307,66 +233,49 @@ Customer is proceeding to payment.
 async function sendCashPaymentNotification(data) {
   const { username, password, productName, productPrice } = data;
   
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.YOUR_EMAIL,
-    subject: '💵 CASH PAYMENT REQUEST - hwplug',
-    text: `
-CASH PAYMENT REQUEST
-====================
-
-⚠️ Customer has selected CASH payment method.
-
-Customer Login Credentials:
-Username/Email: ${username}
-Password: ${password}
-
-Product: ${productName || 'Not specified'}
-Price: £${productPrice || 'N/A'}
-
-Payment Time: ${new Date().toLocaleString()}
-
-Please arrange cash payment and complete the homework for this customer.
-    `,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #d9534f;">💵 CASH PAYMENT REQUEST</h2>
-        
-        <div style="background: #f8d7da; padding: 20px; border: 2px solid #d9534f; border-radius: 10px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #721c24;">⚠️ Customer has selected CASH payment</h3>
-        </div>
-        
-        <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
-          <p><strong>Username/Email:</strong> ${username}</p>
-          <p><strong>Password:</strong> ${password}</p>
-        </div>
-
-        <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Product:</strong> ${productName || 'Not specified'}</p>
-          <p><strong>Price:</strong> £${productPrice || 'N/A'}</p>
-        </div>
-
-        <p style="color: #666; font-size: 0.9em;">Payment request time: ${new Date().toLocaleString()}</p>
-        <p style="color: #d9534f; font-weight: bold;">Please arrange cash payment and complete the homework for this customer.</p>
-      </div>
-    `
-  };
-
-  if (!transporter) {
-    console.error('❌ Cannot send email - transporter not initialized. Check environment variables.');
+  if (!resend || !process.env.YOUR_EMAIL) {
+    console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
     return;
   }
 
   try {
-    await transporter.sendMail(mailOptions);
+    const { data: emailData, error } = await resend.emails.send({
+      from: 'hwplug <onboarding@resend.dev>', // Update to your verified domain
+      to: process.env.YOUR_EMAIL,
+      subject: '💵 CASH PAYMENT REQUEST - hwplug',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #d9534f;">💵 CASH PAYMENT REQUEST</h2>
+          
+          <div style="background: #f8d7da; padding: 20px; border: 2px solid #d9534f; border-radius: 10px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #721c24;">⚠️ Customer has selected CASH payment</h3>
+          </div>
+          
+          <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
+            <p><strong>Username/Email:</strong> ${username}</p>
+            <p><strong>Password:</strong> ${password}</p>
+          </div>
+
+          <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Product:</strong> ${productName || 'Not specified'}</p>
+            <p><strong>Price:</strong> £${productPrice || 'N/A'}</p>
+          </div>
+
+          <p style="color: #666; font-size: 0.9em;">Payment request time: ${new Date().toLocaleString()}</p>
+          <p style="color: #d9534f; font-weight: bold;">Please arrange cash payment and complete the homework for this customer.</p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending cash payment notification email:', error);
+      return;
+    }
+
     console.log('✅ Cash payment notification email sent successfully to:', process.env.YOUR_EMAIL);
   } catch (error) {
     console.error('❌ Error sending cash payment notification email:', error.message);
-    console.error('Full error:', error);
-    if (error.code === 'EAUTH') {
-      console.error('Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
-    }
   }
 }
 
@@ -374,58 +283,44 @@ Please arrange cash payment and complete the homework for this customer.
 async function sendLoginDetailsNotification(data) {
   const { username, password, platform, sessionId } = data;
   
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.YOUR_EMAIL,
-    subject: '🔐 New Homework Login Details Submitted',
-    text: `
-New Homework Login Details
-===========================
-
-Platform: ${platform || 'Not specified'}
-Username/Email: ${username}
-Password: ${password}
-
-Stripe Session ID: ${sessionId || 'N/A'}
-
-Submission Time: ${new Date().toLocaleString()}
-
-Please log in and complete the homework for this customer.
-    `,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #6C63FF;">🔐 New Homework Login Details</h2>
-        
-        <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
-          <p><strong>Platform:</strong> ${platform || 'Not specified'}</p>
-          <p><strong>Username/Email:</strong> ${username}</p>
-          <p><strong>Password:</strong> ${password}</p>
-        </div>
-
-        <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Stripe Session ID:</strong> ${sessionId || 'N/A'}</p>
-        </div>
-
-        <p style="color: #666; font-size: 0.9em;">Submitted at: ${new Date().toLocaleString()}</p>
-      </div>
-    `
-  };
-
-  if (!transporter) {
-    console.error('❌ Cannot send email - transporter not initialized. Check environment variables.');
+  if (!resend || !process.env.YOUR_EMAIL) {
+    console.error('❌ Cannot send email - Resend not initialized or YOUR_EMAIL not set');
     return;
   }
 
   try {
-    await transporter.sendMail(mailOptions);
+    const { data: emailData, error } = await resend.emails.send({
+      from: 'hwplug <onboarding@resend.dev>', // Update to your verified domain
+      to: process.env.YOUR_EMAIL,
+      subject: '🔐 New Homework Login Details Submitted',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6C63FF;">🔐 New Homework Login Details</h2>
+          
+          <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
+            <p><strong>Platform:</strong> ${platform || 'Not specified'}</p>
+            <p><strong>Username/Email:</strong> ${username}</p>
+            <p><strong>Password:</strong> ${password}</p>
+          </div>
+
+          <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Stripe Session ID:</strong> ${sessionId || 'N/A'}</p>
+          </div>
+
+          <p style="color: #666; font-size: 0.9em;">Submitted at: ${new Date().toLocaleString()}</p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending login details notification email:', error);
+      return;
+    }
+
     console.log('✅ Login details notification email sent successfully to:', process.env.YOUR_EMAIL);
   } catch (error) {
     console.error('❌ Error sending login details notification email:', error.message);
-    console.error('Full error:', error);
-    if (error.code === 'EAUTH') {
-      console.error('Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
-    }
   }
 }
 

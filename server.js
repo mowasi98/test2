@@ -12,12 +12,18 @@ app.use(express.json());
 // Only create transporter if credentials are available
 let transporter = null;
 
-if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+// WARNING: Using hardcoded password as fallback - NOT RECOMMENDED for production
+// This should only be used if environment variable is not set
+const emailPassword = process.env.EMAIL_PASSWORD 
+  ? process.env.EMAIL_PASSWORD.replace(/\s+/g, '') 
+  : 'tjalngdhvgkdnyxp'; // Fallback password (remove this in production!)
+
+if (process.env.EMAIL_USER && (process.env.EMAIL_PASSWORD || emailPassword)) {
   transporter = nodemailer.createTransport({
     service: process.env.EMAIL_SERVICE || 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
+      pass: emailPassword
     }
   });
 } else {
@@ -74,10 +80,17 @@ app.get('/test-email', async (req, res) => {
     await transporter.sendMail(testMailOptions);
     res.json({ success: true, message: 'Test email sent successfully! Check your inbox at ' + process.env.YOUR_EMAIL });
   } catch (error) {
+    console.error('Email send error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response
+    });
     res.json({ 
       success: false, 
       error: error.message,
-      details: error.code || 'Unknown error'
+      errorCode: error.code || 'Unknown error',
+      details: error.response || error.command || 'Check Render logs for more details'
     });
   }
 });

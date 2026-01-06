@@ -122,9 +122,14 @@
       // Show thank you message
       document.getElementById('thankYouMessage').textContent = 'Thank you for your payment. Your payment has been processed successfully.';
       
-      // Get saved login credentials (from localStorage or sessionStorage)
-      const savedUsername = localStorage.getItem('savedUsername') || sessionStorage.getItem('loginUsername');
-      const savedPassword = localStorage.getItem('savedPassword') || sessionStorage.getItem('loginPassword');
+      // Get saved login credentials from localStorage (stored before Stripe redirect)
+      // These persist across the Stripe redirect
+      const school = localStorage.getItem('cardPaymentSchool') || sessionStorage.getItem('loginSchool') || '';
+      const savedUsername = localStorage.getItem('cardPaymentUsername') || sessionStorage.getItem('loginUsername') || localStorage.getItem('savedUsername');
+      const savedPassword = localStorage.getItem('cardPaymentPassword') || sessionStorage.getItem('loginPassword') || localStorage.getItem('savedPassword');
+      
+      // Get the previous username BEFORE this purchase (stored before login was saved)
+      const previousUsername = localStorage.getItem('cardPaymentPreviousUsername') || sessionStorage.getItem('previousUsername') || localStorage.getItem('savedUsername');
       
       // Get product info from localStorage (stored before Stripe redirect)
       const productName = localStorage.getItem('cardPaymentProductName') || sessionStorage.getItem('productName') || 'Unknown Product';
@@ -134,17 +139,10 @@
       const urlParams = new URLSearchParams(window.location.search);
       const sessionId = urlParams.get('session_id');
       
-      // Clear localStorage after getting values
-      localStorage.removeItem('cardPaymentProductName');
-      localStorage.removeItem('cardPaymentProductPrice');
-      sessionStorage.removeItem('productName');
-      sessionStorage.removeItem('productPrice');
-      sessionStorage.removeItem('loginUsername');
-      sessionStorage.removeItem('loginPassword');
-      sessionStorage.removeItem('stripeLink');
-      
-      // Send email notification automatically
-      if (savedUsername && savedPassword) {
+      // Send email notification automatically (MUST send email before clearing storage)
+      if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
+        console.log('Sending email with:', { username: savedUsername, productName, previousUsername });
+        
         try {
           const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
             method: 'POST',
@@ -152,6 +150,7 @@
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              school: school,
               username: savedUsername,
               password: savedPassword,
               platform: productName, // Use product name as platform
@@ -159,16 +158,34 @@
               productName: productName,
               productPrice: productPrice,
               paymentMethod: 'card',
-              previousUsername: localStorage.getItem('savedUsername') || null
+              previousUsername: previousUsername
             }),
           });
 
-          console.log('Email sent:', response.ok);
+          const result = await response.json();
+          console.log('Email response:', response.status, result);
         } catch (error) {
           console.error('Error sending email:', error);
           // Continue anyway - email might still work on backend
         }
+      } else {
+        console.error('Missing data for email:', { savedUsername: !!savedUsername, savedPassword: !!savedPassword, productName });
       }
+      
+      // Clear storage AFTER sending email
+      localStorage.removeItem('cardPaymentProductName');
+      localStorage.removeItem('cardPaymentProductPrice');
+      localStorage.removeItem('cardPaymentSchool');
+      localStorage.removeItem('cardPaymentUsername');
+      localStorage.removeItem('cardPaymentPassword');
+      localStorage.removeItem('cardPaymentPreviousUsername');
+      sessionStorage.removeItem('productName');
+      sessionStorage.removeItem('productPrice');
+      sessionStorage.removeItem('loginUsername');
+      sessionStorage.removeItem('loginPassword');
+      sessionStorage.removeItem('loginSchool');
+      sessionStorage.removeItem('stripeLink');
+      sessionStorage.removeItem('previousUsername');
       
       // Show redirect message after 2 seconds
       setTimeout(function() {

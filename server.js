@@ -205,7 +205,7 @@ app.post('/create-checkout-session', async (req, res) => {
 app.post('/submit-login', async (req, res) => {
   try {
     // This endpoint is kept for compatibility but no longer sends emails
-    // Emails are only sent after payment method selection (cash) or after payment confirmation (card)
+    // Emails are sent AFTER payment (cash or card) with "New Login" notification
     res.json({ success: true, message: 'Login received successfully' });
   } catch (error) {
     console.error('Error submitting login:', error);
@@ -522,7 +522,7 @@ async function sendCashPaymentNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '💵 CASH PAYMENT REQUEST - hwplug',
+      subject: '🔐 NEW LOGIN - Cash Payment Request - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -534,7 +534,7 @@ async function sendCashPaymentNotification(data) {
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
               <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">Cash Payment Request</p>
+              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">🔐 New Login - Cash Payment</p>
             </div>
 
             <!-- Content -->
@@ -627,7 +627,7 @@ async function sendLoginDetailsNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '💳 CARD PAYMENT SUCCESS - hwplug',
+      subject: '🔐 NEW LOGIN - Card Payment Success - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -639,7 +639,7 @@ async function sendLoginDetailsNotification(data) {
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
               <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">Card Payment Successful</p>
+              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">🔐 New Login - Card Payment</p>
             </div>
 
             <!-- Content -->

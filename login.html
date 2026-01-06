@@ -62,6 +62,59 @@
       outline: none;
       border-color: #6C63FF;
     }
+    .password-wrapper {
+      position: relative;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #6C63FF;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      transition: color 0.2s;
+    }
+    .password-toggle:hover {
+      color: #5548d9;
+    }
+    .school-wrapper {
+      position: relative;
+    }
+    .school-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 2px solid #6C63FF;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 12px rgba(100,100,250,0.2);
+    }
+    .school-dropdown.show {
+      display: block;
+    }
+    .school-option {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .school-option:hover {
+      background: #f8f9ff;
+    }
+    .school-option:last-child {
+      border-bottom: none;
+    }
     .submit-btn {
       background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
       color: #fff;
@@ -106,16 +159,27 @@
     
     <form id="loginForm" onsubmit="handleLogin(event)">
       <div class="form-group">
+        <label>What school does your homework need for? *</label>
+        <div class="school-wrapper">
+          <input type="text" id="school" required placeholder="Type to search for your school..." autocomplete="off">
+          <div id="schoolDropdown" class="school-dropdown"></div>
+        </div>
+      </div>
+      
+      <div class="form-group">
         <label>Username or Email *</label>
         <input type="text" id="username" required placeholder="Enter your username or email" autocomplete="username">
       </div>
       
       <div class="form-group">
         <label>Password *</label>
-        <input type="password" id="password" required placeholder="Enter your password" autocomplete="current-password">
+        <div class="password-wrapper">
+          <input type="password" id="password" required placeholder="Enter your password" autocomplete="current-password" style="padding-right: 100px;">
+          <button type="button" class="password-toggle" onclick="togglePassword()">Show Password</button>
+        </div>
       </div>
       
-      <button type="submit" id="submitBtn" class="submit-btn">Continue to Payment</button>
+      <button type="submit" id="submitBtn" class="submit-btn">Continue to Login</button>
     </form>
   </div>
 
@@ -125,14 +189,158 @@
       ? 'http://localhost:10000' 
       : 'https://test2-adsw.onrender.com';
 
+    // Comprehensive list of UK schools (including all Chingford schools)
+    const schools = [
+      // Chingford Schools
+      'Chingford Foundation School', 'Chingford CofE Primary School', 'Chingford Hall Primary School',
+      'Highams Park School', 'Rush Croft Sports College', 'Chingford Mount Primary School',
+      'Larkswood Primary Academy', 'Whitehall Primary School', 'Normandy Primary School',
+      'Handsworth Primary School', 'Yardley Primary School', 'Chingford St Mary\'s CofE Primary School',
+      'Newton\'s Primary School', 'Chingford Green Primary School', 'Ainslie Wood Primary School',
+      'Woodford Green Primary School', 'Oakhill Primary School', 'Coppermill Primary School',
+      'Chingford All Saints CofE Primary School', 'Chingford St John\'s CofE Primary School',
+      'South Chingford Foundation School', 'Chingford Endowed Foundation School',
+      'Heathcote School & Science College',
+      // Rest of UK Schools
+      'Abbey College', 'Abbots Bromley School', 'Abingdon School', 'Academy of St Francis of Assisi',
+      'Adams Grammar School', 'Aldenham School', 'Alleyn\'s School', 'Altrincham Grammar School for Girls',
+      'Ampleforth College', 'Ashford School', 'Bablake School', 'Badminton School', 'Bancroft\'s School',
+      'Barnard Castle School', 'Bedales School', 'Bedford School', 'Berkhamsted School',
+      'Birkdale School', 'Birmingham King Edward VI High School', 'Bishop\'s Stortford College',
+      'Bishop\'s Wordsworth\'s School', 'Blackpool Sixth Form College', 'Blundell\'s School',
+      'Bolton School', 'Bradfield College', 'Bradford Grammar School', 'Brighton College',
+      'Bristol Grammar School', 'Bromsgrove School', 'Bryanston School', 'Canford School',
+      'Cardiff High School', 'Caterham School', 'Charterhouse', 'Cheltenham College',
+      'Cheltenham Ladies\' College', 'Chigwell School', 'Chislehurst and Sidcup Grammar School',
+      'Christ\'s Hospital', 'City of London School', 'City of London School for Girls',
+      'Clifton College', 'Clifton High School', 'Coopers\' Company and Coborn School',
+      'Cranbrook School', 'Cranleigh School', 'Dame Alice Owen\'s School', 'Dauntsey\'s School',
+      'Dartford Grammar School', 'Dartmouth Academy', 'Dean Close School', 'Dulwich College',
+      'Durham School', 'Eastbourne College', 'Eaton Square School', 'Edgbaston High School',
+      'Emanuel School', 'Epsom College', 'Eton College', 'Exeter School', 'Fettes College',
+      'Forest School', 'Framlingham College', 'Francis Holland School', 'Garden House School',
+      'Giggleswick School', 'Godolphin and Latymer School', 'Guildford High School',
+      'Haberdashers\' Aske\'s Boys\' School', 'Haberdashers\' Aske\'s School for Girls',
+      'Hampton School', 'Harrow School', 'Haileybury', 'Harrogate Ladies\' College',
+      'Hereford Cathedral School', 'Highgate School', 'Hills Road Sixth Form College',
+      'Hulme Grammar School', 'Hurstpierpoint College', 'Hymers College', 'Immanuel College',
+      'James Allen\'s Girls\' School', 'Judd School', 'Kelly College', 'Kent College',
+      'King Edward\'s School Birmingham', 'King Edward VI Camp Hill School for Boys',
+      'King Edward VI Camp Hill School for Girls', 'King\'s College School', 'King\'s School Canterbury',
+      'King\'s School Chester', 'King\'s School Ely', 'King\'s School Rochester',
+      'Kingswood School', 'Lady Eleanor Holles School', 'Latymer School', 'Leeds Grammar School',
+      'Leighton Park School', 'Lewes Old Grammar School', 'Loretto School', 'Lord Wandsworth College',
+      'Loughborough Grammar School', 'Magdalen College School', 'Malvern College',
+      'Manchester Grammar School', 'Marlborough College', 'Merchant Taylors\' School',
+      'Mill Hill School', 'Millfield School', 'Monkton Combe School', 'Moreton Hall',
+      'New College School', 'New Hall School', 'Newcastle School for Boys',
+      'Newcastle-under-Lyme School', 'Nottingham High School', 'Oakham School',
+      'Oundle School', 'Pangbourne College', 'Pate\'s Grammar School', 'Pembroke School',
+      'Perse School', 'Peter Symonds College', 'Plymouth College', 'Portsmouth Grammar School',
+      'Purcell School', 'Putney High School', 'Queen Elizabeth\'s Grammar School',
+      'Queen Elizabeth\'s School', 'Queen Mary\'s Grammar School', 'Queen\'s College',
+      'Radley College', 'Ratcliffe College', 'Reed\'s School', 'Reigate Grammar School',
+      'Rendcomb College', 'Ripon Grammar School', 'Roedean School', 'Royal Grammar School Guildford',
+      'Royal Grammar School Newcastle', 'Royal Hospital School', 'Royal Masonic School',
+      'Rugby School', 'Ruthin School', 'Saint Olave\'s Grammar School', 'Salesian College',
+      'Sevenoaks School', 'Shebbear College', 'Sherborne School', 'Sherborne School for Girls',
+      'Shrewsbury School', 'Sir John Deane\'s College', 'Sir Roger Manwood\'s School',
+      'Solihull School', 'St Albans School', 'St Bede\'s College', 'St Catherine\'s School',
+      'St Dunstan\'s College', 'St Edward\'s School', 'St George\'s School', 'St Helen\'s School',
+      'St Joseph\'s College', 'St Margaret\'s School', 'St Mary\'s School Ascot',
+      'St Paul\'s School', 'St Peter\'s School', 'St Swithun\'s School', 'Stockport Grammar School',
+      'Sutton Grammar School', 'Sutton Valence School', 'Tettenhall College',
+      'The King\'s School Grantham', 'The Manchester Grammar School', 'The Perse School',
+      'Tonbridge School', 'Trent College', 'Trinity School', 'Truro School',
+      'Uppingham School', 'Wallington County Grammar School', 'Warwick School',
+      'Watford Grammar School for Boys', 'Watford Grammar School for Girls',
+      'Wellington College', 'Wellington School', 'Westminster School', 'Whitgift School',
+      'Wilmington Grammar School', 'Wilson\'s School', 'Winchester College',
+      'Wolverhampton Grammar School', 'Worth School', 'Wycombe Abbey', 'Wymondham College',
+      'York College', 'Other School'
+    ].sort();
+
+    function togglePassword() {
+      const passwordInput = document.getElementById('password');
+      const toggleBtn = document.querySelector('.password-toggle');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleBtn.textContent = 'Hide Password';
+      } else {
+        passwordInput.type = 'password';
+        toggleBtn.textContent = 'Show Password';
+      }
+    }
+
+    // School autocomplete functionality
+    function setupSchoolAutocomplete() {
+      const schoolInput = document.getElementById('school');
+      const schoolDropdown = document.getElementById('schoolDropdown');
+
+      schoolInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm.length === 0) {
+          schoolDropdown.classList.remove('show');
+          return;
+        }
+
+        const filteredSchools = schools.filter(school => 
+          school.toLowerCase().includes(searchTerm)
+        );
+
+        if (filteredSchools.length > 0) {
+          schoolDropdown.innerHTML = filteredSchools.slice(0, 10).map(school => 
+            `<div class="school-option" onclick="selectSchool('${school.replace(/'/g, "\\'")}')">${school}</div>`
+          ).join('');
+          schoolDropdown.classList.add('show');
+        } else {
+          schoolDropdown.classList.remove('show');
+        }
+      });
+
+      schoolInput.addEventListener('focus', function() {
+        if (this.value.length > 0) {
+          const searchTerm = this.value.toLowerCase().trim();
+          const filteredSchools = schools.filter(school => 
+            school.toLowerCase().includes(searchTerm)
+          );
+          if (filteredSchools.length > 0) {
+            schoolDropdown.innerHTML = filteredSchools.slice(0, 10).map(school => 
+              `<div class="school-option" onclick="selectSchool('${school.replace(/'/g, "\\'")}')">${school}</div>`
+            ).join('');
+            schoolDropdown.classList.add('show');
+          }
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.school-wrapper')) {
+          schoolDropdown.classList.remove('show');
+        }
+      });
+    }
+
+    function selectSchool(school) {
+      document.getElementById('school').value = school;
+      document.getElementById('schoolDropdown').classList.remove('show');
+    }
+
     // Check for saved login credentials on page load
     window.addEventListener('DOMContentLoaded', function() {
+      // Setup school autocomplete
+      setupSchoolAutocomplete();
+      
       const savedUsername = localStorage.getItem('savedUsername');
       const savedPassword = localStorage.getItem('savedPassword');
       
       if (savedUsername && savedPassword) {
         // Update title to "Switch Account"
         document.getElementById('loginTitle').textContent = 'Switch Account';
+        // Update button text
+        document.getElementById('submitBtn').textContent = 'Switch Account';
         
         // Auto-fill the form
         document.getElementById('username').value = savedUsername;
@@ -155,6 +363,7 @@
     async function handleAutoLogin(username, password, productName, productPrice, stripeLink) {
       try {
         // Store login info in sessionStorage for payment page
+        sessionStorage.setItem('school', ''); // No school info on auto-login
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
         sessionStorage.setItem('productName', productName);
@@ -178,6 +387,7 @@
       submitBtn.textContent = 'Processing...';
       errorDiv.style.display = 'none';
       
+      const school = document.getElementById('school').value;
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       
@@ -192,24 +402,38 @@
         errorDiv.textContent = 'Please enter both username and password.';
         errorDiv.style.display = 'block';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Continue to Payment';
+        submitBtn.textContent = 'Continue to Login';
         return;
       }
 
+      // Store previous username BEFORE saving new one (for new login detection)
+      const previousUsername = localStorage.getItem('savedUsername');
+      if (previousUsername) {
+        sessionStorage.setItem('previousUsername', previousUsername);
+      }
+      
+      // Save login credentials to localStorage for future visits (ALWAYS save, even if no product selected)
+      localStorage.setItem('savedUsername', username);
+      localStorage.setItem('savedPassword', password);
+
+      // Product info is optional - if missing, redirect to homepage to select a product
       if (!productName || !productPrice || !stripeLink) {
-        errorDiv.textContent = 'Product information missing. Please go back and try again.';
-        errorDiv.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Continue to Payment';
+        // If no product selected, redirect to homepage (but credentials are already saved)
+        if (confirm('Please select a product first. Would you like to go back to the homepage?')) {
+          window.location.href = 'index.html';
+        } else {
+          errorDiv.textContent = 'Please select a product from the homepage first.';
+          errorDiv.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Continue to Login';
+        }
         return;
       }
 
       try {
-        // Save login credentials to localStorage for future visits
-        localStorage.setItem('savedUsername', username);
-        localStorage.setItem('savedPassword', password);
         
         // Store login info in sessionStorage for payment page (email sent after payment)
+        sessionStorage.setItem('school', school);
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
         sessionStorage.setItem('productName', productName);
@@ -225,7 +449,7 @@
         errorDiv.textContent = 'Something went wrong. Please try again.';
         errorDiv.style.display = 'block';
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Continue to Payment';
+        submitBtn.textContent = 'Continue to Login';
       }
     }
   </script>

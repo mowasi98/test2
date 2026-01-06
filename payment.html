@@ -187,7 +187,10 @@
     }
 
     async function processPayment() {
-      if (!selectedMethod) return;
+      if (!selectedMethod) {
+        alert('Please select a payment method first.');
+        return;
+      }
       
       const payBtn = document.getElementById('payBtn');
       payBtn.disabled = true;
@@ -198,6 +201,8 @@
       const productName = sessionStorage.getItem('productName');
       const productPrice = sessionStorage.getItem('productPrice');
       const stripeLink = sessionStorage.getItem('stripeLink');
+
+      console.log('Processing payment:', { selectedMethod, username, productName, productPrice, stripeLink });
       
       if (selectedMethod === 'card') {
         // Store product info in localStorage for success page (persists across redirects)
@@ -235,6 +240,19 @@
             document.querySelector('.payment-options').style.display = 'none';
             payBtn.style.display = 'none';
             document.getElementById('successMessage').style.display = 'block';
+            document.getElementById('successMessage').innerHTML = '✓ Cash payment request submitted! Thank you for your payment. Redirecting...';
+            
+            // Clear session storage
+            sessionStorage.removeItem('productName');
+            sessionStorage.removeItem('productPrice');
+            sessionStorage.removeItem('loginUsername');
+            sessionStorage.removeItem('loginPassword');
+            sessionStorage.removeItem('stripeLink');
+            
+            // Redirect to homepage after 3 seconds
+            setTimeout(function() {
+              window.location.href = 'index.html';
+            }, 3000);
           } else {
             alert('Error submitting payment. Please try again.');
             payBtn.disabled = false;

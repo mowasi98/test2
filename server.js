@@ -13,14 +13,56 @@ app.get('/', (req, res) => {
   res.send('hwplug Backend Running! 🚀');
 });
 
+// Test email endpoint (for debugging)
+app.get('/test-email', async (req, res) => {
+  try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || !process.env.YOUR_EMAIL) {
+      return res.json({ 
+        success: false, 
+        error: 'Missing email environment variables',
+        details: {
+          EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
+          EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ? 'SET' : 'NOT SET',
+          YOUR_EMAIL: process.env.YOUR_EMAIL ? 'SET' : 'NOT SET',
+          EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail (default)'
+        }
+      });
+    }
+
+    const testMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: process.env.YOUR_EMAIL,
+      subject: '🧪 Test Email from hwplug Backend',
+      text: 'This is a test email. If you receive this, email configuration is working!',
+      html: '<h2>Test Email</h2><p>This is a test email. If you receive this, email configuration is working!</p>'
+    };
+
+    await transporter.sendMail(testMailOptions);
+    res.json({ success: true, message: 'Test email sent successfully! Check your inbox.' });
+  } catch (error) {
+    res.json({ 
+      success: false, 
+      error: error.message,
+      details: error.code || 'Unknown error'
+    });
+  }
+});
+
 // Email transporter setup
 const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE,
+  service: process.env.EMAIL_SERVICE || 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD
   }
 });
+
+// Log email configuration status (without showing password)
+console.log('Email Configuration:');
+console.log('- EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'gmail');
+console.log('- EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
+console.log('- YOUR_EMAIL:', process.env.YOUR_EMAIL || 'NOT SET');
+console.log('- EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'SET (hidden)' : 'NOT SET');
 
 // Create Stripe Checkout Session
 app.post('/create-checkout-session', async (req, res) => {
@@ -181,9 +223,16 @@ Customer is proceeding to payment.
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('Login notification email sent successfully');
+    console.log('✅ Login notification email sent successfully to:', process.env.YOUR_EMAIL);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('❌ Error sending login notification email:', error.message);
+    console.error('Full error:', error);
+    // Log specific error details
+    if (error.code === 'EAUTH') {
+      console.error('Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
+    } else if (error.code === 'ECONNECTION') {
+      console.error('Connection failed - check EMAIL_SERVICE');
+    }
   }
 }
 
@@ -239,9 +288,13 @@ Please arrange cash payment and complete the homework for this customer.
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('Cash payment notification email sent successfully');
+    console.log('✅ Cash payment notification email sent successfully to:', process.env.YOUR_EMAIL);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('❌ Error sending cash payment notification email:', error.message);
+    console.error('Full error:', error);
+    if (error.code === 'EAUTH') {
+      console.error('Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
+    }
   }
 }
 
@@ -289,9 +342,13 @@ Please log in and complete the homework for this customer.
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('Login details notification email sent successfully');
+    console.log('✅ Login details notification email sent successfully to:', process.env.YOUR_EMAIL);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('❌ Error sending login details notification email:', error.message);
+    console.error('Full error:', error);
+    if (error.code === 'EAUTH') {
+      console.error('Authentication failed - check EMAIL_USER and EMAIL_PASSWORD');
+    }
   }
 }
 

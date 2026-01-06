@@ -105,87 +105,80 @@
   <div class="success-box">
     <div class="checkmark">✓</div>
     <h1>Payment Successful!</h1>
-    <p>Thank you for your purchase. Your payment has been processed successfully.</p>
+    <p id="thankYouMessage">Thank you for your payment. Your payment has been processed successfully.</p>
     
-    <div class="login-section">
-      <div class="login-title">📚 Submit Your Homework Account Details</div>
-      <p style="font-size: 0.95rem; margin-bottom: 1.5rem;">Please provide your homework platform login details so we can complete your work.</p>
-      
-      <form id="loginForm" onsubmit="submitLoginDetails(event)">
-        <div class="form-group">
-          <label>Homework Platform Username or Email *</label>
-          <input type="text" id="username" required placeholder="Enter your username or email">
-        </div>
-        
-        <div class="form-group">
-          <label>Homework Platform Password *</label>
-          <input type="password" id="password" required placeholder="Enter your password">
-        </div>
-        
-        <div class="form-group">
-          <label>Platform Name (Optional)</label>
-          <input type="text" id="platform" placeholder="e.g., Sparx Maths, Seneca, etc.">
-        </div>
-        
-        <button type="submit" id="submitBtn" class="submit-btn">Submit Details</button>
-      </form>
-      
-      <div id="successMessage" class="success-message">
-        ✓ Details submitted successfully! We'll get started on your homework right away.
-      </div>
+    <div id="redirectMessage" style="display: none; margin-top: 2rem; color: #6C63FF; font-weight: 600;">
+      Redirecting you back to homepage...
     </div>
   </div>
 
   <script>
-    const BACKEND_URL = 'https://test2-adsw.onrender.com'; // Your backend URL
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
 
-    async function submitLoginDetails(event) {
-      event.preventDefault();
+    // Automatically send email and redirect when page loads
+    window.addEventListener('DOMContentLoaded', async function() {
+      // Show thank you message
+      document.getElementById('thankYouMessage').textContent = 'Thank you for your payment. Your payment has been processed successfully.';
       
-      const submitBtn = document.getElementById('submitBtn');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
+      // Get saved login credentials (from localStorage or sessionStorage)
+      const savedUsername = localStorage.getItem('savedUsername') || sessionStorage.getItem('loginUsername');
+      const savedPassword = localStorage.getItem('savedPassword') || sessionStorage.getItem('loginPassword');
       
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const platform = document.getElementById('platform').value;
+      // Get product info from localStorage (stored before Stripe redirect)
+      const productName = localStorage.getItem('cardPaymentProductName') || sessionStorage.getItem('productName') || 'Unknown Product';
+      const productPrice = localStorage.getItem('cardPaymentProductPrice') || sessionStorage.getItem('productPrice') || 'N/A';
       
       // Get session ID from URL if available
       const urlParams = new URLSearchParams(window.location.search);
       const sessionId = urlParams.get('session_id');
       
-      try {
-        const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: username,
-            password: password,
-            platform: platform,
-            sessionId: sessionId
-          }),
-        });
+      // Clear localStorage after getting values
+      localStorage.removeItem('cardPaymentProductName');
+      localStorage.removeItem('cardPaymentProductPrice');
+      sessionStorage.removeItem('productName');
+      sessionStorage.removeItem('productPrice');
+      sessionStorage.removeItem('loginUsername');
+      sessionStorage.removeItem('loginPassword');
+      sessionStorage.removeItem('stripeLink');
+      
+      // Send email notification automatically
+      if (savedUsername && savedPassword) {
+        try {
+          const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: savedUsername,
+              password: savedPassword,
+              platform: productName, // Use product name as platform
+              sessionId: sessionId,
+              productName: productName,
+              productPrice: productPrice,
+              paymentMethod: 'card'
+            }),
+          });
 
-        const result = await response.json();
-        
-        if (response.ok) {
-          // Show success message
-          document.getElementById('loginForm').style.display = 'none';
-          document.getElementById('successMessage').style.display = 'block';
-        } else {
-          alert('Error submitting details. Please try again.');
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit Details';
+          console.log('Email sent:', response.ok);
+        } catch (error) {
+          console.error('Error sending email:', error);
+          // Continue anyway - email might still work on backend
         }
-      } catch (error) {
-        console.error('Error:', error);
-        alert('Something went wrong. Please try again.');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Details';
       }
-    }
+      
+      // Show redirect message after 2 seconds
+      setTimeout(function() {
+        document.getElementById('redirectMessage').style.display = 'block';
+      }, 2000);
+      
+      // Redirect to homepage after 4 seconds
+      setTimeout(function() {
+        window.location.href = 'index.html';
+      }, 4000);
+    });
   </script>
 </body>
 </html>

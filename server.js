@@ -19,21 +19,24 @@ const emailPassword = process.env.EMAIL_PASSWORD
   : 'tjalngdhvgkdnyxp'; // Fallback password (remove this in production!)
 
 if (process.env.EMAIL_USER && (process.env.EMAIL_PASSWORD || emailPassword)) {
-  // Use explicit SMTP settings for Gmail (better connection reliability)
+  // Use explicit SMTP settings for Gmail - try port 465 (SSL) first
   transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
+    port: 465,
+    secure: true, // true for 465 (SSL), false for 587 (TLS)
     auth: {
       user: process.env.EMAIL_USER,
       pass: emailPassword
     },
     tls: {
-      rejectUnauthorized: false // For Render hosting compatibility
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
     },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+    connectionTimeout: 20000, // 20 seconds
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
+    debug: false, // Set to true for detailed logs
+    logger: false
   });
 } else {
   console.warn('⚠️ Email transporter not initialized - missing EMAIL_USER or EMAIL_PASSWORD');

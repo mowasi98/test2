@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Payment Successful - officialhwplug</title>
+  <link rel="icon" type="image/png" href="plug-logo.png">
   <style>
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
@@ -99,6 +100,34 @@
       border-radius: 8px;
       margin-top: 1rem;
     }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .success-box {
+        padding: 2rem 1.5rem;
+      }
+      .checkmark {
+        font-size: 3rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      p {
+        font-size: 0.95rem;
+      }
+      .login-title {
+        font-size: 1.1rem;
+      }
+      .form-group input {
+        padding: 0.7rem;
+        font-size: 0.95rem;
+      }
+      .submit-btn {
+        padding: 0.85rem 1.5rem;
+        font-size: 1rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -142,7 +171,15 @@
       
       // Send email notification automatically (MUST send email before clearing storage)
       if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
-        console.log('Sending email with:', { username: savedUsername, productName, previousUsername, reservationId });
+        console.log('💳 CARD PAYMENT SUCCESS - Sending email with:', { 
+          school, 
+          username: savedUsername, 
+          productName, 
+          productPrice,
+          previousUsername, 
+          reservationId,
+          sessionId
+        });
         
         try {
           const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
@@ -164,14 +201,24 @@
             }),
           });
 
-          const result = await response.json();
-          console.log('Email response:', response.status, result);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('💳 Email send error response:', response.status, errorText);
+          } else {
+            const result = await response.json();
+            console.log('✅ Card payment email response:', response.status, result);
+          }
         } catch (error) {
-          console.error('Error sending email:', error);
+          console.error('💳 Error sending card payment email:', error);
           // Continue anyway - email might still work on backend
         }
       } else {
-        console.error('Missing data for email:', { savedUsername: !!savedUsername, savedPassword: !!savedPassword, productName });
+        console.error('❌ Missing data for card payment email:', { 
+          savedUsername: !!savedUsername, 
+          savedPassword: !!savedPassword, 
+          productName,
+          school 
+        });
       }
       
       // Clear storage AFTER sending email (payment completed - don't release slot)

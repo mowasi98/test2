@@ -336,6 +336,48 @@ app.post('/admin/toggle-product-availability', (req, res) => {
   });
 });
 
+// Admin endpoint to set custom slot count for a product
+app.post('/admin/set-slot-count', (req, res) => {
+  const { password, productName, slotCount } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  // Validate slot count
+  const newCount = parseInt(slotCount);
+  if (isNaN(newCount) || newCount < 0) {
+    return res.status(400).json({ error: 'Invalid slot count. Must be a positive number.' });
+  }
+  
+  if (newCount > MAX_PURCHASES_PER_DAY) {
+    return res.status(400).json({ 
+      error: `Slot count cannot exceed maximum (${MAX_PURCHASES_PER_DAY}). Change MAX_PURCHASES_PER_DAY if you need more slots.` 
+    });
+  }
+  
+  const oldCount = dailyLimits[productName].count;
+  dailyLimits[productName].count = newCount;
+  const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - newCount);
+  
+  console.log(`🔧 Admin: Set slot count for "${productName}": ${oldCount} → ${newCount} (${remaining} remaining)`);
+  
+  res.json({
+    success: true,
+    message: `Slot count for ${productName} set to ${newCount}`,
+    product: productName,
+    oldCount: oldCount,
+    newCount: newCount,
+    remaining: remaining,
+    max: MAX_PURCHASES_PER_DAY
+  });
+});
+
 // Admin endpoint to get current counter status
 app.get('/admin/counters-status', (req, res) => {
   resetDailyCountersIfNeeded();
@@ -560,10 +602,16 @@ function confirmReservation(productName) {
 // NEW ENDPOINT: Submit cash payment
 app.post('/submit-cash-payment', async (req, res) => {
   try {
-    const { school, username, password, productName, productPrice, previousUsername } = req.body;
+    console.log('💵 CASH PAYMENT REQUEST RECEIVED');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { school, username, password, productName, productPrice, previousUsername, reservationId } = req.body;
+    
+    console.log('💵 Extracted data:', { school, username, productName, productPrice, previousUsername, reservationId, hasPassword: !!password });
     
     // Validate required fields
     if (!username || !password) {
+      console.error('❌ Missing required fields - username or password');
       return res.status(400).json({ error: 'Username and password are required' });
     }
     
@@ -603,6 +651,7 @@ app.post('/submit-cash-payment', async (req, res) => {
     }
     
     // Send email notification for cash payment (non-blocking)
+    console.log('📧 Attempting to send cash payment email...');
     sendCashPaymentNotification({
       school: school || 'Not provided',
       username,
@@ -612,12 +661,15 @@ app.post('/submit-cash-payment', async (req, res) => {
       remainingSlots: remainingSlots,
       currentCount: currentCount,
       isNewLogin: isNewLogin
+    }).then(() => {
+      console.log('✅ Cash payment email sent successfully');
     }).catch(err => {
       console.error('❌ Error sending cash payment notification email:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
       // Don't fail the request if email fails
     });
 
+    console.log('✅ Cash payment request processed successfully');
     res.json({ success: true, message: 'Cash payment notification sent successfully' });
   } catch (error) {
     console.error('Error submitting cash payment:', error);
@@ -628,10 +680,27 @@ app.post('/submit-cash-payment', async (req, res) => {
 // NEW ENDPOINT: Submit login details after payment
 app.post('/submit-login-details', async (req, res) => {
   try {
+    console.log('💳 CARD PAYMENT - LOGIN DETAILS REQUEST RECEIVED');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
     const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername, reservationId } = req.body;
+    
+    console.log('💳 Extracted data:', { 
+      school, 
+      username, 
+      platform, 
+      sessionId, 
+      productName, 
+      productPrice, 
+      paymentMethod,
+      previousUsername, 
+      reservationId,
+      hasPassword: !!password 
+    });
     
     // Check if this is a new login (different username)
     const isNewLogin = !previousUsername || previousUsername !== username;
+    console.log('💳 Is new login:', isNewLogin);
     
     // Check if product is available
     resetDailyCountersIfNeeded();
@@ -666,6 +735,7 @@ app.post('/submit-login-details', async (req, res) => {
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
+    console.log('📧 Attempting to send card payment email...');
     await sendLoginDetailsNotification({
       school: school || 'Not provided',
       username,
@@ -680,6 +750,8 @@ app.post('/submit-login-details', async (req, res) => {
       isNewLogin: isNewLogin
     });
 
+    console.log('✅ Card payment email sent successfully');
+    console.log('✅ Card payment request processed successfully');
     res.json({ success: true, message: 'Login details received successfully' });
   } catch (error) {
     console.error('Error submitting login details:', error);

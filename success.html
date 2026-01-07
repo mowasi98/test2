@@ -249,6 +249,22 @@
       setTimeout(function() {
         window.location.href = 'index.html';
       }, 4000);
+
+      // Send heartbeat to keep user active in admin panel
+      const heartbeatUsername = localStorage.getItem('savedUsername');
+      const heartbeatSchool = sessionStorage.getItem('selectedSchool');
+      if (heartbeatUsername) {
+        fetch(`${BACKEND_URL}/user/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username: heartbeatUsername,
+            school: heartbeatSchool || 'Not provided'
+          })
+        }).catch(error => {
+          console.error('Heartbeat error:', error);
+        });
+      }
     });
   </script>
 </body>

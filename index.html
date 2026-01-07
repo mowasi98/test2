@@ -635,19 +635,21 @@
     // Intercept buy button clicks to check availability before redirecting
     document.querySelectorAll('.buy-btn').forEach(btn => {
       btn.addEventListener('click', async function(e) {
+        e.preventDefault(); // Always prevent default to handle navigation ourselves
+        
         console.log('🖱️ Buy button clicked:', this.getAttribute('data-product'));
         
         const product = this.getAttribute('data-product');
         const btnElement = this;
+        const originalHref = btnElement.getAttribute('href');
         
         // Check if product is disabled (from availability check)
         if (btnElement.classList.contains('disabled')) {
           console.log('❌ Product is disabled, preventing navigation');
-          e.preventDefault();
           return false;
         }
         
-        // Check availability first (quick check, don't reserve yet)
+        // Check availability first
         try {
           console.log('🔍 Checking availability for:', product);
           const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
@@ -655,7 +657,6 @@
           
           if (!data.available || data.manuallyDisabled) {
             console.log('❌ Product not available:', data);
-            e.preventDefault();
             if (data.manuallyDisabled) {
               alert('⚠️ This product is not available right now. Please try again later.');
             } else {
@@ -664,13 +665,73 @@
             return false;
           }
           
-          console.log('✅ Product available, allowing navigation to login page');
-          // If available, allow normal navigation (let the link work as normal)
-          // Slot will be reserved later in the payment flow
+          // Check if user is already logged in
+          const savedUsername = localStorage.getItem('savedUsername');
+          const savedPassword = localStorage.getItem('savedPassword');
+          const savedSchool = localStorage.getItem('savedSchool') || '';
+          
+          if (savedUsername && savedPassword) {
+            // User is already logged in - skip login page and go directly to payment
+            console.log('✅ User already logged in, skipping login page');
+            
+            // Extract product info from URL
+            const urlParams = new URLSearchParams(originalHref.split('?')[1] || '');
+            const productName = urlParams.get('product') || product;
+            const productPrice = urlParams.get('price') || '';
+            const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
+            
+            // Reserve slot first
+            try {
+              console.log('🔒 Reserving slot for:', productName);
+              const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ productName: productName })
+              });
+              
+              const reservationData = await reservationResponse.json();
+              
+              if (!reservationData.success || !reservationData.reserved) {
+                if (reservationData.manuallyDisabled) {
+                  alert('⚠️ This product is not available right now. Please try again later.');
+                } else {
+                  alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+                }
+                return false;
+              }
+              
+              // Slot reserved! Store everything and go to payment
+              sessionStorage.setItem('school', savedSchool);
+              sessionStorage.setItem('loginUsername', savedUsername);
+              sessionStorage.setItem('loginPassword', savedPassword);
+              sessionStorage.setItem('productName', productName);
+              sessionStorage.setItem('productPrice', productPrice);
+              sessionStorage.setItem('stripeLink', stripeLink);
+              sessionStorage.setItem('slotReserved', 'true');
+              sessionStorage.setItem('reservedProduct', productName);
+              sessionStorage.setItem('reservationId', reservationData.reservationId);
+              
+              // Store previous username for new login detection
+              sessionStorage.setItem('previousUsername', savedUsername);
+              
+              console.log('✅ Redirecting directly to payment page');
+              window.location.href = 'payment.html';
+            } catch (error) {
+              console.error('❌ Error reserving slot:', error);
+              alert('⚠️ Error reserving slot. Please try again.');
+              return false;
+            }
+          } else {
+            // User not logged in - go to login page as usual
+            console.log('ℹ️ User not logged in, going to login page');
+            window.location.href = originalHref;
+          }
         } catch (error) {
           console.error('❌ Error checking availability:', error);
-          console.log('⚠️ Allowing navigation anyway (fail open)');
-          // On error, allow navigation (fail open)
+          // On error, go to login page anyway (fail open)
+          window.location.href = originalHref;
         }
       });
     });

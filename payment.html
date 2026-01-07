@@ -163,6 +163,15 @@
     window.addEventListener('DOMContentLoaded', () => {
       const productName = sessionStorage.getItem('productName');
       const productPrice = sessionStorage.getItem('productPrice');
+      const slotReserved = sessionStorage.getItem('slotReserved');
+      const reservedProduct = sessionStorage.getItem('reservedProduct');
+      
+      // Verify slot was reserved for this product
+      if (!slotReserved || reservedProduct !== productName) {
+        alert('⚠️ No slot reservation found. Please go back and select the product again.');
+        window.location.href = 'index.html';
+        return;
+      }
       
       if (productName) {
         document.getElementById('productName').textContent = productName;
@@ -170,6 +179,29 @@
       if (productPrice) {
         document.getElementById('productPrice').textContent = productPrice;
       }
+      
+      // Store reservation ID for release if needed
+      const reservationId = sessionStorage.getItem('reservationId');
+      
+      // Release reservation if user leaves/abandons the payment page
+      window.addEventListener('beforeunload', function() {
+        if (reservationId && reservedProduct) {
+          // Try to release slot (use fetch with keepalive for reliability)
+          fetch(`${BACKEND_URL}/release-slot`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservationId: reservationId,
+              productName: reservedProduct
+            }),
+            keepalive: true // Keep request alive even if page unloads
+          }).catch(() => {
+            // Ignore errors - page is unloading
+          });
+        }
+      });
     });
 
     function selectPaymentMethod(method) {
@@ -250,14 +282,17 @@
             document.querySelector('.payment-options').style.display = 'none';
             payBtn.style.display = 'none';
             document.getElementById('successMessage').style.display = 'block';
-            document.getElementById('successMessage').innerHTML = '✓ Cash payment request submitted! Thank you for your payment. Redirecting...';
+            document.getElementById('successMessage').innerHTML = '✓ CASH PAYMENT REQUEST SUBMITTED! THANK YOU FOR YOUR PAYMENT. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.';
             
-            // Clear session storage
+            // Clear session storage (don't release slot - payment completed)
             sessionStorage.removeItem('productName');
             sessionStorage.removeItem('productPrice');
             sessionStorage.removeItem('loginUsername');
             sessionStorage.removeItem('loginPassword');
             sessionStorage.removeItem('stripeLink');
+            sessionStorage.removeItem('slotReserved');
+            sessionStorage.removeItem('reservedProduct');
+            sessionStorage.removeItem('reservationId'); // Don't release - payment completed
             
             // Redirect to homepage after 3 seconds
             setTimeout(function() {

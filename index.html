@@ -3,455 +3,677 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - officialhwplug</title>
+  <title>officialhwplug – Your Learning Marketplace</title>
   <style>
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
       background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
+      color: #222;
       margin: 0;
-      padding: 20px;
+      padding: 0;
     }
-    .login-box {
-      background: #fff;
-      padding: 3rem;
-      border-radius: 16px;
+    header {
+      background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%);
+      color: #fff;
+      padding: 2.5rem 0 1.8rem 0;
       text-align: center;
-      max-width: 450px;
-      width: 100%;
-      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+      box-shadow: 0 3px 12px rgba(50,50,150,0.15);
+      position: relative;
+    }
+    .auth-buttons {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .reset-timer-container {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .reset-timer {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 200px;
+    }
+    .reset-timer-label {
+      font-size: 0.75rem;
+      opacity: 0.9;
+      margin-bottom: 0.2rem;
+    }
+    .reset-timer-countdown {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .auth-btn {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .auth-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    @media (max-width: 600px) {
+      .auth-buttons {
+        position: static;
+        justify-content: center;
+        margin-bottom: 1rem;
+      }
+      .reset-timer-container {
+        position: static;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .reset-timer {
+        min-width: 180px;
+      }
     }
     .logo {
-      font-size: 2.5rem;
+      font-size: 3.2rem;
       font-weight: 900;
-      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      margin: 0;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff 30%, #e0e0ff 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 0.5rem;
     }
-    h2 {
-      color: #333;
-      margin: 1rem 0 2rem 0;
-      font-size: 1.5rem;
+    .tagline {
+      font-size: 1.2rem;
+      color: #e8e6ff;
+      margin-top: 0.4rem;
+      font-weight: 400;
     }
-    .form-group {
-      margin-bottom: 1.5rem;
-      text-align: left;
+    .items {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 2.5rem auto;
+      gap: 1.8rem;
+      max-width: 1100px;
+      padding: 0 1rem;
     }
-    .form-group label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: #444;
-      font-size: 0.95rem;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 0.9rem;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 1rem;
-      box-sizing: border-box;
-      transition: border 0.2s;
-    }
-    .form-group input:focus {
-      outline: none;
-      border-color: #6C63FF;
-    }
-    .password-wrapper {
-      position: relative;
-    }
-    .password-toggle {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      color: #6C63FF;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      padding: 0.25rem 0.5rem;
-      transition: color 0.2s;
-    }
-    .password-toggle:hover {
-      color: #5548d9;
-    }
-    .school-wrapper {
-      position: relative;
-    }
-    .school-dropdown {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
+    .item-card {
       background: #fff;
-      border: 2px solid #6C63FF;
-      border-top: none;
-      border-radius: 0 0 8px 8px;
-      max-height: 200px;
-      overflow-y: auto;
-      z-index: 1000;
-      display: none;
-      box-shadow: 0 4px 12px rgba(100,100,250,0.2);
+      border-radius: 16px;
+      box-shadow: 0 3px 20px rgba(100,100,250,0.1);
+      padding: 2rem 1.8rem 1.5rem 1.8rem;
+      text-align: center;
+      width: 240px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      border: 2px solid #f0f0ff;
     }
-    .school-dropdown.show {
-      display: block;
+    .item-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 6px 28px rgba(100,100,250,0.18);
+      border-color: #c8c4ff;
     }
-    .school-option {
-      padding: 0.75rem 1rem;
-      cursor: pointer;
-      transition: background 0.2s;
-      border-bottom: 1px solid #f0f0f0;
+    .item-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 0.6rem;
     }
-    .school-option:hover {
-      background: #f8f9ff;
+    .item-desc {
+      font-size: 0.96rem;
+      color: #555;
+      min-height: 42px;
+      margin-bottom: 1rem;
+      line-height: 1.4;
     }
-    .school-option:last-child {
-      border-bottom: none;
+    .price {
+      color: #6C63FF;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0.8rem 0 1.2rem 0;
     }
-    .submit-btn {
+    .buy-btn {
       background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
-      color: #fff;
-      padding: 1rem 2rem;
+      color: #fff !important;
+      padding: 0.75rem 2rem;
       border: none;
       border-radius: 10px;
-      font-size: 1.1rem;
-      font-weight: 700;
+      font-size: 1.08rem;
+      font-weight: 600;
       cursor: pointer;
-      width: 100%;
-      margin-top: 0.5rem;
       transition: all 0.2s;
       box-shadow: 0 2px 8px rgba(108,99,255,0.25);
+      text-decoration: none;
+      display: inline-block;
+      pointer-events: auto;
+      z-index: 10;
+      position: relative;
     }
-    .submit-btn:hover {
+    .buy-btn:hover {
       background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
       box-shadow: 0 4px 14px rgba(108,99,255,0.35);
       transform: translateY(-2px);
     }
-    .submit-btn:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-      transform: none;
+    .buy-btn:active {
+      transform: scale(0.97);
     }
-    .error-message {
-      display: none;
-      background: #f8d7da;
-      color: #721c24;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
+    .buy-btn:disabled,
+    .buy-btn.disabled {
+      background: #ccc !important;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .slots-message {
+      color: #d9534f;
       font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #f8d7da;
+      border-radius: 6px;
+      border: 1px solid #f5c6cb;
+    }
+    .slots-remaining {
+      color: #6C63FF;
+      font-size: 0.85rem;
+      margin-top: 0.3rem;
+      font-weight: 500;
+    }
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      background: #ececff;
+      color: #777;
+      margin-top: 3.5rem;
+      border-top: 1px solid #e1e1e1;
+      font-size: 0.98rem;
+      position: relative;
+    }
+    .support-section {
+      text-align: left;
+      padding: 1rem 2rem;
+      background: #fff;
+      border-radius: 12px;
+      margin: 0 auto 1rem auto;
+      max-width: 1100px;
+      box-shadow: 0 2px 8px rgba(100,100,250,0.1);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .support-text {
+      flex: 1;
+      font-size: 0.95rem;
+      color: #555;
+    }
+    .support-text strong {
+      color: #6C63FF;
+    }
+    .snapchat-link {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #FFFC00;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, #FFFC00 0%, #FFF700 100%);
+      border-radius: 8px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(255,252,0,0.3);
+    }
+    .snapchat-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(255,252,0,0.4);
+    }
+    .snapchat-link span {
+      color: #000;
+    }
+    .snapchat-icon {
+      font-size: 1.5rem;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+    }
+    @media (max-width: 900px) {
+      .items {
+        flex-direction: column;
+        align-items: center;
+      }
+      .item-card {
+        width: 85vw;
+        max-width: 360px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="login-box">
-    <div class="logo">officialhwplug</div>
-    <h2 id="loginTitle">Login to Continue</h2>
+  <header>
+    <div class="reset-timer-container">
+      <div class="reset-timer">
+        <div class="reset-timer-label">🕐 Slots Reset In:</div>
+        <div class="reset-timer-countdown" id="resetTimer">--:--:--</div>
+      </div>
+    </div>
+    <div class="auth-buttons">
+      <span id="userInfo" style="display: none; color: #fff; padding: 0.5rem 1rem; font-size: 0.9rem;">
+        Logged in as: <strong id="loggedInUser"></strong>
+      </span>
+      <button id="logoutBtn" class="auth-btn" onclick="logout()" style="display: none;">Logout</button>
+      <a href="login.html" class="auth-btn" id="loginBtn">Login</a>
+    </div>
+    <h1 class="logo">officialhwplug</h1>
+    <div class="tagline">Your one-stop shop for learning tools</div>
+  </header>
+
+  <section class="items">
+    <div class="item-card" data-product="Sparx Reader">
+      <div class="item-title">Sparx Reader</div>
+      <div class="item-desc">Improve reading comprehension with interactive tasks</div>
+      <div class="price">&pound;2</div>
+      <div id="slots-Sparx Reader"></div>
+      <a href="login.html?product=Sparx%20Reader&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h" class="buy-btn" data-product="Sparx Reader">Buy Now</a>
+    </div>
     
-    <div id="errorMessage" class="error-message"></div>
+    <div class="item-card" data-product="Sparx Maths">
+      <div class="item-title">Sparx Maths</div>
+      <div class="item-desc">Master maths with adaptive problem sets</div>
+      <div class="price">&pound;2</div>
+      <div id="slots-Sparx Maths"></div>
+      <a href="login.html?product=Sparx%20Maths&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F5kQ00b64c7j7g5IbSMcfK0g" class="buy-btn" data-product="Sparx Maths">Buy Now</a>
+    </div>
     
-    <form id="loginForm" onsubmit="handleLogin(event)">
-      <div class="form-group">
-        <label>What school does your homework need for? *</label>
-        <div class="school-wrapper">
-          <input type="text" id="school" required placeholder="Type to search for your school..." autocomplete="off">
-          <div id="schoolDropdown" class="school-dropdown"></div>
-        </div>
+    <div class="item-card" data-product="Educate">
+      <div class="item-title">Educate</div>
+      <div class="item-desc">Explore science topics with engaging resources</div>
+      <div class="price">&pound;2</div>
+      <div id="slots-Educate"></div>
+      <a href="login.html?product=Educate&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2FfZubITfEM32R6v81e8cfK0i" class="buy-btn" data-product="Educate">Buy Now</a>
+    </div>
+    
+    <div class="item-card" data-product="Seneca">
+      <div class="item-title">Seneca</div>
+      <div class="item-desc">Learn smarter with bite-sized lessons and quizzes</div>
+      <div class="price">&pound;2</div>
+      <div id="slots-Seneca"></div>
+      <a href="login.html?product=Seneca&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F6oUfZ978g1YNcTw6yscfK01" class="buy-btn" data-product="Seneca">Buy Now</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="support-section">
+      <div class="support-text">
+        <strong>Need Support?</strong> Contact us on Snapchat
       </div>
-      
-      <div class="form-group">
-        <label>Username or Email *</label>
-        <input type="text" id="username" required placeholder="Enter your username or email" autocomplete="username">
-      </div>
-      
-      <div class="form-group">
-        <label>Password *</label>
-        <div class="password-wrapper">
-          <input type="password" id="password" required placeholder="Enter your password" autocomplete="current-password" style="padding-right: 100px;">
-          <button type="button" class="password-toggle" onclick="togglePassword()">Show Password</button>
-        </div>
-      </div>
-      
-      <button type="submit" id="submitBtn" class="submit-btn">Continue to Login</button>
-    </form>
-  </div>
+      <a href="https://snapchat.com/add/mo_wasi98" target="_blank" class="snapchat-link" rel="noopener noreferrer">
+        <span class="snapchat-icon">👻</span>
+        <span>mo_wasi98</span>
+      </a>
+    </div>
+    <div>
+      &copy; 2025 officialhwplug – All rights reserved
+    </div>
+  </footer>
 
   <script>
-    // Auto-detect backend URL (use localhost for local testing, or set your production URL)
     const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
       ? 'http://localhost:10000' 
       : 'https://test2-adsw.onrender.com';
 
-    // Comprehensive list of UK schools (including all Chingford schools)
-    const schools = [
-      // Chingford Schools
-      'Chingford Foundation School', 'Chingford CofE Primary School', 'Chingford Hall Primary School',
-      'Highams Park School', 'Rush Croft Sports College', 'Chingford Mount Primary School',
-      'Larkswood Primary Academy', 'Whitehall Primary School', 'Normandy Primary School',
-      'Handsworth Primary School', 'Yardley Primary School', 'Chingford St Mary\'s CofE Primary School',
-      'Newton\'s Primary School', 'Chingford Green Primary School', 'Ainslie Wood Primary School',
-      'Woodford Green Primary School', 'Oakhill Primary School', 'Coppermill Primary School',
-      'Chingford All Saints CofE Primary School', 'Chingford St John\'s CofE Primary School',
-      'South Chingford Foundation School', 'Chingford Endowed Foundation School',
-      'Heathcote School & Science College',
-      // Rest of UK Schools
-      'Abbey College', 'Abbots Bromley School', 'Abingdon School', 'Academy of St Francis of Assisi',
-      'Adams Grammar School', 'Aldenham School', 'Alleyn\'s School', 'Altrincham Grammar School for Girls',
-      'Ampleforth College', 'Ashford School', 'Bablake School', 'Badminton School', 'Bancroft\'s School',
-      'Barnard Castle School', 'Bedales School', 'Bedford School', 'Berkhamsted School',
-      'Birkdale School', 'Birmingham King Edward VI High School', 'Bishop\'s Stortford College',
-      'Bishop\'s Wordsworth\'s School', 'Blackpool Sixth Form College', 'Blundell\'s School',
-      'Bolton School', 'Bradfield College', 'Bradford Grammar School', 'Brighton College',
-      'Bristol Grammar School', 'Bromsgrove School', 'Bryanston School', 'Canford School',
-      'Cardiff High School', 'Caterham School', 'Charterhouse', 'Cheltenham College',
-      'Cheltenham Ladies\' College', 'Chigwell School', 'Chislehurst and Sidcup Grammar School',
-      'Christ\'s Hospital', 'City of London School', 'City of London School for Girls',
-      'Clifton College', 'Clifton High School', 'Coopers\' Company and Coborn School',
-      'Cranbrook School', 'Cranleigh School', 'Dame Alice Owen\'s School', 'Dauntsey\'s School',
-      'Dartford Grammar School', 'Dartmouth Academy', 'Dean Close School', 'Dulwich College',
-      'Durham School', 'Eastbourne College', 'Eaton Square School', 'Edgbaston High School',
-      'Emanuel School', 'Epsom College', 'Eton College', 'Exeter School', 'Fettes College',
-      'Forest School', 'Framlingham College', 'Francis Holland School', 'Garden House School',
-      'Giggleswick School', 'Godolphin and Latymer School', 'Guildford High School',
-      'Haberdashers\' Aske\'s Boys\' School', 'Haberdashers\' Aske\'s School for Girls',
-      'Hampton School', 'Harrow School', 'Haileybury', 'Harrogate Ladies\' College',
-      'Hereford Cathedral School', 'Highgate School', 'Hills Road Sixth Form College',
-      'Hulme Grammar School', 'Hurstpierpoint College', 'Hymers College', 'Immanuel College',
-      'James Allen\'s Girls\' School', 'Judd School', 'Kelly College', 'Kent College',
-      'King Edward\'s School Birmingham', 'King Edward VI Camp Hill School for Boys',
-      'King Edward VI Camp Hill School for Girls', 'King\'s College School', 'King\'s School Canterbury',
-      'King\'s School Chester', 'King\'s School Ely', 'King\'s School Rochester',
-      'Kingswood School', 'Lady Eleanor Holles School', 'Latymer School', 'Leeds Grammar School',
-      'Leighton Park School', 'Lewes Old Grammar School', 'Loretto School', 'Lord Wandsworth College',
-      'Loughborough Grammar School', 'Magdalen College School', 'Malvern College',
-      'Manchester Grammar School', 'Marlborough College', 'Merchant Taylors\' School',
-      'Mill Hill School', 'Millfield School', 'Monkton Combe School', 'Moreton Hall',
-      'New College School', 'New Hall School', 'Newcastle School for Boys',
-      'Newcastle-under-Lyme School', 'Nottingham High School', 'Oakham School',
-      'Oundle School', 'Pangbourne College', 'Pate\'s Grammar School', 'Pembroke School',
-      'Perse School', 'Peter Symonds College', 'Plymouth College', 'Portsmouth Grammar School',
-      'Purcell School', 'Putney High School', 'Queen Elizabeth\'s Grammar School',
-      'Queen Elizabeth\'s School', 'Queen Mary\'s Grammar School', 'Queen\'s College',
-      'Radley College', 'Ratcliffe College', 'Reed\'s School', 'Reigate Grammar School',
-      'Rendcomb College', 'Ripon Grammar School', 'Roedean School', 'Royal Grammar School Guildford',
-      'Royal Grammar School Newcastle', 'Royal Hospital School', 'Royal Masonic School',
-      'Rugby School', 'Ruthin School', 'Saint Olave\'s Grammar School', 'Salesian College',
-      'Sevenoaks School', 'Shebbear College', 'Sherborne School', 'Sherborne School for Girls',
-      'Shrewsbury School', 'Sir John Deane\'s College', 'Sir Roger Manwood\'s School',
-      'Solihull School', 'St Albans School', 'St Bede\'s College', 'St Catherine\'s School',
-      'St Dunstan\'s College', 'St Edward\'s School', 'St George\'s School', 'St Helen\'s School',
-      'St Joseph\'s College', 'St Margaret\'s School', 'St Mary\'s School Ascot',
-      'St Paul\'s School', 'St Peter\'s School', 'St Swithun\'s School', 'Stockport Grammar School',
-      'Sutton Grammar School', 'Sutton Valence School', 'Tettenhall College',
-      'The King\'s School Grantham', 'The Manchester Grammar School', 'The Perse School',
-      'Tonbridge School', 'Trent College', 'Trinity School', 'Truro School',
-      'Uppingham School', 'Wallington County Grammar School', 'Warwick School',
-      'Watford Grammar School for Boys', 'Watford Grammar School for Girls',
-      'Wellington College', 'Wellington School', 'Westminster School', 'Whitgift School',
-      'Wilmington Grammar School', 'Wilson\'s School', 'Winchester College',
-      'Wolverhampton Grammar School', 'Worth School', 'Wycombe Abbey', 'Wymondham College',
-      'York College', 'Other School'
-    ].sort();
+    const products = ['Sparx Reader', 'Sparx Maths', 'Educate', 'Seneca'];
 
-    function togglePassword() {
-      const passwordInput = document.getElementById('password');
-      const toggleBtn = document.querySelector('.password-toggle');
+    // Store the timer reset time from server
+    let serverResetTime = null;
+    let serverCurrentTime = Date.now();
+    
+    // Fetch timer reset time from server
+    async function fetchTimerResetTime() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/timer-reset-time`);
+        const data = await response.json();
+        if (data.success) {
+          const oldResetTime = serverResetTime;
+          serverResetTime = data.resetTime;
+          serverCurrentTime = data.currentTime;
+          
+          // If reset time changed, update immediately
+          if (oldResetTime !== null && oldResetTime !== serverResetTime) {
+            console.log('⏰ Timer reset detected! Updating display immediately...');
+            previousResetTime = serverResetTime;
+            updateResetTimer(); // Force immediate update
+          } else if (oldResetTime === null) {
+            // First time loading
+            previousResetTime = serverResetTime;
+            console.log('Timer reset time synced from server:', new Date(serverResetTime).toLocaleString());
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching timer reset time:', error);
+        // Fallback to midnight calculation
+        serverResetTime = null;
+        previousResetTime = null;
+      }
+    }
+    
+    // Calculate time until next reset (24 hours from server reset time, or midnight)
+    function getTimeUntilReset() {
+      let targetTime;
       
-      if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleBtn.textContent = 'Hide Password';
+      if (serverResetTime) {
+        // Calculate 24 hours from server reset time
+        const elapsed = Date.now() - serverResetTime;
+        const timeSinceReset = elapsed % (24 * 60 * 60 * 1000); // Modulo 24 hours
+        const timeUntilNextReset = (24 * 60 * 60 * 1000) - timeSinceReset;
+        targetTime = Date.now() + timeUntilNextReset;
       } else {
-        passwordInput.type = 'password';
-        toggleBtn.textContent = 'Show Password';
+        // Fallback: calculate to midnight
+        const now = new Date();
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0);
+        targetTime = midnight.getTime();
+      }
+      
+      const now = Date.now();
+      const diff = targetTime - now;
+      
+      // If diff is negative or very small, reset is happening now
+      if (diff <= 0) {
+        // Force refresh timer reset time
+        fetchTimerResetTime();
+        return {
+          hours: '23',
+          minutes: '59',
+          seconds: '59',
+          total: 24 * 60 * 60 * 1000 - 1000
+        };
+      }
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      return {
+        hours: hours.toString().padStart(2, '0'),
+        minutes: minutes.toString().padStart(2, '0'),
+        seconds: seconds.toString().padStart(2, '0'),
+        total: diff
+      };
+    }
+    
+    // Store previous reset time to detect changes
+    let previousResetTime = null;
+    
+    // Update countdown timer
+    function updateResetTimer() {
+      // Check if reset time changed (admin reset timer)
+      if (serverResetTime !== null && previousResetTime !== null && serverResetTime !== previousResetTime) {
+        console.log('⏰ Timer reset detected! Refreshing...');
+        previousResetTime = serverResetTime;
+      }
+      
+      const time = getTimeUntilReset();
+      const timerElement = document.getElementById('resetTimer');
+      
+      if (timerElement) {
+        // If timer reached 0 or negative, reset slots
+        if (time.total <= 0) {
+          timerElement.textContent = '00:00:00';
+          // Automatically reset slots when timer reaches 0
+          resetSlotsAutomatically();
+          // Fetch new reset time from server
+          fetchTimerResetTime().then(() => {
+            const newTime = getTimeUntilReset();
+            timerElement.textContent = `${newTime.hours}:${newTime.minutes}:${newTime.seconds}`;
+          });
+        } else {
+          timerElement.textContent = `${time.hours}:${time.minutes}:${time.seconds}`;
+          
+          // If less than 1 hour remaining, make it more prominent
+          if (time.total < 3600000) {
+            timerElement.style.color = '#ffd700';
+            timerElement.style.animation = 'pulse 2s infinite';
+          } else {
+            timerElement.style.color = '';
+            timerElement.style.animation = '';
+          }
+        }
+      }
+    }
+    
+    // Automatically reset slots when timer reaches midnight
+    async function resetSlotsAutomatically() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/auto-reset-slots`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        const data = await response.json();
+        if (data.success) {
+          console.log('✅ Slots automatically reset at midnight');
+          // Refresh availability display
+          checkAvailability();
+        }
+      } catch (error) {
+        console.error('Error auto-resetting slots:', error);
+      }
+    }
+    
+    // Update timer every second
+    updateResetTimer();
+    setInterval(updateResetTimer, 1000);
+
+    // Check if user is logged in and update UI
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('✅ Homepage loaded - index.html');
+      
+      // Make absolutely sure we're staying on the homepage - no redirects
+      if (window.location.pathname.includes('login.html')) {
+        console.warn('⚠️ Somehow ended up on login.html - redirecting back to homepage');
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      const savedUsername = localStorage.getItem('savedUsername');
+      if (savedUsername) {
+        document.getElementById('userInfo').style.display = 'inline-block';
+        document.getElementById('loggedInUser').textContent = savedUsername;
+        document.getElementById('logoutBtn').style.display = 'inline-block';
+        document.getElementById('loginBtn').textContent = 'Switch Account';
+      }
+      
+      // Fetch timer reset time from server and start countdown timer
+      fetchTimerResetTime().then(() => {
+        updateResetTimer();
+        // Update timer every second
+        setInterval(updateResetTimer, 1000);
+      });
+      
+      // Re-fetch timer reset time every 5 seconds to stay in sync (especially after admin resets)
+      setInterval(fetchTimerResetTime, 5000);
+    });
+
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('savedUsername');
+        localStorage.removeItem('savedPassword');
+        sessionStorage.clear();
+        window.location.reload();
       }
     }
 
-    // School autocomplete functionality
-    function setupSchoolAutocomplete() {
-      const schoolInput = document.getElementById('school');
-      const schoolDropdown = document.getElementById('schoolDropdown');
-
-      schoolInput.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase().trim();
-        
-        if (searchTerm.length === 0) {
-          schoolDropdown.classList.remove('show');
-          return;
-        }
-
-        const filteredSchools = schools.filter(school => 
-          school.toLowerCase().includes(searchTerm)
-        );
-
-        if (filteredSchools.length > 0) {
-          schoolDropdown.innerHTML = filteredSchools.slice(0, 10).map(school => 
-            `<div class="school-option" onclick="selectSchool('${school.replace(/'/g, "\\'")}')">${school}</div>`
-          ).join('');
-          schoolDropdown.classList.add('show');
-        } else {
-          schoolDropdown.classList.remove('show');
-        }
-      });
-
-      schoolInput.addEventListener('focus', function() {
-        if (this.value.length > 0) {
-          const searchTerm = this.value.toLowerCase().trim();
-          const filteredSchools = schools.filter(school => 
-            school.toLowerCase().includes(searchTerm)
-          );
-          if (filteredSchools.length > 0) {
-            schoolDropdown.innerHTML = filteredSchools.slice(0, 10).map(school => 
-              `<div class="school-option" onclick="selectSchool('${school.replace(/'/g, "\\'")}')">${school}</div>`
-            ).join('');
-            schoolDropdown.classList.add('show');
-          }
-        }
-      });
-
-      // Close dropdown when clicking outside
-      document.addEventListener('click', function(event) {
-        if (!event.target.closest('.school-wrapper')) {
-          schoolDropdown.classList.remove('show');
-        }
-      });
-    }
-
-    function selectSchool(school) {
-      document.getElementById('school').value = school;
-      document.getElementById('schoolDropdown').classList.remove('show');
-    }
-
-    // Check for saved login credentials on page load
+    // Release slot reservation if user returns to homepage without completing payment
     window.addEventListener('DOMContentLoaded', function() {
-      // Setup school autocomplete
-      setupSchoolAutocomplete();
+      const reservationId = sessionStorage.getItem('reservationId');
+      const reservedProduct = sessionStorage.getItem('reservedProduct');
+      const slotReserved = sessionStorage.getItem('slotReserved');
       
-      const savedUsername = localStorage.getItem('savedUsername');
-      const savedPassword = localStorage.getItem('savedPassword');
-      
-      if (savedUsername && savedPassword) {
-        // Update title to "Switch Account"
-        document.getElementById('loginTitle').textContent = 'Switch Account';
-        // Update button text
-        document.getElementById('submitBtn').textContent = 'Switch Account';
-        
-        // Auto-fill the form
-        document.getElementById('username').value = savedUsername;
-        document.getElementById('password').value = savedPassword;
-        
-        // Get product info from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const productName = urlParams.get('product');
-        const productPrice = urlParams.get('price');
-        const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
-        
-        // If product info exists, auto-submit (skip login page)
-        if (productName && productPrice && stripeLink) {
-          // Auto-login and proceed
-          handleAutoLogin(savedUsername, savedPassword, productName, productPrice, stripeLink);
-        }
+      // If there's an active reservation and user is back on homepage, release it
+      if (reservationId && reservedProduct && slotReserved) {
+        // User abandoned the payment process - release the slot
+        fetch(`${BACKEND_URL}/release-slot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: reservationId,
+            productName: reservedProduct
+          })
+        }).then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              console.log('🔓 Slot released due to return to homepage');
+            }
+            // Clear reservation data
+            sessionStorage.removeItem('slotReserved');
+            sessionStorage.removeItem('reservedProduct');
+            sessionStorage.removeItem('reservationId');
+            // Refresh availability display
+            checkAvailability();
+          })
+          .catch(error => {
+            console.error('Error releasing slot:', error);
+            // Clear anyway
+            sessionStorage.removeItem('slotReserved');
+            sessionStorage.removeItem('reservedProduct');
+            sessionStorage.removeItem('reservationId');
+          });
       }
     });
 
-    async function handleAutoLogin(username, password, productName, productPrice, stripeLink) {
-      try {
-        // Store login info in sessionStorage for payment page
-        sessionStorage.setItem('school', ''); // No school info on auto-login
-        sessionStorage.setItem('loginUsername', username);
-        sessionStorage.setItem('loginPassword', password);
-        sessionStorage.setItem('productName', productName);
-        sessionStorage.setItem('productPrice', productPrice);
-        sessionStorage.setItem('stripeLink', stripeLink);
-        
-        // Redirect to payment selection page
-        window.location.href = 'payment.html';
-      } catch (error) {
-        console.error('Auto-login error:', error);
-        // If auto-login fails, just let them use the form
-      }
-    }
-
-    async function handleLogin(event) {
-      event.preventDefault();
-      
-      const submitBtn = document.getElementById('submitBtn');
-      const errorDiv = document.getElementById('errorMessage');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Processing...';
-      errorDiv.style.display = 'none';
-      
-      const school = document.getElementById('school').value;
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      
-      // Get product info from URL params
-      const urlParams = new URLSearchParams(window.location.search);
-      const productName = urlParams.get('product');
-      const productPrice = urlParams.get('price');
-      const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
-      
-      // Validate inputs
-      if (!username || !password) {
-        errorDiv.textContent = 'Please enter both username and password.';
-        errorDiv.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Continue to Login';
-        return;
-      }
-
-      // Store previous username BEFORE saving new one (for new login detection)
-      const previousUsername = localStorage.getItem('savedUsername');
-      if (previousUsername) {
-        sessionStorage.setItem('previousUsername', previousUsername);
-      }
-      
-      // Save login credentials to localStorage for future visits (ALWAYS save, even if no product selected)
-      localStorage.setItem('savedUsername', username);
-      localStorage.setItem('savedPassword', password);
-
-      // Product info is optional - if missing, redirect to homepage to select a product
-      if (!productName || !productPrice || !stripeLink) {
-        // If no product selected, redirect to homepage (but credentials are already saved)
-        if (confirm('Please select a product first. Would you like to go back to the homepage?')) {
-          window.location.href = 'index.html';
-        } else {
-          errorDiv.textContent = 'Please select a product from the homepage first.';
-          errorDiv.style.display = 'block';
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Continue to Login';
+    // Check availability for all products on page load
+    async function checkAvailability() {
+      for (const product of products) {
+        try {
+          const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
+          const data = await response.json();
+          
+          const buyBtn = document.querySelector(`.buy-btn[data-product="${product}"]`);
+          const slotsDiv = document.getElementById(`slots-${product}`);
+          
+          // Only update if button is not currently disabled due to reservation in progress
+          if (buyBtn && !buyBtn.hasAttribute('data-reserving')) {
+            if (data.manuallyDisabled) {
+              // Product manually disabled
+              buyBtn.classList.add('disabled');
+              buyBtn.style.pointerEvents = 'none';
+              buyBtn.onclick = function(e) {
+                e.preventDefault();
+                return false;
+              };
+              slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
+            } else if (data.available) {
+              // Product is available
+              buyBtn.classList.remove('disabled');
+              buyBtn.style.pointerEvents = 'auto';
+              // Highlight if only 1 slot remaining - only ONE person can reserve it
+              if (data.remaining === 1) {
+                slotsDiv.innerHTML = `<div class="slots-remaining" style="color: #ff6b6b; font-weight: 700; animation: pulse 2s infinite;">⚠️ Only 1 slot remaining today!</div>`;
+              } else {
+                slotsDiv.innerHTML = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
+              }
+            } else {
+              // Slots finished
+              buyBtn.classList.add('disabled');
+              buyBtn.style.pointerEvents = 'none';
+              buyBtn.onclick = function(e) {
+                e.preventDefault();
+                return false;
+              };
+              slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
+            }
+          }
+        } catch (error) {
+          console.error(`Error checking availability for ${product}:`, error);
+          // On error, show error but keep button enabled
+          const buyBtn = document.querySelector(`.buy-btn[data-product="${product}"]`);
+          const slotsDiv = document.getElementById(`slots-${product}`);
+          if (slotsDiv) {
+            slotsDiv.innerHTML = `<div class="slots-message" style="color: #d9534f;">⚠️ Cannot connect to backend. Check console for details.</div>`;
+          }
+          // Keep button enabled on error (fail open)
+          if (buyBtn) {
+            buyBtn.classList.remove('disabled');
+            buyBtn.style.pointerEvents = 'auto';
+          }
+          console.error('Backend URL:', BACKEND_URL);
+          console.error('Full error:', error);
+          console.error('Try checking if backend is running at:', BACKEND_URL);
         }
-        return;
-      }
-
-      try {
-        
-        // Store login info in sessionStorage for payment page (email sent after payment)
-        sessionStorage.setItem('school', school);
-        sessionStorage.setItem('loginUsername', username);
-        sessionStorage.setItem('loginPassword', password);
-        sessionStorage.setItem('productName', productName);
-        sessionStorage.setItem('productPrice', productPrice);
-        sessionStorage.setItem('stripeLink', stripeLink);
-        
-        console.log('Stored data:', { productName, productPrice, stripeLink });
-        
-        // Redirect to payment selection page
-        window.location.href = 'payment.html';
-      } catch (error) {
-        console.error('Error:', error);
-        errorDiv.textContent = 'Something went wrong. Please try again.';
-        errorDiv.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Continue to Login';
       }
     }
+
+    // Check availability when page loads
+    window.addEventListener('DOMContentLoaded', checkAvailability);
+    
+    // Auto-refresh slot availability every 5 seconds (no page reload needed)
+    setInterval(checkAvailability, 5000);
+
+    // Intercept buy button clicks to check availability before redirecting
+    document.querySelectorAll('.buy-btn').forEach(btn => {
+      btn.addEventListener('click', async function(e) {
+        console.log('🖱️ Buy button clicked:', this.getAttribute('data-product'));
+        
+        const product = this.getAttribute('data-product');
+        const btnElement = this;
+        
+        // Check if product is disabled (from availability check)
+        if (btnElement.classList.contains('disabled')) {
+          console.log('❌ Product is disabled, preventing navigation');
+          e.preventDefault();
+          return false;
+        }
+        
+        // Check availability first (quick check, don't reserve yet)
+        try {
+          console.log('🔍 Checking availability for:', product);
+          const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
+          const data = await response.json();
+          
+          if (!data.available || data.manuallyDisabled) {
+            console.log('❌ Product not available:', data);
+            e.preventDefault();
+            if (data.manuallyDisabled) {
+              alert('⚠️ This product is not available right now. Please try again later.');
+            } else {
+              alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+            }
+            return false;
+          }
+          
+          console.log('✅ Product available, allowing navigation to login page');
+          // If available, allow normal navigation (let the link work as normal)
+          // Slot will be reserved later in the payment flow
+        } catch (error) {
+          console.error('❌ Error checking availability:', error);
+          console.log('⚠️ Allowing navigation anyway (fail open)');
+          // On error, allow navigation (fail open)
+        }
+      });
+    });
   </script>
 </body>
 </html>

@@ -25,6 +25,9 @@ const activeReservations = {};
 // Store the last timer reset time (for frontend to sync) - Initialize with current time
 let lastTimerResetTime = Date.now();
 
+// Track all login history
+const loginHistory = [];
+
   // Clean up expired reservations (run every minute)
 setInterval(() => {
   const now = Date.now();
@@ -426,6 +429,25 @@ app.get('/admin/timer-reset-time', (req, res) => {
   });
 });
 
+// Admin endpoint to get login history
+app.post('/admin/login-history', (req, res) => {
+  const { password } = req.body;
+  
+  // Check admin password
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid admin password' });
+  }
+  
+  // Return login history (sorted by most recent first)
+  const sortedHistory = [...loginHistory].reverse();
+  
+  res.json({
+    success: true,
+    loginHistory: sortedHistory,
+    totalLogins: loginHistory.length
+  });
+});
+
 // Endpoint for automatic slot reset at midnight (called by frontend)
 app.post('/admin/auto-reset-slots', (req, res) => {
   // This is called automatically when timer reaches 0
@@ -669,6 +691,18 @@ app.post('/submit-cash-payment', async (req, res) => {
       // Don't fail the request if email fails
     });
 
+    // Track login history
+    loginHistory.push({
+      username,
+      school: school || 'Not provided',
+      productName: productName || 'Unknown',
+      productPrice: productPrice || 'Unknown',
+      paymentMethod: 'Cash',
+      timestamp: new Date().toISOString(),
+      isNewLogin
+    });
+    console.log(`📊 Login tracked: ${username} (Total logins: ${loginHistory.length})`);
+
     console.log('✅ Cash payment request processed successfully');
     res.json({ success: true, message: 'Cash payment notification sent successfully' });
   } catch (error) {
@@ -749,6 +783,18 @@ app.post('/submit-login-details', async (req, res) => {
       currentCount: currentCount,
       isNewLogin: isNewLogin
     });
+
+    // Track login history
+    loginHistory.push({
+      username,
+      school: school || 'Not provided',
+      productName: productName || 'Unknown',
+      productPrice: productPrice || 'Unknown',
+      paymentMethod: 'Card',
+      timestamp: new Date().toISOString(),
+      isNewLogin
+    });
+    console.log(`📊 Login tracked: ${username} (Total logins: ${loginHistory.length})`);
 
     console.log('✅ Card payment email sent successfully');
     console.log('✅ Card payment request processed successfully');

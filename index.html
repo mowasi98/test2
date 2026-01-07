@@ -26,6 +26,42 @@
       right: 1rem;
       display: flex;
       gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .reset-timer-container {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .reset-timer {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 200px;
+    }
+    .reset-timer-label {
+      font-size: 0.75rem;
+      opacity: 0.9;
+      margin-bottom: 0.2rem;
+    }
+    .reset-timer-countdown {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
     .auth-btn {
       background: rgba(255, 255, 255, 0.2);
@@ -49,6 +85,14 @@
         position: static;
         justify-content: center;
         margin-bottom: 1rem;
+      }
+      .reset-timer-container {
+        position: static;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .reset-timer {
+        min-width: 180px;
       }
     }
     .logo {
@@ -226,6 +270,12 @@
 </head>
 <body>
   <header>
+    <div class="reset-timer-container">
+      <div class="reset-timer">
+        <div class="reset-timer-label">🕐 Slots Reset In:</div>
+        <div class="reset-timer-countdown" id="resetTimer">--:--:--</div>
+      </div>
+    </div>
     <div class="auth-buttons">
       <span id="userInfo" style="display: none; color: #fff; padding: 0.5rem 1rem; font-size: 0.9rem;">
         Logged in as: <strong id="loggedInUser"></strong>
@@ -293,6 +343,148 @@
 
     const products = ['Sparx Reader', 'Sparx Maths', 'Educate', 'Seneca'];
 
+    // Store the timer reset time from server
+    let serverResetTime = null;
+    let serverCurrentTime = Date.now();
+    
+    // Fetch timer reset time from server
+    async function fetchTimerResetTime() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/timer-reset-time`);
+        const data = await response.json();
+        if (data.success) {
+          const oldResetTime = serverResetTime;
+          serverResetTime = data.resetTime;
+          serverCurrentTime = data.currentTime;
+          
+          // If reset time changed, update immediately
+          if (oldResetTime !== null && oldResetTime !== serverResetTime) {
+            console.log('⏰ Timer reset detected! Updating display immediately...');
+            previousResetTime = serverResetTime;
+            updateResetTimer(); // Force immediate update
+          } else if (oldResetTime === null) {
+            // First time loading
+            previousResetTime = serverResetTime;
+            console.log('Timer reset time synced from server:', new Date(serverResetTime).toLocaleString());
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching timer reset time:', error);
+        // Fallback to midnight calculation
+        serverResetTime = null;
+        previousResetTime = null;
+      }
+    }
+    
+    // Calculate time until next reset (24 hours from server reset time, or midnight)
+    function getTimeUntilReset() {
+      let targetTime;
+      
+      if (serverResetTime) {
+        // Calculate 24 hours from server reset time
+        const elapsed = Date.now() - serverResetTime;
+        const timeSinceReset = elapsed % (24 * 60 * 60 * 1000); // Modulo 24 hours
+        const timeUntilNextReset = (24 * 60 * 60 * 1000) - timeSinceReset;
+        targetTime = Date.now() + timeUntilNextReset;
+      } else {
+        // Fallback: calculate to midnight
+        const now = new Date();
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0);
+        targetTime = midnight.getTime();
+      }
+      
+      const now = Date.now();
+      const diff = targetTime - now;
+      
+      // If diff is negative or very small, reset is happening now
+      if (diff <= 0) {
+        // Force refresh timer reset time
+        fetchTimerResetTime();
+        return {
+          hours: '23',
+          minutes: '59',
+          seconds: '59',
+          total: 24 * 60 * 60 * 1000 - 1000
+        };
+      }
+      
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      return {
+        hours: hours.toString().padStart(2, '0'),
+        minutes: minutes.toString().padStart(2, '0'),
+        seconds: seconds.toString().padStart(2, '0'),
+        total: diff
+      };
+    }
+    
+    // Store previous reset time to detect changes
+    let previousResetTime = null;
+    
+    // Update countdown timer
+    function updateResetTimer() {
+      // Check if reset time changed (admin reset timer)
+      if (serverResetTime !== null && previousResetTime !== null && serverResetTime !== previousResetTime) {
+        console.log('⏰ Timer reset detected! Refreshing...');
+        previousResetTime = serverResetTime;
+      }
+      
+      const time = getTimeUntilReset();
+      const timerElement = document.getElementById('resetTimer');
+      
+      if (timerElement) {
+        // If timer reached 0 or negative, reset slots
+        if (time.total <= 0) {
+          timerElement.textContent = '00:00:00';
+          // Automatically reset slots when timer reaches 0
+          resetSlotsAutomatically();
+          // Fetch new reset time from server
+          fetchTimerResetTime().then(() => {
+            const newTime = getTimeUntilReset();
+            timerElement.textContent = `${newTime.hours}:${newTime.minutes}:${newTime.seconds}`;
+          });
+        } else {
+          timerElement.textContent = `${time.hours}:${time.minutes}:${time.seconds}`;
+          
+          // If less than 1 hour remaining, make it more prominent
+          if (time.total < 3600000) {
+            timerElement.style.color = '#ffd700';
+            timerElement.style.animation = 'pulse 2s infinite';
+          } else {
+            timerElement.style.color = '';
+            timerElement.style.animation = '';
+          }
+        }
+      }
+    }
+    
+    // Automatically reset slots when timer reaches midnight
+    async function resetSlotsAutomatically() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/auto-reset-slots`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        const data = await response.json();
+        if (data.success) {
+          console.log('✅ Slots automatically reset at midnight');
+          // Refresh availability display
+          checkAvailability();
+        }
+      } catch (error) {
+        console.error('Error auto-resetting slots:', error);
+      }
+    }
+    
+    // Update timer every second
+    updateResetTimer();
+    setInterval(updateResetTimer, 1000);
+
     // Check if user is logged in and update UI
     window.addEventListener('DOMContentLoaded', function() {
       const savedUsername = localStorage.getItem('savedUsername');
@@ -302,6 +494,16 @@
         document.getElementById('logoutBtn').style.display = 'inline-block';
         document.getElementById('loginBtn').textContent = 'Switch Account';
       }
+      
+      // Fetch timer reset time from server and start countdown timer
+      fetchTimerResetTime().then(() => {
+        updateResetTimer();
+        // Update timer every second
+        setInterval(updateResetTimer, 1000);
+      });
+      
+      // Re-fetch timer reset time every 5 seconds to stay in sync (especially after admin resets)
+      setInterval(fetchTimerResetTime, 5000);
     });
 
     function logout() {
@@ -363,29 +565,37 @@
           const buyBtn = document.querySelector(`.buy-btn[data-product="${product}"]`);
           const slotsDiv = document.getElementById(`slots-${product}`);
           
-          if (data.manuallyDisabled) {
-            // Product manually disabled
-            buyBtn.classList.add('disabled');
-            buyBtn.style.pointerEvents = 'none';
-            buyBtn.onclick = function(e) {
-              e.preventDefault();
-              return false;
-            };
-            slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
-          } else if (data.available) {
-            // Product is available
-            buyBtn.classList.remove('disabled');
-            buyBtn.style.pointerEvents = 'auto';
-            slotsDiv.innerHTML = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
-          } else {
-            // Slots finished
-            buyBtn.classList.add('disabled');
-            buyBtn.style.pointerEvents = 'none';
-            buyBtn.onclick = function(e) {
-              e.preventDefault();
-              return false;
-            };
-            slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
+          // Only update if button is not currently disabled due to reservation in progress
+          if (buyBtn && !buyBtn.hasAttribute('data-reserving')) {
+            if (data.manuallyDisabled) {
+              // Product manually disabled
+              buyBtn.classList.add('disabled');
+              buyBtn.style.pointerEvents = 'none';
+              buyBtn.onclick = function(e) {
+                e.preventDefault();
+                return false;
+              };
+              slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
+            } else if (data.available) {
+              // Product is available
+              buyBtn.classList.remove('disabled');
+              buyBtn.style.pointerEvents = 'auto';
+              // Highlight if only 1 slot remaining - only ONE person can reserve it
+              if (data.remaining === 1) {
+                slotsDiv.innerHTML = `<div class="slots-remaining" style="color: #ff6b6b; font-weight: 700; animation: pulse 2s infinite;">⚠️ Only 1 slot remaining today!</div>`;
+              } else {
+                slotsDiv.innerHTML = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
+              }
+            } else {
+              // Slots finished
+              buyBtn.classList.add('disabled');
+              buyBtn.style.pointerEvents = 'none';
+              buyBtn.onclick = function(e) {
+                e.preventDefault();
+                return false;
+              };
+              slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
+            }
           }
         } catch (error) {
           console.error(`Error checking availability for ${product}:`, error);
@@ -396,6 +606,9 @@
 
     // Check availability when page loads
     window.addEventListener('DOMContentLoaded', checkAvailability);
+    
+    // Auto-refresh slot availability every 5 seconds (no page reload needed)
+    setInterval(checkAvailability, 5000);
 
     // Intercept buy button clicks to RESERVE slot immediately (prevents race condition)
     document.querySelectorAll('.buy-btn').forEach(btn => {
@@ -404,12 +617,15 @@
         const product = this.getAttribute('data-product');
         const btnElement = this;
         
-        // Disable button to prevent double-clicking
+        // Disable button IMMEDIATELY to prevent double-clicking or multiple simultaneous requests
         btnElement.disabled = true;
+        btnElement.style.pointerEvents = 'none';
+        btnElement.setAttribute('data-reserving', 'true'); // Mark as reserving to prevent auto-refresh from interfering
         btnElement.textContent = 'Reserving slot...';
         
         try {
           // ATOMICALLY reserve a slot (check and increment in one operation)
+          // This ensures only ONE person can get the last slot, even if multiple people click simultaneously
           const response = await fetch(`${BACKEND_URL}/reserve-slot`, {
             method: 'POST',
             headers: {
@@ -426,24 +642,34 @@
             sessionStorage.setItem('reservedProduct', product);
             sessionStorage.setItem('reservationId', data.reservationId);
             
+            // If this was the last slot, show a message
+            if (data.wasLastSlot) {
+              console.log('⚠️ Last slot reserved!');
+            }
+            
             // Now proceed to login page with product info
             const url = btnElement.getAttribute('href');
             window.location.href = url;
           } else {
             // Slot reservation failed - slots are full or product unavailable
+            // This happens if someone else got the last slot first
             btnElement.disabled = false;
+            btnElement.style.pointerEvents = 'auto';
+            btnElement.removeAttribute('data-reserving'); // Allow auto-refresh again
             btnElement.textContent = 'Buy Now';
             
             if (data.manuallyDisabled) {
               alert('⚠️ This product is not available right now. Please try again later.');
             } else {
-              alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+              alert('⚠️ Slots are finished for today for this product. Someone else may have just reserved the last slot. Please try again tomorrow.');
             }
             checkAvailability(); // Refresh status to show updated slot count
           }
         } catch (error) {
           console.error('Error reserving slot:', error);
           btnElement.disabled = false;
+          btnElement.style.pointerEvents = 'auto';
+          btnElement.removeAttribute('data-reserving'); // Allow auto-refresh again
           btnElement.textContent = 'Buy Now';
           alert('⚠️ Error reserving slot. Please try again.');
           checkAvailability(); // Refresh status

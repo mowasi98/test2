@@ -17,6 +17,26 @@ const dailyLimits = {
 };
 
 const MAX_PURCHASES_PER_DAY = 3;
+const RESERVATION_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+// Track active reservations: { reservationId: { productName, timestamp } }
+const activeReservations = {};
+
+// Clean up expired reservations (run every minute)
+setInterval(() => {
+  const now = Date.now();
+  Object.keys(activeReservations).forEach(reservationId => {
+    const reservation = activeReservations[reservationId];
+    if (now - reservation.timestamp > RESERVATION_TIMEOUT) {
+      // Release expired reservation
+      if (dailyLimits[reservation.productName] && dailyLimits[reservation.productName].count > 0) {
+        dailyLimits[reservation.productName].count--;
+        console.log(`⏰ Expired reservation released for "${reservation.productName}" (ID: ${reservationId})`);
+      }
+      delete activeReservations[reservationId];
+    }
+  });
+}, 60000); // Check every minute
 
 // Reset counters if it's a new day
 function resetDailyCountersIfNeeded() {
@@ -64,7 +84,113 @@ app.get('/check-product-availability', (req, res) => {
   });
 });
 
-// Increment product purchase count
+// Reserve a slot (atomically check and increment) - prevents race conditions
+app.post('/reserve-slot', (req, res) => {
+  resetDailyCountersIfNeeded();
+  const { productName } = req.body;
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ success: false, error: 'Product not found' });
+  }
+  
+  const product = dailyLimits[productName];
+  
+  // Check if product is manually disabled
+  if (!product.available) {
+    return res.json({ 
+      success: false, 
+      error: 'Product is not available right now',
+      manuallyDisabled: true
+    });
+  }
+  
+  // Atomic check and increment (prevents race condition)
+  if (product.count >= MAX_PURCHASES_PER_DAY) {
+    return res.json({ 
+      success: false, 
+      error: 'Slots are finished for today',
+      remaining: 0,
+      count: product.count
+    });
+  }
+  
+  // Reserve the slot by incrementing immediately
+  product.count++;
+  const remaining = MAX_PURCHASES_PER_DAY - product.count;
+  
+  // Create reservation ID and track it
+  const reservationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  activeReservations[reservationId] = {
+    productName: productName,
+    timestamp: Date.now()
+  };
+  
+  console.log(`🔒 Slot RESERVED for "${productName}": ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining) - Reservation ID: ${reservationId}`);
+  
+  res.json({
+    success: true,
+    reserved: true,
+    reservationId: reservationId,
+    count: product.count,
+    remaining: remaining,
+    max: MAX_PURCHASES_PER_DAY
+  });
+});
+
+// Release a reserved slot (if user abandons payment)
+app.post('/release-slot', (req, res) => {
+  resetDailyCountersIfNeeded();
+  const { reservationId, productName } = req.body;
+  
+  if (!reservationId || !productName) {
+    return res.status(400).json({ success: false, error: 'Reservation ID and product name required' });
+  }
+  
+  // Check if reservation exists
+  if (!activeReservations[reservationId]) {
+    return res.json({ 
+      success: false, 
+      error: 'Reservation not found or already released',
+      message: 'Slot may have already been released or expired'
+    });
+  }
+  
+  const reservation = activeReservations[reservationId];
+  
+  // Verify product matches
+  if (reservation.productName !== productName) {
+    return res.status(400).json({ success: false, error: 'Product name mismatch' });
+  }
+  
+  // Release the slot by decrementing
+  if (dailyLimits[productName] && dailyLimits[productName].count > 0) {
+    dailyLimits[productName].count--;
+    const remaining = MAX_PURCHASES_PER_DAY - dailyLimits[productName].count;
+    
+    // Remove reservation
+    delete activeReservations[reservationId];
+    
+    console.log(`🔓 Slot RELEASED for "${productName}": ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining) - Reservation ID: ${reservationId}`);
+    
+    res.json({
+      success: true,
+      released: true,
+      count: dailyLimits[productName].count,
+      remaining: remaining,
+      max: MAX_PURCHASES_PER_DAY
+    });
+  } else {
+    // Already released or count is 0
+    delete activeReservations[reservationId];
+    res.json({
+      success: false,
+      error: 'Slot was already released',
+      count: dailyLimits[productName] ? dailyLimits[productName].count : 0
+    });
+  }
+});
+
+// Increment product purchase count (kept for backward compatibility)
 app.post('/increment-product-count', (req, res) => {
   resetDailyCountersIfNeeded();
   const { productName } = req.body;
@@ -325,6 +451,17 @@ app.post('/submit-card-payment', async (req, res) => {
   }
 });
 
+// Helper function to confirm reservation (remove from active reservations)
+function confirmReservation(productName) {
+  // Find and remove any active reservations for this product
+  Object.keys(activeReservations).forEach(reservationId => {
+    if (activeReservations[reservationId].productName === productName) {
+      delete activeReservations[reservationId];
+      console.log(`✅ Reservation CONFIRMED (payment completed) for "${productName}" - Reservation ID: ${reservationId}`);
+    }
+  });
+}
+
 // NEW ENDPOINT: Submit cash payment
 app.post('/submit-cash-payment', async (req, res) => {
   try {
@@ -344,12 +481,16 @@ app.post('/submit-cash-payment', async (req, res) => {
       return res.status(400).json({ error: 'Product is not available right now' });
     }
     
-    // Increment purchase count for this product
+    // Slot was already reserved when user clicked "Buy Now", so we just need to verify and get status
     let remainingSlots = 0;
+    let currentCount = 0;
     if (productName && dailyLimits[productName]) {
-      dailyLimits[productName].count++;
-      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - dailyLimits[productName].count);
-      console.log(`✅ Product "${productName}" purchase count: ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      currentCount = dailyLimits[productName].count;
+      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      
+      // Confirm reservation - payment completed, remove from active reservations
+      confirmReservation(productName);
     }
     
     // Send email notification for cash payment (non-blocking)
@@ -360,7 +501,7 @@ app.post('/submit-cash-payment', async (req, res) => {
       productName,
       productPrice,
       remainingSlots: remainingSlots,
-      currentCount: productName && dailyLimits[productName] ? dailyLimits[productName].count : 0,
+      currentCount: currentCount,
       isNewLogin: isNewLogin
     }).catch(err => {
       console.error('❌ Error sending cash payment notification email:', err);
@@ -389,14 +530,16 @@ app.post('/submit-login-details', async (req, res) => {
       return res.status(400).json({ error: 'Product is not available right now' });
     }
     
-    // Increment purchase count for this product
+    // Slot was already reserved when user clicked "Buy Now", so we just need to verify and get status
     let remainingSlots = 0;
     let currentCount = 0;
     if (productName && dailyLimits[productName]) {
-      dailyLimits[productName].count++;
       currentCount = dailyLimits[productName].count;
       remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
-      console.log(`✅ Product "${productName}" purchase count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      
+      // Confirm reservation - payment completed, remove from active reservations
+      confirmReservation(productName);
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)

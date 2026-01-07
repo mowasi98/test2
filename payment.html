@@ -158,6 +158,7 @@
       ? 'http://localhost:10000' 
       : 'https://test2-adsw.onrender.com';
     let selectedMethod = null;
+    let isProceedingToStripe = false; // Flag to track if user is going to Stripe (don't release slot)
 
     // Load product info from sessionStorage
     window.addEventListener('DOMContentLoaded', () => {
@@ -183,9 +184,16 @@
       // Store reservation ID for release if needed
       const reservationId = sessionStorage.getItem('reservationId');
       
-      // Release reservation if user leaves/abandons the payment page
+      // Release reservation ONLY if user leaves/abandons the payment page (not going to Stripe)
       window.addEventListener('beforeunload', function() {
+        // Don't release if user is proceeding to Stripe (card payment)
+        if (isProceedingToStripe) {
+          console.log('✅ Proceeding to Stripe - keeping slot reservation');
+          return;
+        }
+        
         if (reservationId && reservedProduct) {
+          console.log('⚠️ User leaving payment page - releasing slot reservation');
           // Try to release slot (use fetch with keepalive for reliability)
           fetch(`${BACKEND_URL}/release-slot`, {
             method: 'POST',
@@ -241,6 +249,13 @@
       console.log('Processing payment:', { selectedMethod, username, productName, productPrice, stripeLink });
       
       if (selectedMethod === 'card') {
+        // Get reservation ID (stored when slot was reserved)
+        const reservationId = sessionStorage.getItem('reservationId');
+        
+        // Set flag to prevent slot release when navigating to Stripe
+        isProceedingToStripe = true;
+        console.log('✅ Setting flag: proceeding to Stripe - slot will NOT be released');
+        
         // Store product info in localStorage for success page (persists across redirects)
         localStorage.setItem('cardPaymentProductName', productName);
         localStorage.setItem('cardPaymentProductPrice', productPrice);
@@ -248,11 +263,17 @@
         localStorage.setItem('cardPaymentUsername', username || ''); // Save username
         localStorage.setItem('cardPaymentPassword', password || ''); // Save password
         localStorage.setItem('cardPaymentPreviousUsername', previousUsername || ''); // Save previous username
+        localStorage.setItem('cardPaymentReservationId', reservationId || ''); // Save reservation ID
         
         // Redirect to Stripe payment (email will be sent after payment is confirmed)
         if (stripeLink && stripeLink.startsWith('http')) {
-          window.location.href = stripeLink;
+          // Small delay to ensure flag is set and localStorage is saved before navigation
+          setTimeout(() => {
+            window.location.href = stripeLink;
+          }, 50);
         } else {
+          // Reset flag if redirect fails
+          isProceedingToStripe = false;
           alert('Payment link not available. Please go back and try again.');
           payBtn.disabled = false;
           payBtn.textContent = 'Continue to Payment';
@@ -271,7 +292,8 @@
               password: password,
               productName: productName,
               productPrice: productPrice,
-              previousUsername: previousUsername
+              previousUsername: previousUsername,
+              reservationId: sessionStorage.getItem('reservationId') || '' // Pass reservation ID
             }),
           });
 

@@ -28,6 +28,10 @@ let lastTimerResetTime = Date.now();
 // Track all login history
 const loginHistory = [];
 
+// Track active sessions: { username: { lastActive: timestamp, school: '' } }
+const activeSessions = {};
+const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes of inactivity = offline
+
   // Clean up expired reservations (run every minute)
 setInterval(() => {
   const now = Date.now();
@@ -45,6 +49,19 @@ setInterval(() => {
         console.log(`⏰ Expired reservation for "${reservation.productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
       }
       delete activeReservations[reservationId];
+    }
+  });
+}, 60000); // Check every minute
+
+// Clean up inactive sessions (run every minute)
+setInterval(() => {
+  const now = Date.now();
+  Object.keys(activeSessions).forEach(username => {
+    const session = activeSessions[username];
+    const inactiveTime = now - session.lastActive;
+    if (inactiveTime > SESSION_TIMEOUT) {
+      console.log(`👋 User "${username}" is now inactive (${Math.round(inactiveTime / 60000)} min)`);
+      delete activeSessions[username];
     }
   });
 }, 60000); // Check every minute
@@ -448,6 +465,72 @@ app.post('/admin/login-history', (req, res) => {
   });
 });
 
+// Admin endpoint to get active users
+app.post('/admin/active-users', (req, res) => {
+  const { password } = req.body;
+  
+  // Check admin password
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid admin password' });
+  }
+  
+  // Clean up expired sessions before returning
+  const now = Date.now();
+  Object.keys(activeSessions).forEach(username => {
+    const session = activeSessions[username];
+    if (now - session.lastActive > SESSION_TIMEOUT) {
+      delete activeSessions[username];
+    }
+  });
+  
+  // Convert to array format
+  const activeUsers = Object.keys(activeSessions).map(username => ({
+    username,
+    school: activeSessions[username].school,
+    lastActive: activeSessions[username].lastActive,
+    secondsSinceActive: Math.floor((now - activeSessions[username].lastActive) / 1000)
+  }));
+  
+  res.json({
+    success: true,
+    activeUsers,
+    totalActive: activeUsers.length
+  });
+});
+
+// Heartbeat endpoint - keep user session alive (tracks browsing activity)
+app.post('/user/heartbeat', (req, res) => {
+  const { username, school } = req.body;
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  // Create or update session
+  if (!activeSessions[username]) {
+    console.log(`🟢 User "${username}" is now ONLINE (Total active: ${Object.keys(activeSessions).length + 1})`);
+  }
+  
+  activeSessions[username] = {
+    lastActive: Date.now(),
+    school: school || 'Not provided'
+  };
+  
+  res.json({ success: true });
+});
+
+// Logout endpoint - remove user from active sessions
+app.post('/user/logout', (req, res) => {
+  const { username } = req.body;
+  
+  if (username && activeSessions[username]) {
+    delete activeSessions[username];
+    console.log(`👋 User "${username}" logged out (Total active: ${Object.keys(activeSessions).length})`);
+  }
+  
+  res.json({ success: true });
+});
+
 // Endpoint for automatic slot reset at midnight (called by frontend)
 app.post('/admin/auto-reset-slots', (req, res) => {
   // This is called automatically when timer reaches 0
@@ -703,6 +786,11 @@ app.post('/submit-cash-payment', async (req, res) => {
     });
     console.log(`📊 Login tracked: ${username} (Total logins: ${loginHistory.length})`);
 
+    // Update active session (if exists) - payment completed
+    if (activeSessions[username]) {
+      activeSessions[username].lastActive = Date.now();
+    }
+
     console.log('✅ Cash payment request processed successfully');
     res.json({ success: true, message: 'Cash payment notification sent successfully' });
   } catch (error) {
@@ -795,6 +883,11 @@ app.post('/submit-login-details', async (req, res) => {
       isNewLogin
     });
     console.log(`📊 Login tracked: ${username} (Total logins: ${loginHistory.length})`);
+
+    // Update active session (if exists) - payment completed
+    if (activeSessions[username]) {
+      activeSessions[username].lastActive = Date.now();
+    }
 
     console.log('✅ Card payment email sent successfully');
     console.log('✅ Card payment request processed successfully');

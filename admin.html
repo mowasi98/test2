@@ -213,6 +213,10 @@
         min-height: 52px;
       }
     }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
     .message {
       padding: 1rem;
       border-radius: 8px;
@@ -263,6 +267,18 @@
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
           <button class="btn btn-warning" id="markAllUnavailableBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Mark All as NOT Available</button>
           <button class="btn btn-success" id="markAllAvailableBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Mark All as Available</button>
+        </div>
+      </div>
+
+      <div class="active-users-section" style="margin-top: 2rem;">
+        <h3 style="margin-top: 0; color: #28a745;">🟢 Active Users Browsing Now</h3>
+        <p style="color: #666; margin-bottom: 1rem;">See who is currently online browsing the website (updates every 15 seconds)</p>
+        <button class="btn btn-success" onclick="loadActiveUsers()" style="margin-bottom: 1rem;">Show Who's Online</button>
+        <div id="activeUsersContent" style="display: none;">
+          <div id="activeUsersStats" style="margin-bottom: 1rem; padding: 1rem; background: #d4edda; border-radius: 8px; color: #155724; font-size: 1.1rem;">
+            <strong>👁️ Currently Browsing:</strong> <span id="totalActive" style="font-size: 1.5rem; font-weight: 700;">0</span> users online
+          </div>
+          <div id="activeUsersList"></div>
         </div>
       </div>
 
@@ -685,6 +701,82 @@
         });
       }
     });
+
+    let activeUsersInterval = null;
+
+    async function loadActiveUsers() {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/active-users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('activeUsersContent').style.display = 'block';
+          document.getElementById('totalActive').textContent = data.totalActive;
+          
+          const usersList = document.getElementById('activeUsersList');
+          usersList.innerHTML = '';
+          
+          if (data.activeUsers.length === 0) {
+            usersList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No users currently browsing</p>';
+          } else {
+            data.activeUsers.forEach((user) => {
+              const userItem = document.createElement('div');
+              userItem.style.cssText = 'background: #f8f9fa; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 4px solid #28a745; position: relative;';
+              
+              const timeText = user.secondsSinceActive < 10 ? 'Active now' : 
+                              user.secondsSinceActive < 60 ? `Active ${user.secondsSinceActive}s ago` :
+                              `Active ${Math.floor(user.secondsSinceActive / 60)}m ago`;
+              
+              userItem.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 200px;">
+                    <div style="font-weight: 600; color: #333; font-size: 1.1rem;">
+                      <span style="display: inline-block; width: 10px; height: 10px; background: #28a745; border-radius: 50%; margin-right: 0.5rem; animation: pulse 2s infinite;"></span>
+                      ${user.username}
+                      <span style="background: #28a745; color: #fff; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">ONLINE</span>
+                    </div>
+                    <div style="color: #666; font-size: 0.9rem; margin-top: 0.3rem; margin-left: 1.5rem;">
+                      <strong>School:</strong> ${user.school}
+                    </div>
+                  </div>
+                  <div style="text-align: right; color: #28a745; font-size: 0.9rem; font-weight: 600; white-space: nowrap;">
+                    ${timeText}
+                  </div>
+                </div>
+              `;
+              
+              usersList.appendChild(userItem);
+            });
+          }
+          
+          // Set up auto-refresh every 15 seconds
+          if (!activeUsersInterval) {
+            activeUsersInterval = setInterval(() => {
+              loadActiveUsers();
+            }, 15000);
+          }
+          
+          showMessage('Active users loaded! Auto-refreshing every 15 seconds.', 'success');
+        } else {
+          showMessage(data.error || 'Failed to load active users', 'error');
+        }
+      } catch (error) {
+        console.error('Error loading active users:', error);
+        showMessage('Error loading active users: ' + error.message, 'error');
+      }
+    }
 
     async function loadLoginHistory() {
       const password = document.getElementById('adminPassword').value;

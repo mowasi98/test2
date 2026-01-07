@@ -22,6 +22,9 @@ const RESERVATION_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 // Track active reservations: { reservationId: { productName, timestamp } }
 const activeReservations = {};
 
+// Store the last timer reset time (for frontend to sync) - Initialize with current time
+let lastTimerResetTime = Date.now();
+
 // Clean up expired reservations (run every minute)
 setInterval(() => {
   const now = Date.now();
@@ -104,7 +107,8 @@ app.post('/reserve-slot', (req, res) => {
     });
   }
   
-  // Atomic check and increment (prevents race condition)
+  // ATOMIC check and increment (prevents race condition)
+  // This ensures only ONE person can reserve the last slot, even if multiple requests arrive simultaneously
   if (product.count >= MAX_PURCHASES_PER_DAY) {
     return res.json({ 
       success: false, 
@@ -114,7 +118,8 @@ app.post('/reserve-slot', (req, res) => {
     });
   }
   
-  // Reserve the slot by incrementing immediately
+  // CRITICAL: Increment IMMEDIATELY before any other operation
+  // This atomic operation ensures only one person gets the last slot
   product.count++;
   const remaining = MAX_PURCHASES_PER_DAY - product.count;
   
@@ -125,7 +130,8 @@ app.post('/reserve-slot', (req, res) => {
     timestamp: Date.now()
   };
   
-  console.log(`🔒 Slot RESERVED for "${productName}": ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining) - Reservation ID: ${reservationId}`);
+  const wasLastSlot = remaining === 0;
+  console.log(`🔒 Slot RESERVED for "${productName}": ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining)${wasLastSlot ? ' ⚠️ LAST SLOT!' : ''} - Reservation ID: ${reservationId}`);
   
   res.json({
     success: true,
@@ -133,7 +139,8 @@ app.post('/reserve-slot', (req, res) => {
     reservationId: reservationId,
     count: product.count,
     remaining: remaining,
-    max: MAX_PURCHASES_PER_DAY
+    max: MAX_PURCHASES_PER_DAY,
+    wasLastSlot: wasLastSlot
   });
 });
 
@@ -309,6 +316,67 @@ app.get('/admin/counters-status', (req, res) => {
     success: true,
     counters: dailyLimits,
     maxPerDay: MAX_PURCHASES_PER_DAY
+  });
+});
+
+// Admin endpoint to reset timer only (date) without resetting counts
+// Note: lastTimerResetTime is declared at the top of the file
+app.post('/admin/reset-timer', (req, res) => {
+  const { password } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  // Reset only the date (timer) but keep the counts
+  const today = new Date().toDateString();
+  Object.keys(dailyLimits).forEach(product => {
+    dailyLimits[product].date = today;
+  });
+  
+  // Update the last timer reset time (so frontend can sync)
+  lastTimerResetTime = Date.now();
+  
+  console.log(`⏰ Timer reset at ${new Date().toISOString()} - Counts preserved`);
+  
+  res.json({
+    success: true,
+    message: 'Timer reset successfully (counts preserved)',
+    counters: dailyLimits,
+    resetTime: lastTimerResetTime
+  });
+});
+
+// Endpoint to get timer reset time (for frontend sync)
+app.get('/admin/timer-reset-time', (req, res) => {
+  res.json({
+    success: true,
+    resetTime: lastTimerResetTime,
+    currentTime: Date.now()
+  });
+});
+
+// Endpoint for automatic slot reset at midnight (called by frontend)
+app.post('/admin/auto-reset-slots', (req, res) => {
+  // This is called automatically when timer reaches 0
+  // No password required - it's triggered by the timer logic
+  const today = new Date().toDateString();
+  
+  // Check if date has actually changed (prevent multiple resets)
+  let hasReset = false;
+  Object.keys(dailyLimits).forEach(product => {
+    if (dailyLimits[product].date !== today) {
+      dailyLimits[product].count = 0;
+      dailyLimits[product].date = today;
+      hasReset = true;
+    }
+  });
+  
+  res.json({
+    success: true,
+    message: hasReset ? 'Slots reset automatically at midnight' : 'Slots already reset',
+    counters: dailyLimits
   });
 });
 

@@ -105,7 +105,7 @@
   <div class="success-box">
     <div class="checkmark">✓</div>
     <h1>Payment Successful!</h1>
-    <p id="thankYouMessage">Thank you for your payment. Your payment has been processed successfully.</p>
+    <p id="thankYouMessage">THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.</p>
     
     <div id="redirectMessage" style="display: none; margin-top: 2rem; color: #6C63FF; font-weight: 600;">
       Redirecting you back to homepage...
@@ -120,7 +120,7 @@
     // Automatically send email and redirect when page loads
     window.addEventListener('DOMContentLoaded', async function() {
       // Show thank you message
-      document.getElementById('thankYouMessage').textContent = 'Thank you for your payment. Your payment has been processed successfully.';
+      document.getElementById('thankYouMessage').textContent = 'THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.';
       
       // Get saved login credentials from localStorage (stored before Stripe redirect)
       // These persist across the Stripe redirect
@@ -172,7 +172,7 @@
         console.error('Missing data for email:', { savedUsername: !!savedUsername, savedPassword: !!savedPassword, productName });
       }
       
-      // Clear storage AFTER sending email
+      // Clear storage AFTER sending email (payment completed - don't release slot)
       localStorage.removeItem('cardPaymentProductName');
       localStorage.removeItem('cardPaymentProductPrice');
       localStorage.removeItem('cardPaymentSchool');
@@ -186,6 +186,9 @@
       sessionStorage.removeItem('loginSchool');
       sessionStorage.removeItem('stripeLink');
       sessionStorage.removeItem('previousUsername');
+      sessionStorage.removeItem('slotReserved');
+      sessionStorage.removeItem('reservedProduct');
+      sessionStorage.removeItem('reservationId'); // Payment completed - slot is used
       
       // Show redirect message after 2 seconds
       setTimeout(function() {

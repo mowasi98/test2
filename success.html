@@ -134,6 +134,7 @@
       // Get product info from localStorage (stored before Stripe redirect)
       const productName = localStorage.getItem('cardPaymentProductName') || sessionStorage.getItem('productName') || 'Unknown Product';
       const productPrice = localStorage.getItem('cardPaymentProductPrice') || sessionStorage.getItem('productPrice') || 'N/A';
+      const reservationId = localStorage.getItem('cardPaymentReservationId') || sessionStorage.getItem('reservationId') || '';
       
       // Get session ID from URL if available
       const urlParams = new URLSearchParams(window.location.search);
@@ -141,7 +142,7 @@
       
       // Send email notification automatically (MUST send email before clearing storage)
       if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
-        console.log('Sending email with:', { username: savedUsername, productName, previousUsername });
+        console.log('Sending email with:', { username: savedUsername, productName, previousUsername, reservationId });
         
         try {
           const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
@@ -158,7 +159,8 @@
               productName: productName,
               productPrice: productPrice,
               paymentMethod: 'card',
-              previousUsername: previousUsername
+              previousUsername: previousUsername,
+              reservationId: reservationId // Pass reservation ID
             }),
           });
 
@@ -179,6 +181,7 @@
       localStorage.removeItem('cardPaymentUsername');
       localStorage.removeItem('cardPaymentPassword');
       localStorage.removeItem('cardPaymentPreviousUsername');
+      localStorage.removeItem('cardPaymentReservationId'); // Clear reservation ID
       sessionStorage.removeItem('productName');
       sessionStorage.removeItem('productPrice');
       sessionStorage.removeItem('loginUsername');

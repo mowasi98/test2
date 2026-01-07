@@ -187,7 +187,7 @@
     // Auto-detect backend URL (use localhost for local testing, or set your production URL)
     const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
       ? 'http://localhost:10000' 
-      : 'https://officialhwplug-backend.onrender.com';
+      : 'https://test2-adsw.onrender.com';
 
     // Comprehensive list of UK schools (including all Chingford schools)
     const schools = [
@@ -362,6 +362,27 @@
 
     async function handleAutoLogin(username, password, productName, productPrice, stripeLink) {
       try {
+        // First, reserve a slot for the product (prevents race condition)
+        console.log('🔒 Auto-login: Reserving slot for:', productName);
+        const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ productName: productName })
+        });
+        
+        const reservationData = await reservationResponse.json();
+        
+        if (!reservationData.success || !reservationData.reserved) {
+          console.error('❌ Slot reservation failed:', reservationData);
+          // If slot reservation fails, let user use the form normally
+          return;
+        }
+        
+        // Slot reserved successfully! Store reservation details
+        console.log('✅ Auto-login: Slot reserved:', reservationData.reservationId);
+        
         // Store login info in sessionStorage for payment page
         sessionStorage.setItem('school', ''); // No school info on auto-login
         sessionStorage.setItem('loginUsername', username);
@@ -369,6 +390,9 @@
         sessionStorage.setItem('productName', productName);
         sessionStorage.setItem('productPrice', productPrice);
         sessionStorage.setItem('stripeLink', stripeLink);
+        sessionStorage.setItem('slotReserved', 'true');
+        sessionStorage.setItem('reservedProduct', productName);
+        sessionStorage.setItem('reservationId', reservationData.reservationId);
         
         // Redirect to payment selection page
         window.location.href = 'payment.html';
@@ -431,6 +455,34 @@
       }
 
       try {
+        // First, reserve a slot for the product (prevents race condition)
+        console.log('🔒 Reserving slot for:', productName);
+        const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ productName: productName })
+        });
+        
+        const reservationData = await reservationResponse.json();
+        
+        if (!reservationData.success || !reservationData.reserved) {
+          // Slot reservation failed - slots are full or product unavailable
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Continue to Login';
+          
+          if (reservationData.manuallyDisabled) {
+            errorDiv.textContent = '⚠️ This product is not available right now. Please try again later.';
+          } else {
+            errorDiv.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
+          }
+          errorDiv.style.display = 'block';
+          return;
+        }
+        
+        // Slot reserved successfully! Store reservation details
+        console.log('✅ Slot reserved:', reservationData.reservationId);
         
         // Store login info in sessionStorage for payment page (email sent after payment)
         sessionStorage.setItem('school', school);
@@ -439,8 +491,11 @@
         sessionStorage.setItem('productName', productName);
         sessionStorage.setItem('productPrice', productPrice);
         sessionStorage.setItem('stripeLink', stripeLink);
+        sessionStorage.setItem('slotReserved', 'true');
+        sessionStorage.setItem('reservedProduct', productName);
+        sessionStorage.setItem('reservationId', reservationData.reservationId);
         
-        console.log('Stored data:', { productName, productPrice, stripeLink });
+        console.log('Stored data:', { productName, productPrice, stripeLink, reservationId: reservationData.reservationId });
         
         // Redirect to payment selection page
         window.location.href = 'payment.html';

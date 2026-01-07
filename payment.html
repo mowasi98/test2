@@ -121,6 +121,39 @@
       border-radius: 8px;
       margin-top: 1rem;
     }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .payment-box {
+        padding: 2rem 1.5rem;
+      }
+      .logo {
+        font-size: 2rem;
+      }
+      h2 {
+        font-size: 1.3rem;
+      }
+      .product-info {
+        padding: 1rem;
+      }
+      .price {
+        font-size: 1.5rem;
+      }
+      .payment-option {
+        padding: 1.2rem;
+      }
+      .payment-option-title {
+        font-size: 1rem;
+      }
+      .payment-option-desc {
+        font-size: 0.85rem;
+      }
+      .pay-btn {
+        padding: 0.85rem 1.5rem;
+        font-size: 1rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -281,6 +314,15 @@
       } else if (selectedMethod === 'cash') {
         // Submit cash payment notification
         try {
+          console.log('💵 Submitting cash payment with data:', {
+            school: school,
+            username: username,
+            productName: productName,
+            productPrice: productPrice,
+            previousUsername: previousUsername,
+            reservationId: sessionStorage.getItem('reservationId') || ''
+          });
+          
           const response = await fetch(`${BACKEND_URL}/submit-cash-payment`, {
             method: 'POST',
             headers: {
@@ -297,9 +339,21 @@
             }),
           });
 
-          const result = await response.json();
+          console.log('💵 Response status:', response.status);
           
-          if (response.ok) {
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('💵 Error response:', errorText);
+            alert(`Error: ${errorText}`);
+            payBtn.disabled = false;
+            payBtn.textContent = 'Submit Cash Payment';
+            return;
+          }
+
+          const result = await response.json();
+          console.log('💵 Success response:', result);
+          
+          if (response.ok && result.success) {
             // Show success message
             document.querySelector('.payment-options').style.display = 'none';
             payBtn.style.display = 'none';
@@ -315,19 +369,22 @@
             sessionStorage.removeItem('slotReserved');
             sessionStorage.removeItem('reservedProduct');
             sessionStorage.removeItem('reservationId'); // Don't release - payment completed
+            sessionStorage.removeItem('school'); // Clear school too
+            
+            console.log('✅ Cash payment successful - redirecting to homepage in 3 seconds');
             
             // Redirect to homepage after 3 seconds
             setTimeout(function() {
               window.location.href = 'index.html';
             }, 3000);
           } else {
-            alert('Error submitting payment. Please try again.');
+            alert('Error submitting payment: ' + (result.error || 'Unknown error'));
             payBtn.disabled = false;
             payBtn.textContent = 'Submit Cash Payment';
           }
         } catch (error) {
-          console.error('Error:', error);
-          alert('Something went wrong. Please try again.');
+          console.error('💵 Catch error:', error);
+          alert('Something went wrong: ' + error.message);
           payBtn.disabled = false;
           payBtn.textContent = 'Submit Cash Payment';
         }

@@ -391,6 +391,31 @@
         }
       }
     }
+
+    // Send heartbeat to keep user active in admin panel
+    function sendHeartbeat() {
+      const username = localStorage.getItem('savedUsername');
+      const school = sessionStorage.getItem('selectedSchool');
+      if (username) {
+        fetch(`${BACKEND_URL}/user/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username,
+            school: school || 'Not provided'
+          })
+        }).catch(error => {
+          console.error('Heartbeat error:', error);
+        });
+      }
+    }
+
+    // Send heartbeat every 60 seconds
+    setInterval(sendHeartbeat, 60000);
+    // Send initial heartbeat
+    if (localStorage.getItem('savedUsername')) {
+      sendHeartbeat();
+    }
   </script>
 </body>
 </html>

@@ -17,7 +17,7 @@ const dailyLimits = {
 };
 
 const MAX_PURCHASES_PER_DAY = 3;
-const RESERVATION_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
 
 // Track active reservations: { reservationId: { productName, timestamp } }
 const activeReservations = {};
@@ -25,16 +25,21 @@ const activeReservations = {};
 // Store the last timer reset time (for frontend to sync) - Initialize with current time
 let lastTimerResetTime = Date.now();
 
-// Clean up expired reservations (run every minute)
+  // Clean up expired reservations (run every minute)
 setInterval(() => {
   const now = Date.now();
   Object.keys(activeReservations).forEach(reservationId => {
     const reservation = activeReservations[reservationId];
-    if (now - reservation.timestamp > RESERVATION_TIMEOUT) {
+    const age = now - reservation.timestamp;
+    if (age > RESERVATION_TIMEOUT) {
       // Release expired reservation
       if (dailyLimits[reservation.productName] && dailyLimits[reservation.productName].count > 0) {
+        const oldCount = dailyLimits[reservation.productName].count;
         dailyLimits[reservation.productName].count--;
-        console.log(`⏰ Expired reservation released for "${reservation.productName}" (ID: ${reservationId})`);
+        const newCount = dailyLimits[reservation.productName].count;
+        console.log(`⏰ Expired reservation released for "${reservation.productName}": ${oldCount} → ${newCount} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+      } else {
+        console.log(`⏰ Expired reservation for "${reservation.productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
       }
       delete activeReservations[reservationId];
     }
@@ -120,6 +125,7 @@ app.post('/reserve-slot', (req, res) => {
   
   // CRITICAL: Increment IMMEDIATELY before any other operation
   // This atomic operation ensures only one person gets the last slot
+  const oldCount = product.count;
   product.count++;
   const remaining = MAX_PURCHASES_PER_DAY - product.count;
   
@@ -131,7 +137,7 @@ app.post('/reserve-slot', (req, res) => {
   };
   
   const wasLastSlot = remaining === 0;
-  console.log(`🔒 Slot RESERVED for "${productName}": ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining)${wasLastSlot ? ' ⚠️ LAST SLOT!' : ''} - Reservation ID: ${reservationId}`);
+  console.log(`🔒 Slot RESERVED for "${productName}": ${oldCount} → ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining)${wasLastSlot ? ' ⚠️ LAST SLOT!' : ''} - Reservation ID: ${reservationId} (timeout: ${RESERVATION_TIMEOUT / 60000} min)`);
   
   res.json({
     success: true,
@@ -228,15 +234,24 @@ app.post('/admin/reset-counters', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   
+  // Clear all active reservations when resetting counters
+  const clearedReservations = Object.keys(activeReservations).length;
+  Object.keys(activeReservations).forEach(reservationId => {
+    delete activeReservations[reservationId];
+  });
+  
   Object.keys(dailyLimits).forEach(product => {
     dailyLimits[product].count = 0;
     dailyLimits[product].date = new Date().toDateString();
   });
   
+  console.log(`🔄 Admin reset: All counters reset to 0, cleared ${clearedReservations} active reservations`);
+  
   res.json({
     success: true,
     message: 'All counters reset successfully',
-    counters: dailyLimits
+    counters: dailyLimits,
+    clearedReservations: clearedReservations
   });
 });
 
@@ -253,14 +268,26 @@ app.post('/admin/reset-product-counter', (req, res) => {
     return res.status(400).json({ error: 'Product not found' });
   }
   
+  // Clear active reservations for this product when resetting
+  let clearedReservations = 0;
+  Object.keys(activeReservations).forEach(reservationId => {
+    if (activeReservations[reservationId].productName === productName) {
+      delete activeReservations[reservationId];
+      clearedReservations++;
+    }
+  });
+  
   dailyLimits[productName].count = 0;
   dailyLimits[productName].date = new Date().toDateString();
+  
+  console.log(`🔄 Admin reset: Product "${productName}" counter reset to 0, cleared ${clearedReservations} active reservations`);
   
   res.json({
     success: true,
     message: `Counter reset for ${productName}`,
     product: productName,
-    counter: dailyLimits[productName]
+    counter: dailyLimits[productName],
+    clearedReservations: clearedReservations
   });
 });
 
@@ -555,10 +582,24 @@ app.post('/submit-cash-payment', async (req, res) => {
     if (productName && dailyLimits[productName]) {
       currentCount = dailyLimits[productName].count;
       remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
-      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
       
-      // Confirm reservation - payment completed, remove from active reservations
-      confirmReservation(productName);
+      // Confirm the specific reservation if reservationId provided, otherwise confirm all for that product
+      if (reservationId && activeReservations[reservationId]) {
+        // Verify it's for the correct product
+        if (activeReservations[reservationId].productName === productName) {
+          delete activeReservations[reservationId];
+          console.log(`✅ Reservation CONFIRMED (cash payment completed) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+        } else {
+          console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
+          confirmReservation(productName);
+        }
+      } else {
+        // No reservationId or not found - confirm all reservations for this product (fallback)
+        console.log(`✅ Confirming all reservations for "${productName}" (no specific reservationId provided)`);
+        confirmReservation(productName);
+      }
+      
+      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
     }
     
     // Send email notification for cash payment (non-blocking)
@@ -587,7 +628,7 @@ app.post('/submit-cash-payment', async (req, res) => {
 // NEW ENDPOINT: Submit login details after payment
 app.post('/submit-login-details', async (req, res) => {
   try {
-    const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername } = req.body;
+    const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername, reservationId } = req.body;
     
     // Check if this is a new login (different username)
     const isNewLogin = !previousUsername || previousUsername !== username;
@@ -604,10 +645,24 @@ app.post('/submit-login-details', async (req, res) => {
     if (productName && dailyLimits[productName]) {
       currentCount = dailyLimits[productName].count;
       remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
-      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
       
-      // Confirm reservation - payment completed, remove from active reservations
-      confirmReservation(productName);
+      // Confirm the specific reservation if reservationId provided, otherwise confirm all for that product
+      if (reservationId && activeReservations[reservationId]) {
+        // Verify it's for the correct product
+        if (activeReservations[reservationId].productName === productName) {
+          delete activeReservations[reservationId];
+          console.log(`✅ Reservation CONFIRMED (card payment completed) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+        } else {
+          console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
+          confirmReservation(productName);
+        }
+      } else {
+        // No reservationId or not found - confirm all reservations for this product (fallback)
+        console.log(`✅ Confirming all reservations for "${productName}" (no specific reservationId provided)`);
+        confirmReservation(productName);
+      }
+      
+      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)

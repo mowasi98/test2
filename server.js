@@ -1,1214 +1,254 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { Resend } = require('resend');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-// Daily purchase limit tracking (3 per product per day)
-const dailyLimits = {
-  'Sparx Reader': { count: 0, date: null, available: true },
-  'Sparx Maths': { count: 0, date: null, available: true },
-  'Educate': { count: 0, date: null, available: true },
-  'Seneca': { count: 0, date: null, available: true }
-};
-
-const MAX_PURCHASES_PER_DAY = 3;
-const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
-
-// Track active reservations: { reservationId: { productName, timestamp } }
-const activeReservations = {};
-
-// Store the last timer reset time (for frontend to sync) - Initialize with current time
-let lastTimerResetTime = Date.now();
-
-  // Clean up expired reservations (run every minute)
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(activeReservations).forEach(reservationId => {
-    const reservation = activeReservations[reservationId];
-    const age = now - reservation.timestamp;
-    if (age > RESERVATION_TIMEOUT) {
-      // Release expired reservation
-      if (dailyLimits[reservation.productName] && dailyLimits[reservation.productName].count > 0) {
-        const oldCount = dailyLimits[reservation.productName].count;
-        dailyLimits[reservation.productName].count--;
-        const newCount = dailyLimits[reservation.productName].count;
-        console.log(`⏰ Expired reservation released for "${reservation.productName}": ${oldCount} → ${newCount} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
-      } else {
-        console.log(`⏰ Expired reservation for "${reservation.productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful - officialhwplug</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .success-box {
+      background: #fff;
+      padding: 3rem;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+    }
+    .checkmark {
+      font-size: 4rem;
+      color: #00D084;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      color: #333;
+      margin: 1rem 0;
+    }
+    p {
+      color: #666;
+      line-height: 1.6;
+    }
+    .login-section {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 2px solid #f0f0ff;
+    }
+    .login-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    .form-group {
+      margin-bottom: 1.2rem;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: #444;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.8rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      box-sizing: border-box;
+      transition: border 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #6C63FF;
+    }
+    .submit-btn {
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+      transition: all 0.2s;
+    }
+    .submit-btn:hover {
+      background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+    }
+    .submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .success-message {
+      display: none;
+      background: #d4edda;
+      color: #155724;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
       }
-      delete activeReservations[reservationId];
-    }
-  });
-}, 60000); // Check every minute
-
-// Reset counters if it's a new day
-function resetDailyCountersIfNeeded() {
-  const today = new Date().toDateString();
-  Object.keys(dailyLimits).forEach(product => {
-    if (dailyLimits[product].date !== today) {
-      dailyLimits[product].count = 0;
-      dailyLimits[product].date = today;
-    }
-  });
-}
-
-// Check product availability endpoint
-app.get('/check-product-availability', (req, res) => {
-  resetDailyCountersIfNeeded();
-  const productName = req.query.product;
-  
-  if (!productName || !dailyLimits[productName]) {
-    return res.json({ available: false, error: 'Product not found' });
-  }
-  
-  const product = dailyLimits[productName];
-  
-  // Check if product is manually set as unavailable
-  if (!product.available) {
-    return res.json({
-      available: false,
-      remaining: 0,
-      count: product.count,
-      max: MAX_PURCHASES_PER_DAY,
-      manuallyDisabled: true
-    });
-  }
-  
-  // Check if slots are full
-  const available = product.count < MAX_PURCHASES_PER_DAY;
-  const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - product.count);
-  
-  res.json({
-    available: available,
-    remaining: remaining,
-    count: product.count,
-    max: MAX_PURCHASES_PER_DAY,
-    manuallyDisabled: false
-  });
-});
-
-// Reserve a slot (atomically check and increment) - prevents race conditions
-app.post('/reserve-slot', (req, res) => {
-  resetDailyCountersIfNeeded();
-  const { productName } = req.body;
-  
-  if (!productName || !dailyLimits[productName]) {
-    return res.status(400).json({ success: false, error: 'Product not found' });
-  }
-  
-  const product = dailyLimits[productName];
-  
-  // Check if product is manually disabled
-  if (!product.available) {
-    return res.json({ 
-      success: false, 
-      error: 'Product is not available right now',
-      manuallyDisabled: true
-    });
-  }
-  
-  // ATOMIC check and increment (prevents race condition)
-  // This ensures only ONE person can reserve the last slot, even if multiple requests arrive simultaneously
-  if (product.count >= MAX_PURCHASES_PER_DAY) {
-    return res.json({ 
-      success: false, 
-      error: 'Slots are finished for today',
-      remaining: 0,
-      count: product.count
-    });
-  }
-  
-  // CRITICAL: Increment IMMEDIATELY before any other operation
-  // This atomic operation ensures only one person gets the last slot
-  const oldCount = product.count;
-  product.count++;
-  const remaining = MAX_PURCHASES_PER_DAY - product.count;
-  
-  // Create reservation ID and track it
-  const reservationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  activeReservations[reservationId] = {
-    productName: productName,
-    timestamp: Date.now()
-  };
-  
-  const wasLastSlot = remaining === 0;
-  console.log(`🔒 Slot RESERVED for "${productName}": ${oldCount} → ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining)${wasLastSlot ? ' ⚠️ LAST SLOT!' : ''} - Reservation ID: ${reservationId} (timeout: ${RESERVATION_TIMEOUT / 60000} min)`);
-  
-  res.json({
-    success: true,
-    reserved: true,
-    reservationId: reservationId,
-    count: product.count,
-    remaining: remaining,
-    max: MAX_PURCHASES_PER_DAY,
-    wasLastSlot: wasLastSlot
-  });
-});
-
-// Release a reserved slot (if user abandons payment)
-app.post('/release-slot', (req, res) => {
-  resetDailyCountersIfNeeded();
-  const { reservationId, productName } = req.body;
-  
-  if (!reservationId || !productName) {
-    return res.status(400).json({ success: false, error: 'Reservation ID and product name required' });
-  }
-  
-  // Check if reservation exists
-  if (!activeReservations[reservationId]) {
-    return res.json({ 
-      success: false, 
-      error: 'Reservation not found or already released',
-      message: 'Slot may have already been released or expired'
-    });
-  }
-  
-  const reservation = activeReservations[reservationId];
-  
-  // Verify product matches
-  if (reservation.productName !== productName) {
-    return res.status(400).json({ success: false, error: 'Product name mismatch' });
-  }
-  
-  // Release the slot by decrementing
-  if (dailyLimits[productName] && dailyLimits[productName].count > 0) {
-    dailyLimits[productName].count--;
-    const remaining = MAX_PURCHASES_PER_DAY - dailyLimits[productName].count;
-    
-    // Remove reservation
-    delete activeReservations[reservationId];
-    
-    console.log(`🔓 Slot RELEASED for "${productName}": ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining) - Reservation ID: ${reservationId}`);
-    
-    res.json({
-      success: true,
-      released: true,
-      count: dailyLimits[productName].count,
-      remaining: remaining,
-      max: MAX_PURCHASES_PER_DAY
-    });
-  } else {
-    // Already released or count is 0
-    delete activeReservations[reservationId];
-    res.json({
-      success: false,
-      error: 'Slot was already released',
-      count: dailyLimits[productName] ? dailyLimits[productName].count : 0
-    });
-  }
-});
-
-// Increment product purchase count (kept for backward compatibility)
-app.post('/increment-product-count', (req, res) => {
-  resetDailyCountersIfNeeded();
-  const { productName } = req.body;
-  
-  if (!productName || !dailyLimits[productName]) {
-    return res.status(400).json({ error: 'Product not found' });
-  }
-  
-  if (dailyLimits[productName].count >= MAX_PURCHASES_PER_DAY) {
-    return res.status(400).json({ error: 'Daily limit reached for this product' });
-  }
-  
-  dailyLimits[productName].count++;
-  res.json({
-    success: true,
-    count: dailyLimits[productName].count,
-    remaining: MAX_PURCHASES_PER_DAY - dailyLimits[productName].count
-  });
-});
-
-// Admin endpoint to reset all counters
-app.post('/admin/reset-counters', (req, res) => {
-  const { password } = req.body;
-  // Simple password protection (you can change this password)
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
-  
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  // Clear all active reservations when resetting counters
-  const clearedReservations = Object.keys(activeReservations).length;
-  Object.keys(activeReservations).forEach(reservationId => {
-    delete activeReservations[reservationId];
-  });
-  
-  Object.keys(dailyLimits).forEach(product => {
-    dailyLimits[product].count = 0;
-    dailyLimits[product].date = new Date().toDateString();
-  });
-  
-  console.log(`🔄 Admin reset: All counters reset to 0, cleared ${clearedReservations} active reservations`);
-  
-  res.json({
-    success: true,
-    message: 'All counters reset successfully',
-    counters: dailyLimits,
-    clearedReservations: clearedReservations
-  });
-});
-
-// Admin endpoint to reset individual product counter
-app.post('/admin/reset-product-counter', (req, res) => {
-  const { password, productName } = req.body;
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
-  
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  if (!productName || !dailyLimits[productName]) {
-    return res.status(400).json({ error: 'Product not found' });
-  }
-  
-  // Clear active reservations for this product when resetting
-  let clearedReservations = 0;
-  Object.keys(activeReservations).forEach(reservationId => {
-    if (activeReservations[reservationId].productName === productName) {
-      delete activeReservations[reservationId];
-      clearedReservations++;
-    }
-  });
-  
-  dailyLimits[productName].count = 0;
-  dailyLimits[productName].date = new Date().toDateString();
-  
-  console.log(`🔄 Admin reset: Product "${productName}" counter reset to 0, cleared ${clearedReservations} active reservations`);
-  
-  res.json({
-    success: true,
-    message: `Counter reset for ${productName}`,
-    product: productName,
-    counter: dailyLimits[productName],
-    clearedReservations: clearedReservations
-  });
-});
-
-// Admin endpoint to set product availability (all products)
-app.post('/admin/set-product-availability', (req, res) => {
-  const { password, available } = req.body;
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
-  
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  // Update all products availability
-  Object.keys(dailyLimits).forEach(product => {
-    dailyLimits[product].available = available === true;
-  });
-  
-  res.json({
-    success: true,
-    message: `All products ${available ? 'marked as available' : 'marked as not available'}`,
-    availability: available
-  });
-});
-
-// Admin endpoint to toggle individual product availability
-app.post('/admin/toggle-product-availability', (req, res) => {
-  const { password, productName, available } = req.body;
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
-  
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  if (!productName || !dailyLimits[productName]) {
-    return res.status(400).json({ error: 'Product not found' });
-  }
-  
-  // Toggle individual product availability
-  dailyLimits[productName].available = available === true;
-  
-  res.json({
-    success: true,
-    message: `${productName} ${available ? 'marked as available' : 'marked as not available'}`,
-    product: productName,
-    availability: available
-  });
-});
-
-// Admin endpoint to set custom slot count for a product
-app.post('/admin/set-slot-count', (req, res) => {
-  const { password, productName, slotCount } = req.body;
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
-  
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  if (!productName || !dailyLimits[productName]) {
-    return res.status(400).json({ error: 'Product not found' });
-  }
-  
-  // Validate slot count
-  const newCount = parseInt(slotCount);
-  if (isNaN(newCount) || newCount < 0) {
-    return res.status(400).json({ error: 'Invalid slot count. Must be a positive number.' });
-  }
-  
-  if (newCount > MAX_PURCHASES_PER_DAY) {
-    return res.status(400).json({ 
-      error: `Slot count cannot exceed maximum (${MAX_PURCHASES_PER_DAY}). Change MAX_PURCHASES_PER_DAY if you need more slots.` 
-    });
-  }
-  
-  const oldCount = dailyLimits[productName].count;
-  dailyLimits[productName].count = newCount;
-  const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - newCount);
-  
-  console.log(`🔧 Admin: Set slot count for "${productName}": ${oldCount} → ${newCount} (${remaining} remaining)`);
-  
-  res.json({
-    success: true,
-    message: `Slot count for ${productName} set to ${newCount}`,
-    product: productName,
-    oldCount: oldCount,
-    newCount: newCount,
-    remaining: remaining,
-    max: MAX_PURCHASES_PER_DAY
-  });
-});
-
-// Admin endpoint to get current counter status
-app.get('/admin/counters-status', (req, res) => {
-  resetDailyCountersIfNeeded();
-  res.json({
-    success: true,
-    counters: dailyLimits,
-    maxPerDay: MAX_PURCHASES_PER_DAY
-  });
-});
-
-// Admin endpoint to reset timer only (date) without resetting counts
-// Note: lastTimerResetTime is declared at the top of the file
-app.post('/admin/reset-timer', (req, res) => {
-  const { password } = req.body;
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
-  
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  // Reset only the date (timer) but keep the counts
-  const today = new Date().toDateString();
-  Object.keys(dailyLimits).forEach(product => {
-    dailyLimits[product].date = today;
-  });
-  
-  // Update the last timer reset time (so frontend can sync)
-  lastTimerResetTime = Date.now();
-  
-  console.log(`⏰ Timer reset at ${new Date().toISOString()} - Counts preserved`);
-  
-  res.json({
-    success: true,
-    message: 'Timer reset successfully (counts preserved)',
-    counters: dailyLimits,
-    resetTime: lastTimerResetTime
-  });
-});
-
-// Endpoint to get timer reset time (for frontend sync)
-app.get('/admin/timer-reset-time', (req, res) => {
-  res.json({
-    success: true,
-    resetTime: lastTimerResetTime,
-    currentTime: Date.now()
-  });
-});
-
-// Endpoint for automatic slot reset at midnight (called by frontend)
-app.post('/admin/auto-reset-slots', (req, res) => {
-  // This is called automatically when timer reaches 0
-  // No password required - it's triggered by the timer logic
-  const today = new Date().toDateString();
-  
-  // Check if date has actually changed (prevent multiple resets)
-  let hasReset = false;
-  Object.keys(dailyLimits).forEach(product => {
-    if (dailyLimits[product].date !== today) {
-      dailyLimits[product].count = 0;
-      dailyLimits[product].date = today;
-      hasReset = true;
-    }
-  });
-  
-  res.json({
-    success: true,
-    message: hasReset ? 'Slots reset automatically at midnight' : 'Slots already reset',
-    counters: dailyLimits
-  });
-});
-
-// Resend email service setup
-const resend = process.env.RESEND_API_KEY 
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-// Log email configuration status
-console.log('Email Configuration:');
-console.log('- RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'SET (hidden)' : 'NOT SET');
-console.log('- YOUR_EMAIL:', process.env.YOUR_EMAIL || 'NOT SET');
-console.log('- Resend initialized:', resend ? 'Yes' : 'No');
-
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.send('officialhwplug Backend Running! 🚀');
-});
-
-// Test email endpoint (for debugging)
-app.get('/test-email', async (req, res) => {
-  try {
-    if (!resend) {
-      return res.json({ 
-        success: false, 
-        error: 'Resend not initialized - missing RESEND_API_KEY',
-        details: {
-          RESEND_API_KEY: process.env.RESEND_API_KEY ? 'SET' : 'NOT SET',
-          YOUR_EMAIL: process.env.YOUR_EMAIL ? 'SET' : 'NOT SET'
-        }
-      });
-    }
-
-    if (!process.env.YOUR_EMAIL) {
-      return res.json({ 
-        success: false, 
-        error: 'Missing YOUR_EMAIL environment variable'
-      });
-    }
-
-    const { data, error } = await resend.emails.send({
-      from: 'officialhwplug <onboarding@resend.dev>', // Update this to your verified domain
-      to: process.env.YOUR_EMAIL,
-      subject: '🧪 Test Email from officialhwplug Backend',
-      html: '<h2>Test Email</h2><p>This is a test email. If you receive this, Resend configuration is working!</p>'
-    });
-
-    if (error) {
-      return res.json({ 
-        success: false, 
-        error: error.message,
-        details: error
-      });
-    }
-
-    res.json({ success: true, message: 'Test email sent successfully! Check your inbox at ' + process.env.YOUR_EMAIL, data });
-  } catch (error) {
-    console.error('Email send error:', error);
-    res.json({ 
-      success: false, 
-      error: error.message || 'Unknown error'
-    });
-  }
-});
-
-// Create Stripe Checkout Session
-app.post('/create-checkout-session', async (req, res) => {
-  try {
-    const { items, customerEmail, homeworkEmail, homeworkPassword } = req.body;
-    const total = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const lineItems = items.map(item => ({
-      price_data: {
-        currency: 'gbp',
-        product_data: {
-          name: item.name,
-        },
-        unit_amount: item.price * 100,
-      },
-      quantity: item.qty,
-    }));
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'payment',
-      success_url: `${req.headers.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin}/cancel.html`,
-      customer_email: customerEmail,
-      metadata: {
-        homeworkEmail: homeworkEmail,
-        homeworkPassword: homeworkPassword,
-        items: JSON.stringify(items)
+      .success-box {
+        padding: 2rem 1.5rem;
       }
-    });
-
-    res.json({ id: session.id });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// NEW ENDPOINT: Submit login (before payment)
-app.post('/submit-login', async (req, res) => {
-  try {
-    // This endpoint is kept for compatibility but no longer sends emails
-    // Emails are sent AFTER payment (cash or card) with "New Login" notification
-    res.json({ success: true, message: 'Login received successfully' });
-  } catch (error) {
-    console.error('Error submitting login:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// NEW ENDPOINT: Submit card payment (before redirect to Stripe)
-app.post('/submit-card-payment', async (req, res) => {
-  try {
-    const { username, password, productName, productPrice } = req.body;
-    
-    // Validate required fields
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
+      .checkmark {
+        font-size: 3rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      p {
+        font-size: 0.95rem;
+      }
+      .login-title {
+        font-size: 1.1rem;
+      }
+      .form-group input {
+        padding: 0.7rem;
+        font-size: 0.95rem;
+      }
+      .submit-btn {
+        padding: 0.85rem 1.5rem;
+        font-size: 1rem;
+      }
     }
+  </style>
+</head>
+<body>
+  <div class="success-box">
+    <div class="checkmark">✓</div>
+    <h1>Payment Successful!</h1>
+    <p id="thankYouMessage">THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.</p>
     
-    // Send email notification for card payment (non-blocking)
-    sendCardPaymentNotification({
-      username,
-      password,
-      productName,
-      productPrice,
-      paymentMethod: 'card'
-    }).catch(err => {
-      console.error('Error sending card payment notification email:', err);
-    });
+    <div id="redirectMessage" style="display: none; margin-top: 2rem; color: #6C63FF; font-weight: 600;">
+      Redirecting you back to homepage...
+    </div>
+  </div>
 
-    res.json({ success: true, message: 'Card payment notification sent successfully' });
-  } catch (error) {
-    console.error('Error submitting card payment:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+  <script>
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
 
-// Helper function to confirm reservation (remove from active reservations)
-function confirmReservation(productName) {
-  // Find and remove any active reservations for this product
-  Object.keys(activeReservations).forEach(reservationId => {
-    if (activeReservations[reservationId].productName === productName) {
-      delete activeReservations[reservationId];
-      console.log(`✅ Reservation CONFIRMED (payment completed) for "${productName}" - Reservation ID: ${reservationId}`);
-    }
-  });
-}
-
-// NEW ENDPOINT: Submit cash payment
-app.post('/submit-cash-payment', async (req, res) => {
-  try {
-    console.log('💵 CASH PAYMENT REQUEST RECEIVED');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    
-    const { school, username, password, productName, productPrice, previousUsername, reservationId } = req.body;
-    
-    console.log('💵 Extracted data:', { school, username, productName, productPrice, previousUsername, reservationId, hasPassword: !!password });
-    
-    // Validate required fields
-    if (!username || !password) {
-      console.error('❌ Missing required fields - username or password');
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
-    
-    // Check if this is a new login (different username)
-    const isNewLogin = !previousUsername || previousUsername !== username;
-    
-    // Check if product is available
-    resetDailyCountersIfNeeded();
-    if (productName && dailyLimits[productName] && !dailyLimits[productName].available) {
-      return res.status(400).json({ error: 'Product is not available right now' });
-    }
-    
-    // Slot was already reserved when user clicked "Buy Now", so we just need to verify and get status
-    let remainingSlots = 0;
-    let currentCount = 0;
-    if (productName && dailyLimits[productName]) {
-      currentCount = dailyLimits[productName].count;
-      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+    // Automatically send email and redirect when page loads
+    window.addEventListener('DOMContentLoaded', async function() {
+      // Show thank you message
+      document.getElementById('thankYouMessage').textContent = 'THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.';
       
-      // Confirm the specific reservation if reservationId provided, otherwise confirm all for that product
-      if (reservationId && activeReservations[reservationId]) {
-        // Verify it's for the correct product
-        if (activeReservations[reservationId].productName === productName) {
-          delete activeReservations[reservationId];
-          console.log(`✅ Reservation CONFIRMED (cash payment completed) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
-        } else {
-          console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
-          confirmReservation(productName);
+      // Get saved login credentials from localStorage (stored before Stripe redirect)
+      // These persist across the Stripe redirect
+      const school = localStorage.getItem('cardPaymentSchool') || sessionStorage.getItem('loginSchool') || '';
+      const savedUsername = localStorage.getItem('cardPaymentUsername') || sessionStorage.getItem('loginUsername') || localStorage.getItem('savedUsername');
+      const savedPassword = localStorage.getItem('cardPaymentPassword') || sessionStorage.getItem('loginPassword') || localStorage.getItem('savedPassword');
+      
+      // Get the previous username BEFORE this purchase (stored before login was saved)
+      const previousUsername = localStorage.getItem('cardPaymentPreviousUsername') || sessionStorage.getItem('previousUsername') || localStorage.getItem('savedUsername');
+      
+      // Get product info from localStorage (stored before Stripe redirect)
+      const productName = localStorage.getItem('cardPaymentProductName') || sessionStorage.getItem('productName') || 'Unknown Product';
+      const productPrice = localStorage.getItem('cardPaymentProductPrice') || sessionStorage.getItem('productPrice') || 'N/A';
+      const reservationId = localStorage.getItem('cardPaymentReservationId') || sessionStorage.getItem('reservationId') || '';
+      
+      // Get session ID from URL if available
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session_id');
+      
+      // Send email notification automatically (MUST send email before clearing storage)
+      if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
+        console.log('💳 CARD PAYMENT SUCCESS - Sending email with:', { 
+          school, 
+          username: savedUsername, 
+          productName, 
+          productPrice,
+          previousUsername, 
+          reservationId,
+          sessionId
+        });
+        
+        try {
+          const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              school: school,
+              username: savedUsername,
+              password: savedPassword,
+              platform: productName, // Use product name as platform
+              sessionId: sessionId,
+              productName: productName,
+              productPrice: productPrice,
+              paymentMethod: 'card',
+              previousUsername: previousUsername,
+              reservationId: reservationId // Pass reservation ID
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('💳 Email send error response:', response.status, errorText);
+          } else {
+            const result = await response.json();
+            console.log('✅ Card payment email response:', response.status, result);
+          }
+        } catch (error) {
+          console.error('💳 Error sending card payment email:', error);
+          // Continue anyway - email might still work on backend
         }
       } else {
-        // No reservationId or not found - confirm all reservations for this product (fallback)
-        console.log(`✅ Confirming all reservations for "${productName}" (no specific reservationId provided)`);
-        confirmReservation(productName);
+        console.error('❌ Missing data for card payment email:', { 
+          savedUsername: !!savedUsername, 
+          savedPassword: !!savedPassword, 
+          productName,
+          school 
+        });
       }
       
-      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
-    }
-    
-    // Send email notification for cash payment (non-blocking)
-    console.log('📧 Attempting to send cash payment email...');
-    sendCashPaymentNotification({
-      school: school || 'Not provided',
-      username,
-      password,
-      productName,
-      productPrice,
-      remainingSlots: remainingSlots,
-      currentCount: currentCount,
-      isNewLogin: isNewLogin
-    }).then(() => {
-      console.log('✅ Cash payment email sent successfully');
-    }).catch(err => {
-      console.error('❌ Error sending cash payment notification email:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
-      // Don't fail the request if email fails
-    });
-
-    console.log('✅ Cash payment request processed successfully');
-    res.json({ success: true, message: 'Cash payment notification sent successfully' });
-  } catch (error) {
-    console.error('Error submitting cash payment:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// NEW ENDPOINT: Submit login details after payment
-app.post('/submit-login-details', async (req, res) => {
-  try {
-    console.log('💳 CARD PAYMENT - LOGIN DETAILS REQUEST RECEIVED');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    
-    const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername, reservationId } = req.body;
-    
-    console.log('💳 Extracted data:', { 
-      school, 
-      username, 
-      platform, 
-      sessionId, 
-      productName, 
-      productPrice, 
-      paymentMethod,
-      previousUsername, 
-      reservationId,
-      hasPassword: !!password 
-    });
-    
-    // Check if this is a new login (different username)
-    const isNewLogin = !previousUsername || previousUsername !== username;
-    console.log('💳 Is new login:', isNewLogin);
-    
-    // Check if product is available
-    resetDailyCountersIfNeeded();
-    if (productName && dailyLimits[productName] && !dailyLimits[productName].available) {
-      return res.status(400).json({ error: 'Product is not available right now' });
-    }
-    
-    // Slot was already reserved when user clicked "Buy Now", so we just need to verify and get status
-    let remainingSlots = 0;
-    let currentCount = 0;
-    if (productName && dailyLimits[productName]) {
-      currentCount = dailyLimits[productName].count;
-      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+      // Clear storage AFTER sending email (payment completed - don't release slot)
+      localStorage.removeItem('cardPaymentProductName');
+      localStorage.removeItem('cardPaymentProductPrice');
+      localStorage.removeItem('cardPaymentSchool');
+      localStorage.removeItem('cardPaymentUsername');
+      localStorage.removeItem('cardPaymentPassword');
+      localStorage.removeItem('cardPaymentPreviousUsername');
+      localStorage.removeItem('cardPaymentReservationId'); // Clear reservation ID
+      sessionStorage.removeItem('productName');
+      sessionStorage.removeItem('productPrice');
+      sessionStorage.removeItem('loginUsername');
+      sessionStorage.removeItem('loginPassword');
+      sessionStorage.removeItem('loginSchool');
+      sessionStorage.removeItem('stripeLink');
+      sessionStorage.removeItem('previousUsername');
+      sessionStorage.removeItem('slotReserved');
+      sessionStorage.removeItem('reservedProduct');
+      sessionStorage.removeItem('reservationId'); // Payment completed - slot is used
       
-      // Confirm the specific reservation if reservationId provided, otherwise confirm all for that product
-      if (reservationId && activeReservations[reservationId]) {
-        // Verify it's for the correct product
-        if (activeReservations[reservationId].productName === productName) {
-          delete activeReservations[reservationId];
-          console.log(`✅ Reservation CONFIRMED (card payment completed) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
-        } else {
-          console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
-          confirmReservation(productName);
-        }
-      } else {
-        // No reservationId or not found - confirm all reservations for this product (fallback)
-        console.log(`✅ Confirming all reservations for "${productName}" (no specific reservationId provided)`);
-        confirmReservation(productName);
-      }
+      // Show redirect message after 2 seconds
+      setTimeout(function() {
+        document.getElementById('redirectMessage').style.display = 'block';
+      }, 2000);
       
-      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
-    }
-    
-    // Send email notification with login details (CARD PAYMENT - only email sent for card)
-    console.log('📧 Attempting to send card payment email...');
-    await sendLoginDetailsNotification({
-      school: school || 'Not provided',
-      username,
-      password,
-      platform,
-      sessionId,
-      productName: productName || 'Unknown Product',
-      productPrice: productPrice || 'N/A',
-      paymentMethod: paymentMethod || 'card', // Default to card for this endpoint
-      remainingSlots: remainingSlots,
-      currentCount: currentCount,
-      isNewLogin: isNewLogin
+      // Redirect to homepage after 4 seconds
+      setTimeout(function() {
+        window.location.href = 'index.html';
+      }, 4000);
     });
-
-    console.log('✅ Card payment email sent successfully');
-    console.log('✅ Card payment request processed successfully');
-    res.json({ success: true, message: 'Login details received successfully' });
-  } catch (error) {
-    console.error('Error submitting login details:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Send card payment notification via email
-async function sendCardPaymentNotification(data) {
-  const { username, password, productName, productPrice, paymentMethod } = data;
-  
-  if (!resend) {
-    console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
-    return;
-  }
-  
-  if (!process.env.YOUR_EMAIL) {
-    console.error('❌ Cannot send email - YOUR_EMAIL not set in environment variables.');
-    return;
-  }
-  
-  console.log(`📧 Attempting to send cash payment email to: ${process.env.YOUR_EMAIL}`);
-  console.log(`📧 Is new login: ${isNewLogin}`);
-
-  try {
-    const { data: emailData, error } = await resend.emails.send({
-      from: 'hwplug <onboarding@resend.dev>',
-      to: process.env.YOUR_EMAIL,
-      subject: '💳 CARD PAYMENT SELECTED - officialhwplug',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-        </head>
-        <body style="margin: 0; padding: 0; background: #f6f7fb;">
-          <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <!-- Header with gradient -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">Card Payment Selected</p>
-            </div>
-
-            <!-- Content -->
-            <div style="padding: 40px 30px;">
-              <!-- Card Payment Alert -->
-              <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">💳</div>
-                <h2 style="margin: 0; color: #155724; font-size: 24px; font-weight: 700;">CARD PAYMENT SELECTED</h2>
-                <p style="margin: 10px 0 0 0; color: #155724; font-size: 16px; font-weight: 600;">Customer is proceeding to Stripe checkout</p>
-              </div>
-
-              <!-- Login Credentials Card -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 25px; border-radius: 12px; border: 2px solid #ffc107; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(255,193,7,0.2);">
-                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 20px; font-weight: 700;">🔐 Login Credentials</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Username/Email:</strong><br><span style="color: #555; word-break: break-all;">${username}</span></p>
-                </div>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Password:</strong><br><span style="color: #555; font-family: monospace;">${password}</span></p>
-                </div>
-              </div>
-
-              <!-- Product & Payment Info Card -->
-              <div style="background: linear-gradient(135deg, #f8f9ff 0%, #ececff 100%); padding: 25px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(108,99,255,0.15);">
-                <div style="margin-bottom: 20px;">
-                  <p style="margin: 8px 0; color: #555; font-size: 15px;"><strong style="color: #333;">Product:</strong> ${productName || 'Not specified'}</p>
-                  <p style="margin: 8px 0; color: #6C63FF; font-size: 24px; font-weight: 700;">Price: £${productPrice || 'N/A'}</p>
-                </div>
-                
-                <!-- Payment Method Badge -->
-                <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #28a745;">
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; color: #155724;">
-                    💳 PAYMENT METHOD: CARD
-                  </p>
-                </div>
-              </div>
-
-              <!-- Info -->
-              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 20px; border-radius: 12px; border: 2px solid #0066cc; text-align: center;">
-                <p style="margin: 0; color: #004085; font-weight: 600; font-size: 15px;">⏳ Customer completing payment on Stripe...</p>
-                <p style="margin: 10px 0 0 0; color: #004085; font-size: 13px;">You'll receive another email once payment is confirmed.</p>
-              </div>
-
-              <!-- Footer -->
-              <div style="text-align: center; padding-top: 25px; border-top: 2px solid #f0f0ff; margin-top: 25px;">
-                <p style="color: #999; font-size: 13px; margin: 5px 0;">Notification time: ${new Date().toLocaleString()}</p>
-              </div>
-            </div>
-
-            <!-- Bottom gradient bar -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    });
-
-    if (error) {
-      console.error('❌ Error sending card payment notification email:', error);
-      return;
-    }
-
-    console.log('✅ Card payment notification email sent successfully to:', process.env.YOUR_EMAIL);
-  } catch (error) {
-    console.error('❌ Error sending card payment notification email:', error.message);
-  }
-}
-
-// Send login notification via email (before payment)
-async function sendLoginNotification(data) {
-  const { username, password, productName, productPrice, paymentMethod } = data;
-  
-  if (!resend) {
-    console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
-    return;
-  }
-  
-  if (!process.env.YOUR_EMAIL) {
-    console.error('❌ Cannot send email - YOUR_EMAIL not set in environment variables.');
-    return;
-  }
-  
-  console.log(`📧 Attempting to send cash payment email to: ${process.env.YOUR_EMAIL}`);
-  console.log(`📧 Is new login: ${isNewLogin}`);
-
-  const paymentStatus = paymentMethod === 'cash' ? '💵 CASH' : paymentMethod === 'card' ? '💳 CARD' : '⏳ Payment method not selected yet';
-
-  try {
-    const { data: emailData, error } = await resend.emails.send({
-      from: 'hwplug <onboarding@resend.dev>',
-      to: process.env.YOUR_EMAIL,
-      subject: '🔐 New Customer Login - officialhwplug',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-        </head>
-        <body style="margin: 0; padding: 0; background: #f6f7fb;">
-          <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <!-- Header with gradient -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">New Customer Login</p>
-            </div>
-
-            <!-- Content -->
-            <div style="padding: 40px 30px;">
-              <!-- Login Credentials Card -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 25px; border-radius: 12px; border: 2px solid #ffc107; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(255,193,7,0.2);">
-                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 20px; font-weight: 700;">🔐 Login Credentials</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Username/Email:</strong><br><span style="color: #555; word-break: break-all;">${username}</span></p>
-                </div>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Password:</strong><br><span style="color: #555; font-family: monospace;">${password}</span></p>
-                </div>
-              </div>
-
-              <!-- Product & Payment Info Card -->
-              <div style="background: linear-gradient(135deg, #f8f9ff 0%, #ececff 100%); padding: 25px; border-radius: 12px; border: 2px solid #e0e0ff; margin-bottom: 25px; box-shadow: 0 3px 12px rgba(108,99,255,0.1);">
-                <div style="margin-bottom: 20px;">
-                  <p style="margin: 8px 0; color: #555; font-size: 15px;"><strong style="color: #333;">Product:</strong> ${productName || 'Not specified'}</p>
-                  <p style="margin: 8px 0; color: #6C63FF; font-size: 24px; font-weight: 700;">Price: £${productPrice || 'N/A'}</p>
-                </div>
-                
-                <!-- Payment Method Badge -->
-                <div style="background: ${paymentMethod === 'cash' ? 'linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)' : paymentMethod === 'card' ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' : 'linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%)'}; padding: 15px; border-radius: 10px; text-align: center; border: 2px solid ${paymentMethod === 'cash' ? '#ffc107' : paymentMethod === 'card' ? '#28a745' : '#6c757d'};">
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; color: ${paymentMethod === 'cash' ? '#856404' : paymentMethod === 'card' ? '#155724' : '#495057'};">
-                    ${paymentStatus}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Footer -->
-              <div style="text-align: center; padding-top: 20px; border-top: 2px solid #f0f0ff;">
-                <p style="color: #999; font-size: 13px; margin: 5px 0;">Login time: ${new Date().toLocaleString()}</p>
-                <p style="color: #6C63FF; font-weight: 600; margin: 10px 0 0 0;">Customer is proceeding to payment...</p>
-              </div>
-            </div>
-
-            <!-- Bottom gradient bar -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    });
-
-    if (error) {
-      console.error('❌ Error sending login notification email:', error);
-      return;
-    }
-
-    console.log('✅ Login notification email sent successfully to:', process.env.YOUR_EMAIL);
-  } catch (error) {
-    console.error('❌ Error sending login notification email:', error.message);
-  }
-}
-
-// Send cash payment notification via email
-async function sendCashPaymentNotification(data) {
-  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, isNewLogin = false } = data;
-  
-  if (!resend) {
-    console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
-    return;
-  }
-  
-  if (!process.env.YOUR_EMAIL) {
-    console.error('❌ Cannot send email - YOUR_EMAIL not set in environment variables.');
-    return;
-  }
-  
-  console.log(`📧 Attempting to send cash payment email to: ${process.env.YOUR_EMAIL}`);
-  console.log(`📧 Is new login: ${isNewLogin}`);
-
-  try {
-    const { data: emailData, error } = await resend.emails.send({
-      from: 'hwplug <onboarding@resend.dev>',
-      to: process.env.YOUR_EMAIL,
-      subject: isNewLogin ? '🔐 NEW LOGIN - Cash Payment Request - officialhwplug' : '💵 Cash Payment Request - officialhwplug',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-        </head>
-        <body style="margin: 0; padding: 0; background: #f6f7fb;">
-          <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <!-- Header with gradient -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Cash Payment' : '💵 Cash Payment Request'}</p>
-            </div>
-
-            <!-- Content -->
-            <div style="padding: 40px 30px;">
-              <!-- CASH PAYMENT ALERT -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 25px; border-radius: 12px; border: 3px solid #ffc107; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(255,193,7,0.3); text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">💵</div>
-                <h2 style="margin: 0; color: #856404; font-size: 24px; font-weight: 700;">CASH PAYMENT SELECTED</h2>
-                <p style="margin: 10px 0 0 0; color: #856404; font-size: 16px; font-weight: 600;">Customer wants to pay with cash</p>
-              </div>
-
-              <!-- School Info Card -->
-              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 25px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(108,99,255,0.15);">
-                <h3 style="margin: 0 0 15px 0; color: #6C63FF; font-size: 20px; font-weight: 700;">🏫 School Information</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #6C63FF;">School:</strong> <span style="color: #555;">${school && school !== 'Not provided' ? school : 'Not provided'}</span></p>
-                </div>
-              </div>
-              
-              <!-- Login Credentials Card -->
-              <div style="background: linear-gradient(135deg, #f8f9ff 0%, #ececff 100%); padding: 25px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(108,99,255,0.15);">
-                <h3 style="margin: 0 0 15px 0; color: #6C63FF; font-size: 20px; font-weight: 700;">🔐 Login Credentials</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #6C63FF;">Username/Email:</strong><br><span style="color: #555; word-break: break-all;">${username}</span></p>
-                </div>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #6C63FF;">Password:</strong><br><span style="color: #555; font-family: monospace;">${password}</span></p>
-                </div>
-              </div>
-
-              <!-- Product & Payment Info Card -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 25px; border-radius: 12px; border: 2px solid #ffc107; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(255,193,7,0.2);">
-                <div style="margin-bottom: 20px;">
-                  <p style="margin: 8px 0; color: #555; font-size: 15px;"><strong style="color: #856404;">Product:</strong> ${productName || 'Not specified'}</p>
-                  <p style="margin: 8px 0; color: #856404; font-size: 24px; font-weight: 700;">Price: £${productPrice || 'N/A'}</p>
-                </div>
-                
-                <!-- Payment Method Badge -->
-                <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #ffc107;">
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; color: #856404;">
-                    💵 PAYMENT METHOD: CASH
-                  </p>
-                </div>
-              </div>
-
-              <!-- Slots Remaining Card -->
-              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 20px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; text-align: center;">
-                <p style="margin: 0; color: #004085; font-weight: 700; font-size: 18px;">📊 Daily Slots Status</p>
-                <p style="margin: 8px 0 0 0; color: #004085; font-size: 24px; font-weight: 700;">
-                  ${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining today
-                </p>
-                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">(${currentCount} / ${MAX_PURCHASES_PER_DAY} used)</p>
-              </div>
-
-              <!-- Action Required -->
-              <div style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); padding: 20px; border-radius: 12px; border: 2px solid #d9534f; text-align: center;">
-                <p style="margin: 0; color: #721c24; font-weight: 700; font-size: 16px;">⚠️ ACTION REQUIRED</p>
-                <p style="margin: 10px 0 0 0; color: #721c24; font-size: 14px;">Please arrange cash payment and complete the homework for this customer.</p>
-              </div>
-
-              <!-- Footer -->
-              <div style="text-align: center; padding-top: 25px; border-top: 2px solid #f0f0ff; margin-top: 25px;">
-                <p style="color: #999; font-size: 13px; margin: 5px 0;">Request time: ${new Date().toLocaleString()}</p>
-              </div>
-            </div>
-
-            <!-- Bottom gradient bar -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    });
-
-    if (error) {
-      console.error('❌ Resend API Error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      return;
-    }
-
-    console.log('✅ Cash payment notification email sent successfully to:', process.env.YOUR_EMAIL);
-    console.log('Email ID:', emailData?.id || 'N/A');
-  } catch (error) {
-    console.error('❌ Exception sending cash payment notification email:', error.message);
-    console.error('Error stack:', error.stack);
-  }
-}
-
-// Send login details notification via email (after card payment)
-async function sendLoginDetailsNotification(data) {
-  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, isNewLogin = false } = data;
-  
-  if (!resend) {
-    console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
-    return;
-  }
-  
-  if (!process.env.YOUR_EMAIL) {
-    console.error('❌ Cannot send email - YOUR_EMAIL not set in environment variables.');
-    return;
-  }
-  
-  console.log(`📧 Attempting to send cash payment email to: ${process.env.YOUR_EMAIL}`);
-  console.log(`📧 Is new login: ${isNewLogin}`);
-
-  try {
-    const { data: emailData, error } = await resend.emails.send({
-      from: 'hwplug <onboarding@resend.dev>',
-      to: process.env.YOUR_EMAIL,
-      subject: isNewLogin ? '🔐 NEW LOGIN - Card Payment Success - officialhwplug' : '💳 Card Payment Success - officialhwplug',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-        </head>
-        <body style="margin: 0; padding: 0; background: #f6f7fb;">
-          <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <!-- Header with gradient -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
-              <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Card Payment' : '💳 Card Payment Successful'}</p>
-            </div>
-
-            <!-- Content -->
-            <div style="padding: 40px 30px;">
-              <!-- Payment Success Alert -->
-              <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 10px;">💳</div>
-                <h2 style="margin: 0; color: #155724; font-size: 24px; font-weight: 700;">CARD PAYMENT RECEIVED</h2>
-                <p style="margin: 10px 0 0 0; color: #155724; font-size: 16px; font-weight: 600;">Payment completed successfully via Stripe</p>
-              </div>
-
-              <!-- School Info Card -->
-              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 25px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(108,99,255,0.15);">
-                <h3 style="margin: 0 0 15px 0; color: #6C63FF; font-size: 20px; font-weight: 700;">🏫 School Information</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #6C63FF;">School:</strong> <span style="color: #555;">${school && school !== 'Not provided' ? school : 'Not provided'}</span></p>
-                </div>
-              </div>
-              
-              <!-- Login Credentials Card -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 25px; border-radius: 12px; border: 2px solid #ffc107; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(255,193,7,0.2);">
-                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 20px; font-weight: 700;">🔐 Login Credentials</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Platform:</strong> ${platform || 'Not specified'}</p>
-                </div>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 12px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Username/Email:</strong><br><span style="color: #555; word-break: break-all;">${username}</span></p>
-                </div>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Password:</strong><br><span style="color: #555; font-family: monospace;">${password}</span></p>
-                </div>
-              </div>
-
-              <!-- Product & Payment Info Card -->
-              <div style="background: linear-gradient(135deg, #f8f9ff 0%, #ececff 100%); padding: 25px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(108,99,255,0.15);">
-                <h3 style="margin: 0 0 15px 0; color: #6C63FF; font-size: 20px; font-weight: 700;">📚 Product Details</h3>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                  <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #6C63FF;">Product:</strong> ${productName || 'Not specified'}</p>
-                  <p style="margin: 8px 0; color: #6C63FF; font-size: 24px; font-weight: 700;">Price: £${productPrice || 'N/A'}</p>
-                </div>
-                <div style="background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                  <p style="margin: 8px 0; color: #555; font-size: 15px;"><strong style="color: #333;">Stripe Session ID:</strong> ${sessionId || 'N/A'}</p>
-                </div>
-                
-                <!-- Payment Method Badge -->
-                <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #28a745; margin-bottom: 15px;">
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; color: #155724;">
-                    💳 PAYMENT METHOD: CARD
-                  </p>
-                </div>
-                
-                <!-- Slots Remaining -->
-                <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #6C63FF;">
-                  <p style="margin: 0; color: #004085; font-weight: 700; font-size: 16px;">📊 Daily Slots Status</p>
-                  <p style="margin: 8px 0 0 0; color: #004085; font-size: 22px; font-weight: 700;">
-                    ${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining today
-                  </p>
-                  <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">(${currentCount} / ${MAX_PURCHASES_PER_DAY} used)</p>
-                </div>
-              </div>
-
-              <!-- Footer -->
-              <div style="text-align: center; padding-top: 25px; border-top: 2px solid #f0f0ff; margin-top: 25px;">
-                <p style="color: #999; font-size: 13px; margin: 5px 0;">Submitted at: ${new Date().toLocaleString()}</p>
-                <p style="color: #6C63FF; font-weight: 600; margin: 10px 0 0 0;">Please complete the homework for this customer.</p>
-              </div>
-            </div>
-
-            <!-- Bottom gradient bar -->
-            <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    });
-
-    if (error) {
-      console.error('❌ Resend API Error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      return;
-    }
-
-    console.log('✅ Login details notification email sent successfully to:', process.env.YOUR_EMAIL);
-    console.log('Email ID:', emailData?.id || 'N/A');
-  } catch (error) {
-    console.error('❌ Exception sending login details notification email:', error.message);
-    console.error('Error stack:', error.stack);
-  }
-}
-
-// Port binding for Render
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  </script>
+</body>
+</html>

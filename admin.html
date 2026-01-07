@@ -171,7 +171,14 @@
     <div class="status-section" id="statusSection" style="display: none;">
       <h2>Current Status (3 slots per product per day)</h2>
       <div id="statusItems"></div>
-      <button class="btn btn-danger" onclick="resetCounters()">Reset All Counters</button>
+      
+      <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+        <button class="btn btn-danger" onclick="resetCounters()" style="flex: 1;">Reset All Counters</button>
+        <button class="btn btn-warning" onclick="resetTimer()" style="flex: 1;">Reset Timer Only</button>
+      </div>
+      <p style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; margin-bottom: 1rem;">
+        <strong>Note:</strong> "Reset Timer Only" resets the 24-hour timer but keeps current slot counts. "Reset All Counters" resets both timer and slot counts to 0.
+      </p>
       
       <div class="availability-section">
         <h3 style="margin-top: 0; color: #856404;">🌐 Global Availability Controls</h3>
@@ -362,6 +369,59 @@
         }
       } catch (error) {
         showMessage('Error connecting to server', 'error');
+        console.error('Error:', error);
+      }
+    }
+
+    async function resetTimer() {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to reset the timer only? This will reset the 24-hour countdown but keep current slot counts.')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/reset-timer`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password: password }),
+        });
+        
+        // Check if response is ok
+        if (!response.ok) {
+          if (response.status === 404) {
+            showMessage('❌ Endpoint not found. Please make sure you have deployed the latest server.js to Render.', 'error');
+            return;
+          }
+          const errorText = await response.text();
+          showMessage(`❌ Server error (${response.status}): ${errorText}`, 'error');
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage('✅ Timer reset successfully! Slot counts preserved.', 'success');
+          checkStatus(); // Refresh status
+          
+          // Trigger frontend timer refresh on all open pages by notifying
+          console.log('Timer reset at:', new Date(data.resetTime).toLocaleString());
+        } else {
+          showMessage(data.error || 'Error resetting timer', 'error');
+        }
+      } catch (error) {
+        if (error.message && error.message.includes('Unexpected token')) {
+          showMessage('❌ Server returned HTML instead of JSON. The endpoint may not exist on the deployed server. Please deploy the latest server.js to Render.', 'error');
+        } else {
+          showMessage('Error connecting to server: ' + error.message, 'error');
+        }
         console.error('Error:', error);
       }
     }

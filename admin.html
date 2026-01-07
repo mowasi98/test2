@@ -136,6 +136,63 @@
       border-radius: 12px;
       border: 2px solid #ffc107;
     }
+    .slot-control {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .slot-control input {
+      width: 80px;
+      padding: 0.5rem;
+      border: 2px solid #6C63FF;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .slot-control button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      min-width: 45px;
+    }
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+      .admin-container {
+        padding: 1.5rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      .status-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .status-item .count {
+        margin-top: 0.5rem;
+      }
+      .product-controls {
+        flex-direction: column;
+        width: 100%;
+      }
+      .product-controls button {
+        width: 100%;
+      }
+      .slot-control {
+        width: 100%;
+      }
+      .slot-control input {
+        flex: 1;
+      }
+      .btn-small {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+      }
+    }
     .message {
       padding: 1rem;
       border-radius: 8px;
@@ -233,6 +290,7 @@
         const count = counters[product].count;
         const isFull = count >= 3;
         const isUnavailable = counters[product].available === false;
+        const safeProductId = product.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
         
         const itemDiv = document.createElement('div');
         itemDiv.className = `status-item ${isFull ? 'full' : ''} ${isUnavailable ? 'unavailable' : ''}`;
@@ -242,8 +300,22 @@
             <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">
               ${counters[product].date ? 'Last reset: ' + counters[product].date : ''}
             </div>
+            
+            <!-- Slot Management Controls -->
+            <div class="slot-control">
+              <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)">−</button>
+              <input type="number" 
+                     id="slot-${safeProductId}" 
+                     value="${count}" 
+                     min="0" 
+                     max="3" 
+                     onchange="setSlotCount('${product}', this.value)">
+              <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)">+</button>
+              <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)">Set</button>
+            </div>
+            
             <div class="product-controls">
-              <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')">Reset This Product</button>
+              <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')">Reset to 0</button>
               <button class="btn btn-small ${isUnavailable ? 'btn-success' : 'btn-warning'}" 
                       onclick="toggleProductAvailability('${product}', ${!isUnavailable})">
                 ${isUnavailable ? 'Mark Available' : 'Mark Not Available'}
@@ -459,6 +531,71 @@
         showMessage('Error connecting to server', 'error');
         console.error('Error:', error);
       }
+    }
+
+    async function setSlotCount(productName, slotCount) {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+      
+      const count = parseInt(slotCount);
+      if (isNaN(count) || count < 0) {
+        showMessage('Invalid slot count. Must be 0 or greater.', 'error');
+        return;
+      }
+      
+      if (count > 3) {
+        showMessage('Slot count cannot exceed 3. Please use a value between 0 and 3.', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/set-slot-count`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            password: password,
+            productName: productName,
+            slotCount: count
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage(`✅ ${productName}: ${data.oldCount} → ${data.newCount} slots`, 'success');
+          checkStatus(); // Refresh status
+        } else {
+          showMessage(data.error || 'Error setting slot count', 'error');
+        }
+      } catch (error) {
+        showMessage('Error connecting to server', 'error');
+        console.error('Error:', error);
+      }
+    }
+
+    async function adjustSlotCount(productName, delta) {
+      const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+      const input = document.getElementById(`slot-${safeProductId}`);
+      const currentValue = parseInt(input.value) || 0;
+      const newValue = Math.max(0, Math.min(3, currentValue + delta));
+      
+      if (newValue === currentValue) {
+        if (newValue === 0 && delta < 0) {
+          showMessage('Slot count is already at minimum (0)', 'error');
+        } else if (newValue === 3 && delta > 0) {
+          showMessage('Slot count is already at maximum (3)', 'error');
+        }
+        return;
+      }
+      
+      input.value = newValue;
+      await setSlotCount(productName, newValue);
     }
   </script>
 </body>

@@ -1,7 +1,7 @@
 {
-  "name": "hwplug-backend",
+  "name": "officialhwplug-backend",
   "version": "1.0.0",
-  "description": "Backend for hwplug payments",
+  "description": "Backend for officialhwplug payments",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -14,4 +14,3 @@
     "resend": "^3.2.0"
   }
 }
-

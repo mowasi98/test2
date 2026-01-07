@@ -313,6 +313,46 @@
       }
     }
 
+    // Release slot reservation if user returns to homepage without completing payment
+    window.addEventListener('DOMContentLoaded', function() {
+      const reservationId = sessionStorage.getItem('reservationId');
+      const reservedProduct = sessionStorage.getItem('reservedProduct');
+      const slotReserved = sessionStorage.getItem('slotReserved');
+      
+      // If there's an active reservation and user is back on homepage, release it
+      if (reservationId && reservedProduct && slotReserved) {
+        // User abandoned the payment process - release the slot
+        fetch(`${BACKEND_URL}/release-slot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: reservationId,
+            productName: reservedProduct
+          })
+        }).then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              console.log('🔓 Slot released due to return to homepage');
+            }
+            // Clear reservation data
+            sessionStorage.removeItem('slotReserved');
+            sessionStorage.removeItem('reservedProduct');
+            sessionStorage.removeItem('reservationId');
+            // Refresh availability display
+            checkAvailability();
+          })
+          .catch(error => {
+            console.error('Error releasing slot:', error);
+            // Clear anyway
+            sessionStorage.removeItem('slotReserved');
+            sessionStorage.removeItem('reservedProduct');
+            sessionStorage.removeItem('reservationId');
+          });
+      }
+    });
+
     // Check availability for all products on page load
     async function checkAvailability() {
       for (const product of products) {
@@ -357,28 +397,56 @@
     // Check availability when page loads
     window.addEventListener('DOMContentLoaded', checkAvailability);
 
-    // Also intercept buy button clicks to double-check
+    // Intercept buy button clicks to RESERVE slot immediately (prevents race condition)
     document.querySelectorAll('.buy-btn').forEach(btn => {
       btn.addEventListener('click', async function(e) {
+        e.preventDefault(); // Prevent default navigation first
         const product = this.getAttribute('data-product');
+        const btnElement = this;
+        
+        // Disable button to prevent double-clicking
+        btnElement.disabled = true;
+        btnElement.textContent = 'Reserving slot...';
         
         try {
-          const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
+          // ATOMICALLY reserve a slot (check and increment in one operation)
+          const response = await fetch(`${BACKEND_URL}/reserve-slot`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ productName: product })
+          });
+          
           const data = await response.json();
           
-          if (!data.available) {
-            e.preventDefault();
+          if (data.success && data.reserved) {
+            // Slot reserved! Store reservation details in sessionStorage
+            sessionStorage.setItem('slotReserved', 'true');
+            sessionStorage.setItem('reservedProduct', product);
+            sessionStorage.setItem('reservationId', data.reservationId);
+            
+            // Now proceed to login page with product info
+            const url = btnElement.getAttribute('href');
+            window.location.href = url;
+          } else {
+            // Slot reservation failed - slots are full or product unavailable
+            btnElement.disabled = false;
+            btnElement.textContent = 'Buy Now';
+            
             if (data.manuallyDisabled) {
               alert('⚠️ This product is not available right now. Please try again later.');
             } else {
               alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
             }
-            checkAvailability(); // Refresh status
-            return false;
+            checkAvailability(); // Refresh status to show updated slot count
           }
         } catch (error) {
-          console.error('Error checking availability:', error);
-          // Allow navigation on error
+          console.error('Error reserving slot:', error);
+          btnElement.disabled = false;
+          btnElement.textContent = 'Buy Now';
+          alert('⚠️ Error reserving slot. Please try again.');
+          checkAvailability(); // Refresh status
         }
       });
     });

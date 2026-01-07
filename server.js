@@ -393,7 +393,7 @@ console.log('- Resend initialized:', resend ? 'Yes' : 'No');
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.send('hwplug Backend Running! 🚀');
+  res.send('officialhwplug Backend Running! 🚀');
 });
 
 // Test email endpoint (for debugging)
@@ -418,9 +418,9 @@ app.get('/test-email', async (req, res) => {
     }
 
     const { data, error } = await resend.emails.send({
-      from: 'hwplug <onboarding@resend.dev>', // Update this to your verified domain
+      from: 'officialhwplug <onboarding@resend.dev>', // Update this to your verified domain
       to: process.env.YOUR_EMAIL,
-      subject: '🧪 Test Email from hwplug Backend',
+      subject: '🧪 Test Email from officialhwplug Backend',
       html: '<h2>Test Email</h2><p>This is a test email. If you receive this, Resend configuration is working!</p>'
     });
 
@@ -653,7 +653,7 @@ async function sendCardPaymentNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '💳 CARD PAYMENT SELECTED - hwplug',
+      subject: '💳 CARD PAYMENT SELECTED - officialhwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -664,7 +664,7 @@ async function sendCardPaymentNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">Card Payment Selected</p>
             </div>
 
@@ -717,7 +717,7 @@ async function sendCardPaymentNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>
@@ -759,7 +759,7 @@ async function sendLoginNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '🔐 New Customer Login - hwplug',
+      subject: '🔐 New Customer Login - officialhwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -770,7 +770,7 @@ async function sendLoginNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">New Customer Login</p>
             </div>
 
@@ -811,7 +811,7 @@ async function sendLoginNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>
@@ -851,7 +851,7 @@ async function sendCashPaymentNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: isNewLogin ? '🔐 NEW LOGIN - Cash Payment Request - hwplug' : '💵 Cash Payment Request - hwplug',
+      subject: isNewLogin ? '🔐 NEW LOGIN - Cash Payment Request - officialhwplug' : '💵 Cash Payment Request - officialhwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -862,7 +862,7 @@ async function sendCashPaymentNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Cash Payment' : '💵 Cash Payment Request'}</p>
             </div>
 
@@ -932,7 +932,7 @@ async function sendCashPaymentNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>
@@ -975,7 +975,7 @@ async function sendLoginDetailsNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: isNewLogin ? '🔐 NEW LOGIN - Card Payment Success - hwplug' : '💳 Card Payment Success - hwplug',
+      subject: isNewLogin ? '🔐 NEW LOGIN - Card Payment Success - officialhwplug' : '💳 Card Payment Success - officialhwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -986,7 +986,7 @@ async function sendLoginDetailsNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Card Payment' : '💳 Card Payment Successful'}</p>
             </div>
 
@@ -1058,7 +1058,7 @@ async function sendLoginDetailsNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>

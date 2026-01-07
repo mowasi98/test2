@@ -62,9 +62,16 @@
       transition: all 0.2s;
       width: 100%;
       margin-top: 1rem;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     .btn:hover {
       background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+    }
+    .btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     .btn-danger {
       background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%);
@@ -192,6 +199,18 @@
         font-size: 0.8rem;
         padding: 0.4rem 0.8rem;
       }
+      .btn {
+        padding: 0.9rem 1.5rem;
+        font-size: 0.95rem;
+        min-height: 48px;
+      }
+    }
+    @media (max-width: 600px) {
+      .btn {
+        padding: 1rem 1.2rem;
+        font-size: 0.9rem;
+        min-height: 52px;
+      }
     }
     .message {
       padding: 1rem;
@@ -229,9 +248,9 @@
       <h2>Current Status (3 slots per product per day)</h2>
       <div id="statusItems"></div>
       
-      <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-        <button class="btn btn-danger" onclick="resetCounters()" style="flex: 1;">Reset All Counters</button>
-        <button class="btn btn-warning" onclick="resetTimer()" style="flex: 1;">Reset Timer Only</button>
+      <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <button class="btn btn-danger" id="resetAllBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset All Counters</button>
+        <button class="btn btn-warning" id="resetTimerBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset Timer Only</button>
       </div>
       <p style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; margin-bottom: 1rem;">
         <strong>Note:</strong> "Reset Timer Only" resets the 24-hour timer but keeps current slot counts. "Reset All Counters" resets both timer and slot counts to 0.
@@ -240,9 +259,9 @@
       <div class="availability-section">
         <h3 style="margin-top: 0; color: #856404;">🌐 Global Availability Controls</h3>
         <p style="color: #856404; margin-bottom: 1rem;">Mark all products as available or not available</p>
-        <div style="display: flex; gap: 1rem;">
-          <button class="btn btn-warning" onclick="setAllAvailable(false)" style="flex: 1;">Mark All as NOT Available</button>
-          <button class="btn btn-success" onclick="setAllAvailable(true)" style="flex: 1;">Mark All as Available</button>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button class="btn btn-warning" id="markAllUnavailableBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Mark All as NOT Available</button>
+          <button class="btn btn-success" id="markAllAvailableBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Mark All as Available</button>
         </div>
       </div>
     </div>
@@ -597,6 +616,62 @@
       input.value = newValue;
       await setSlotCount(productName, newValue);
     }
+
+    // Add mobile-friendly event listeners when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      // Reset All Counters button
+      const resetAllBtn = document.getElementById('resetAllBtn');
+      if (resetAllBtn) {
+        resetAllBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          resetCounters();
+        });
+        // Add touch event for better mobile response
+        resetAllBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          this.click();
+        });
+      }
+
+      // Reset Timer Only button
+      const resetTimerBtn = document.getElementById('resetTimerBtn');
+      if (resetTimerBtn) {
+        resetTimerBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          resetTimer();
+        });
+        resetTimerBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          this.click();
+        });
+      }
+
+      // Mark All Unavailable button
+      const markAllUnavailableBtn = document.getElementById('markAllUnavailableBtn');
+      if (markAllUnavailableBtn) {
+        markAllUnavailableBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          setAllAvailable(false);
+        });
+        markAllUnavailableBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          this.click();
+        });
+      }
+
+      // Mark All Available button
+      const markAllAvailableBtn = document.getElementById('markAllAvailableBtn');
+      if (markAllAvailableBtn) {
+        markAllAvailableBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          setAllAvailable(true);
+        });
+        markAllAvailableBtn.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          this.click();
+        });
+      }
+    });
   </script>
 </body>
 </html>

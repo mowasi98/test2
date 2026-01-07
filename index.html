@@ -570,13 +570,53 @@
       setInterval(fetchTimerResetTime, 5000);
     });
 
-    function logout() {
+    async function logout() {
       if (confirm('Are you sure you want to logout?')) {
+        const username = localStorage.getItem('savedUsername');
+        
+        // Notify backend that user is logging out
+        if (username) {
+          try {
+            await fetch(`${BACKEND_URL}/user/logout`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username })
+            });
+          } catch (error) {
+            console.error('Error sending logout signal:', error);
+          }
+        }
+        
         localStorage.removeItem('savedUsername');
         localStorage.removeItem('savedPassword');
         sessionStorage.clear();
         window.location.reload();
       }
+    }
+
+    // Send heartbeat to keep user active in admin panel
+    function sendHeartbeat() {
+      const username = localStorage.getItem('savedUsername');
+      const school = sessionStorage.getItem('selectedSchool');
+      if (username) {
+        fetch(`${BACKEND_URL}/user/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username,
+            school: school || 'Not provided'
+          })
+        }).catch(error => {
+          console.error('Heartbeat error:', error);
+        });
+      }
+    }
+
+    // Send heartbeat every 60 seconds (1 minute) to stay active
+    setInterval(sendHeartbeat, 60000);
+    // Send initial heartbeat if user is logged in
+    if (localStorage.getItem('savedUsername')) {
+      sendHeartbeat();
     }
 
     // Release slot reservation if user returns to homepage without completing payment

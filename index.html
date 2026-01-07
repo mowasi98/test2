@@ -339,7 +339,7 @@
   <script>
     const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
       ? 'http://localhost:10000' 
-      : 'https://officialhwplug-backend.onrender.com';
+      : 'https://test2-adsw.onrender.com';
 
     const products = ['Sparx Reader', 'Sparx Maths', 'Educate', 'Seneca'];
 
@@ -599,7 +599,20 @@
           }
         } catch (error) {
           console.error(`Error checking availability for ${product}:`, error);
-          // On error, allow purchase (fail open)
+          // On error, show error but keep button enabled
+          const buyBtn = document.querySelector(`.buy-btn[data-product="${product}"]`);
+          const slotsDiv = document.getElementById(`slots-${product}`);
+          if (slotsDiv) {
+            slotsDiv.innerHTML = `<div class="slots-message" style="color: #d9534f;">⚠️ Cannot connect to backend. Check console for details.</div>`;
+          }
+          // Keep button enabled on error (fail open)
+          if (buyBtn) {
+            buyBtn.classList.remove('disabled');
+            buyBtn.style.pointerEvents = 'auto';
+          }
+          console.error('Backend URL:', BACKEND_URL);
+          console.error('Full error:', error);
+          console.error('Try checking if backend is running at:', BACKEND_URL);
         }
       }
     }
@@ -667,11 +680,18 @@
           }
         } catch (error) {
           console.error('Error reserving slot:', error);
+          console.error('Backend URL:', BACKEND_URL);
           btnElement.disabled = false;
           btnElement.style.pointerEvents = 'auto';
           btnElement.removeAttribute('data-reserving'); // Allow auto-refresh again
           btnElement.textContent = 'Buy Now';
-          alert('⚠️ Error reserving slot. Please try again.');
+          
+          // Check if it's a connection error
+          if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+            alert(`⚠️ Cannot connect to backend server!\n\nBackend URL: ${BACKEND_URL}\n\nPlease check:\n1. Is the backend running?\n2. Is the URL correct?\n3. Check browser console (F12) for details.`);
+          } else {
+            alert('⚠️ Error reserving slot. Please try again.\n\nCheck browser console (F12) for details.');
+          }
           checkAvailability(); // Refresh status
         }
       });

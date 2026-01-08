@@ -3,13 +3,40 @@ const express = require('express');
 const cors = require('cors');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { Resend } = require('resend');
+const mongoose = require('mongoose');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hwplug';
+console.log('🔌 Connecting to MongoDB...');
+
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => {
+  console.log('✅ MongoDB connected successfully');
+}).catch(err => {
+  console.error('❌ MongoDB connection error:', err);
+  console.error('⚠️  Server will continue with in-memory storage (data will not persist)');
+});
+
+// MongoDB Schema for persistent data
+const DataSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  dailyLimits: { type: Object, default: {} },
+  activeReservations: { type: Object, default: {} },
+  lastTimerResetTime: { type: Number, default: Date.now },
+  loginHistory: { type: Array, default: [] },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const DataModel = mongoose.model('Data', DataSchema);
+
 // Daily purchase limit tracking (3 per product per day)
-const dailyLimits = {
+let dailyLimits = {
   'Sparx Reader': { count: 0, date: null, available: true },
   'Sparx Maths': { count: 0, date: null, available: true },
   'Educate': { count: 0, date: null, available: true },
@@ -20,21 +47,87 @@ const MAX_PURCHASES_PER_DAY = 3;
 const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
 
 // Track active reservations: { reservationId: { productName, timestamp } }
-const activeReservations = {};
+let activeReservations = {};
 
 // Store the last timer reset time (for frontend to sync) - Initialize with current time
 let lastTimerResetTime = Date.now();
 
 // Track all login history
-const loginHistory = [];
+let loginHistory = [];
 
 // Track active sessions: { username: { lastActive: timestamp, school: '' } }
-const activeSessions = {};
+let activeSessions = {};
 const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes of inactivity = offline
+
+// ====== MONGODB PERSISTENT STORAGE FUNCTIONS ======
+
+// Save data to MongoDB (async, non-blocking)
+async function saveData() {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      console.log('⚠️  MongoDB not connected, skipping save');
+      return;
+    }
+    
+    await DataModel.findOneAndUpdate(
+      { key: 'main' },
+      {
+        key: 'main',
+        dailyLimits,
+        activeReservations,
+        lastTimerResetTime,
+        loginHistory,
+        updatedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    
+    console.log('💾 Data saved to MongoDB');
+  } catch (error) {
+    console.error('❌ Error saving data to MongoDB:', error.message);
+  }
+}
+
+// Load data from MongoDB
+async function loadData() {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      console.log('⚠️  MongoDB not connected, using default data');
+      return;
+    }
+    
+    const data = await DataModel.findOne({ key: 'main' });
+    
+    if (data) {
+      // Restore data
+      dailyLimits = data.dailyLimits || dailyLimits;
+      activeReservations = data.activeReservations || {};
+      lastTimerResetTime = data.lastTimerResetTime || Date.now();
+      loginHistory.push(...(data.loginHistory || []));
+      
+      console.log('✅ Data loaded from MongoDB');
+      console.log(`   - Last updated: ${data.updatedAt}`);
+      console.log(`   - Login history entries: ${loginHistory.length}`);
+      console.log(`   - Active reservations: ${Object.keys(activeReservations).length}`);
+      console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}`).join(', '));
+    } else {
+      console.log('📝 No saved data found in MongoDB, starting fresh');
+      await saveData(); // Create initial document
+    }
+  } catch (error) {
+    console.error('❌ Error loading data from MongoDB:', error.message);
+  }
+}
+
+// Load data on startup (after MongoDB connects)
+mongoose.connection.once('open', async () => {
+  await loadData();
+});
 
   // Clean up expired reservations (run every minute)
 setInterval(() => {
   const now = Date.now();
+  let hasChanges = false;
   Object.keys(activeReservations).forEach(reservationId => {
     const reservation = activeReservations[reservationId];
     const age = now - reservation.timestamp;
@@ -45,12 +138,17 @@ setInterval(() => {
         dailyLimits[reservation.productName].count--;
         const newCount = dailyLimits[reservation.productName].count;
         console.log(`⏰ Expired reservation released for "${reservation.productName}": ${oldCount} → ${newCount} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+        hasChanges = true;
       } else {
         console.log(`⏰ Expired reservation for "${reservation.productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
       }
       delete activeReservations[reservationId];
+      hasChanges = true;
     }
   });
+  if (hasChanges) {
+    saveData();
+  }
 }, 60000); // Check every minute
 
 // Clean up inactive sessions (run every minute)
@@ -69,12 +167,18 @@ setInterval(() => {
 // Reset counters if it's a new day
 function resetDailyCountersIfNeeded() {
   const today = new Date().toDateString();
+  let hasChanges = false;
   Object.keys(dailyLimits).forEach(product => {
     if (dailyLimits[product].date !== today) {
       dailyLimits[product].count = 0;
       dailyLimits[product].date = today;
+      hasChanges = true;
     }
   });
+  if (hasChanges) {
+    console.log('🔄 Daily counters reset (new day)');
+    saveData();
+  }
 }
 
 // Check product availability endpoint
@@ -159,6 +263,9 @@ app.post('/reserve-slot', (req, res) => {
   const wasLastSlot = remaining === 0;
   console.log(`🔒 Slot RESERVED for "${productName}": ${oldCount} → ${product.count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining)${wasLastSlot ? ' ⚠️ LAST SLOT!' : ''} - Reservation ID: ${reservationId} (timeout: ${RESERVATION_TIMEOUT / 60000} min)`);
   
+  // Save to disk immediately
+  saveData();
+  
   res.json({
     success: true,
     reserved: true,
@@ -205,6 +312,9 @@ app.post('/release-slot', (req, res) => {
     
     console.log(`🔓 Slot RELEASED for "${productName}": ${dailyLimits[productName].count}/${MAX_PURCHASES_PER_DAY} (${remaining} remaining) - Reservation ID: ${reservationId}`);
     
+    // Save to disk
+    saveData();
+    
     res.json({
       success: true,
       released: true,
@@ -215,6 +325,7 @@ app.post('/release-slot', (req, res) => {
   } else {
     // Already released or count is 0
     delete activeReservations[reservationId];
+    saveData();
     res.json({
       success: false,
       error: 'Slot was already released',
@@ -267,6 +378,9 @@ app.post('/admin/reset-counters', (req, res) => {
   
   console.log(`🔄 Admin reset: All counters reset to 0, cleared ${clearedReservations} active reservations`);
   
+  // Save to disk
+  saveData();
+  
   res.json({
     success: true,
     message: 'All counters reset successfully',
@@ -302,6 +416,9 @@ app.post('/admin/reset-product-counter', (req, res) => {
   
   console.log(`🔄 Admin reset: Product "${productName}" counter reset to 0, cleared ${clearedReservations} active reservations`);
   
+  // Save to disk
+  saveData();
+  
   res.json({
     success: true,
     message: `Counter reset for ${productName}`,
@@ -325,6 +442,9 @@ app.post('/admin/set-product-availability', (req, res) => {
     dailyLimits[product].available = available === true;
   });
   
+  // Save to disk
+  saveData();
+  
   res.json({
     success: true,
     message: `All products ${available ? 'marked as available' : 'marked as not available'}`,
@@ -347,6 +467,9 @@ app.post('/admin/toggle-product-availability', (req, res) => {
   
   // Toggle individual product availability
   dailyLimits[productName].available = available === true;
+  
+  // Save to disk
+  saveData();
   
   res.json({
     success: true,
@@ -386,6 +509,9 @@ app.post('/admin/set-slot-count', (req, res) => {
   const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - newCount);
   
   console.log(`🔧 Admin: Set slot count for "${productName}": ${oldCount} → ${newCount} (${remaining} remaining)`);
+  
+  // Save to disk
+  saveData();
   
   res.json({
     success: true,
@@ -428,6 +554,9 @@ app.post('/admin/reset-timer', (req, res) => {
   lastTimerResetTime = Date.now();
   
   console.log(`⏰ Timer reset at ${new Date().toISOString()} - Counts preserved`);
+  
+  // Save to disk
+  saveData();
   
   res.json({
     success: true,
@@ -546,6 +675,11 @@ app.post('/admin/auto-reset-slots', (req, res) => {
       hasReset = true;
     }
   });
+  
+  if (hasReset) {
+    // Save to disk
+    saveData();
+  }
   
   res.json({
     success: true,
@@ -791,6 +925,9 @@ app.post('/submit-cash-payment', async (req, res) => {
       activeSessions[username].lastActive = Date.now();
     }
 
+    // Save to disk
+    saveData();
+
     console.log('✅ Cash payment request processed successfully');
     res.json({ success: true, message: 'Cash payment notification sent successfully' });
   } catch (error) {
@@ -888,6 +1025,9 @@ app.post('/submit-login-details', async (req, res) => {
     if (activeSessions[username]) {
       activeSessions[username].lastActive = Date.now();
     }
+
+    // Save to disk
+    saveData();
 
     console.log('✅ Card payment email sent successfully');
     console.log('✅ Card payment request processed successfully');

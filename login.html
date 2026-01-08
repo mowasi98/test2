@@ -511,15 +511,8 @@
 
       // Product info is optional - if missing, redirect to homepage to select a product
       if (!productName || !productPrice || !stripeLink) {
-        // If no product selected, redirect to homepage (but credentials are already saved)
-        if (confirm('Please select a product first. Would you like to go back to the homepage?')) {
-          window.location.href = 'index.html';
-        } else {
-          errorDiv.textContent = 'Please select a product from the homepage first.';
-          errorDiv.style.display = 'block';
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Continue to Login';
-        }
+        // If no product selected, silently redirect to homepage (credentials already saved)
+        window.location.href = 'index.html';
         return;
       }
 

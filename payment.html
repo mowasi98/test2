@@ -183,6 +183,12 @@
       </div>
     </div>
     
+    <div id="cashCodeInput" style="display: none; margin-top: 1rem;">
+      <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333;">Enter Cash Payment Code:</label>
+      <input type="text" id="cashCode" placeholder="Enter code from admin" style="width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; text-transform: uppercase;" />
+      <small style="color: #666; display: block; margin-top: 0.5rem;">Contact admin to get a valid payment code</small>
+    </div>
+    
     <button id="payBtn" class="pay-btn" onclick="processPayment()" disabled>Continue</button>
     
     <div id="successMessage" class="success-message">
@@ -259,6 +265,14 @@
       });
       document.querySelector(`[data-method="${method}"]`).classList.add('selected');
       
+      // Show/hide cash code input
+      const cashCodeInput = document.getElementById('cashCodeInput');
+      if (method === 'cash') {
+        cashCodeInput.style.display = 'block';
+      } else {
+        cashCodeInput.style.display = 'none';
+      }
+      
       // Enable pay button
       document.getElementById('payBtn').disabled = false;
       document.getElementById('payBtn').textContent = method === 'card' ? 'Continue to Payment' : 'Submit Cash Payment';
@@ -317,6 +331,15 @@
           payBtn.textContent = 'Continue to Payment';
         }
       } else if (selectedMethod === 'cash') {
+        // Get and validate cash code
+        const cashCode = document.getElementById('cashCode').value.trim();
+        if (!cashCode) {
+          alert('Please enter a cash payment code');
+          payBtn.disabled = false;
+          payBtn.textContent = 'Submit Cash Payment';
+          return;
+        }
+        
         // Submit cash payment notification
         try {
           console.log('💵 Submitting cash payment with data:', {
@@ -325,7 +348,8 @@
             productName: productName,
             productPrice: productPrice,
             previousUsername: previousUsername,
-            reservationId: sessionStorage.getItem('reservationId') || ''
+            reservationId: sessionStorage.getItem('reservationId') || '',
+            cashCode: cashCode
           });
           
           const response = await fetch(`${BACKEND_URL}/submit-cash-payment`, {
@@ -340,16 +364,23 @@
               productName: productName,
               productPrice: productPrice,
               previousUsername: previousUsername,
-              reservationId: sessionStorage.getItem('reservationId') || '' // Pass reservation ID
+              reservationId: sessionStorage.getItem('reservationId') || '', // Pass reservation ID
+              cashCode: cashCode // Include cash code
             }),
           });
 
           console.log('💵 Response status:', response.status);
           
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('💵 Error response:', errorText);
-            alert(`Error: ${errorText}`);
+            try {
+              const errorData = await response.json();
+              console.error('💵 Error response:', errorData);
+              alert(errorData.error || 'Payment failed. Please try again.');
+            } catch (e) {
+              const errorText = await response.text();
+              console.error('💵 Error response:', errorText);
+              alert('Payment failed. Please check your code and try again.');
+            }
             payBtn.disabled = false;
             payBtn.textContent = 'Submit Cash Payment';
             return;
@@ -361,6 +392,7 @@
           if (response.ok && result.success) {
             // Show success message
             document.querySelector('.payment-options').style.display = 'none';
+            document.getElementById('cashCodeInput').style.display = 'none';
             payBtn.style.display = 'none';
             document.getElementById('successMessage').style.display = 'block';
             document.getElementById('successMessage').innerHTML = '✓ CASH PAYMENT REQUEST SUBMITTED! THANK YOU FOR YOUR PAYMENT. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.';

@@ -355,6 +355,8 @@
     <div class="tagline">Your one-stop shop for learning tools</div>
   </header>
 
+  <div id="errorMessage" style="display: none; max-width: 900px; margin: 2rem auto 0 auto; padding: 1rem 1.5rem; background: #f8d7da; color: #721c24; border-radius: 8px; border-left: 4px solid #f5c6cb; font-weight: 600;"></div>
+
   <section class="items">
     <div class="item-card" data-product="Sparx Reader">
       <div class="item-title">Sparx Reader</div>
@@ -584,27 +586,37 @@
     });
 
     async function logout() {
-      if (confirm('Are you sure you want to logout?')) {
-        const username = localStorage.getItem('savedUsername');
-        
-        // Notify backend that user is logging out
-        if (username) {
-          try {
-            await fetch(`${BACKEND_URL}/user/logout`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username })
-            });
-          } catch (error) {
-            console.error('Error sending logout signal:', error);
-          }
+      const username = localStorage.getItem('savedUsername');
+      
+      // Show logout message
+      const errorMsg = document.getElementById('errorMessage');
+      errorMsg.textContent = '👋 Logging out...';
+      errorMsg.style.background = '#d4edda';
+      errorMsg.style.color = '#155724';
+      errorMsg.style.borderLeftColor = '#c3e6cb';
+      errorMsg.style.display = 'block';
+      
+      // Notify backend that user is logging out
+      if (username) {
+        try {
+          await fetch(`${BACKEND_URL}/user/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+          });
+        } catch (error) {
+          console.error('Error sending logout signal:', error);
         }
-        
-        localStorage.removeItem('savedUsername');
-        localStorage.removeItem('savedPassword');
-        sessionStorage.clear();
-        window.location.reload();
       }
+      
+      // Clear credentials and reload
+      localStorage.removeItem('savedUsername');
+      localStorage.removeItem('savedPassword');
+      sessionStorage.clear();
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     }
 
     // Send heartbeat to keep user active in admin panel
@@ -765,11 +777,14 @@
           
           if (!data.available || data.manuallyDisabled) {
             console.log('❌ Product not available:', data);
+            const errorMsg = document.getElementById('errorMessage');
             if (data.manuallyDisabled) {
-              alert('⚠️ This product is not available right now. Please try again later.');
+              errorMsg.textContent = '⚠️ This product is not available right now. Please try again later.';
             } else {
-              alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+              errorMsg.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
             }
+            errorMsg.style.display = 'block';
+            setTimeout(() => { errorMsg.style.display = 'none'; }, 5000);
             return false;
           }
           
@@ -802,11 +817,14 @@
               const reservationData = await reservationResponse.json();
               
               if (!reservationData.success || !reservationData.reserved) {
+                const errorMsg = document.getElementById('errorMessage');
                 if (reservationData.manuallyDisabled) {
-                  alert('⚠️ This product is not available right now. Please try again later.');
+                  errorMsg.textContent = '⚠️ This product is not available right now. Please try again later.';
                 } else {
-                  alert('⚠️ Slots are finished for today for this product. Please try again tomorrow.');
+                  errorMsg.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
                 }
+                errorMsg.style.display = 'block';
+                setTimeout(() => { errorMsg.style.display = 'none'; }, 5000);
                 return false;
               }
               
@@ -828,7 +846,10 @@
               window.location.href = 'payment.html';
             } catch (error) {
               console.error('❌ Error reserving slot:', error);
-              alert('⚠️ Error reserving slot. Please try again.');
+              const errorMsg = document.getElementById('errorMessage');
+              errorMsg.textContent = '⚠️ Error reserving slot. Please try again.';
+              errorMsg.style.display = 'block';
+              setTimeout(() => { errorMsg.style.display = 'none'; }, 5000);
               return false;
             }
           } else {

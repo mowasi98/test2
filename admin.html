@@ -274,6 +274,25 @@
         </div>
       </div>
 
+      <div class="cash-codes-section" style="margin-top: 2rem; padding: 1.5rem; background: #d1ecf1; border-radius: 12px; border: 2px solid #17a2b8;">
+        <h3 style="margin-top: 0; color: #0c5460;">💵 Cash Payment Codes</h3>
+        <p style="color: #0c5460; margin-bottom: 1rem;">Manage codes that users need to enter for cash payments</p>
+        
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+          <input type="text" id="newCashCode" placeholder="Enter new code (e.g., CASH123)" style="flex: 1; min-width: 200px; padding: 0.8rem; border: 2px solid #17a2b8; border-radius: 8px; font-size: 1rem; text-transform: uppercase;" />
+          <button class="btn btn-success" onclick="addCashCode()" style="touch-action: manipulation;">Add Code</button>
+        </div>
+        
+        <button class="btn" onclick="loadCashCodes()" style="margin-bottom: 1rem; touch-action: manipulation;">Show All Codes</button>
+        
+        <div id="cashCodesContent" style="display: none;">
+          <div id="cashCodesStats" style="margin-bottom: 1rem; padding: 1rem; background: #bee5eb; border-radius: 8px; color: #0c5460;">
+            <strong>Total Active Codes:</strong> <span id="totalCodes">0</span>
+          </div>
+          <div id="cashCodesList"></div>
+        </div>
+      </div>
+
       <div class="active-users-section" style="margin-top: 2rem;">
         <h3 style="margin-top: 0; color: #28a745;">🟢 Active Users Browsing Now</h3>
         <p style="color: #666; margin-bottom: 1rem;">See who is currently online browsing the website (updates every 15 seconds)</p>
@@ -853,6 +872,122 @@
       } catch (error) {
         console.error('Error loading login history:', error);
         showMessage('Error loading login history: ' + error.message, 'error');
+      }
+    }
+
+    // ====== CASH PAYMENT CODES MANAGEMENT ======
+    async function loadCashCodes() {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/get-cash-codes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('cashCodesContent').style.display = 'block';
+          document.getElementById('totalCodes').textContent = data.totalCodes;
+          
+          const codesList = document.getElementById('cashCodesList');
+          codesList.innerHTML = '';
+          
+          if (data.codes.length === 0) {
+            codesList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No codes created yet. Add a code above to get started.</p>';
+          } else {
+            data.codes.forEach((code, index) => {
+              const codeItem = document.createElement('div');
+              codeItem.style.cssText = 'background: #fff; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;';
+              
+              codeItem.innerHTML = `
+                <div style="font-family: monospace; font-size: 1.2rem; font-weight: 700; color: #0c5460;">
+                  ${code}
+                </div>
+                <button class="btn btn-danger btn-small" onclick="removeCashCode('${code}')" style="touch-action: manipulation;">Remove</button>
+              `;
+              
+              codesList.appendChild(codeItem);
+            });
+          }
+        } else {
+          showMessage(data.error || 'Failed to load codes', 'error');
+        }
+      } catch (error) {
+        console.error('Error loading cash codes:', error);
+        showMessage('Error loading cash codes: ' + error.message, 'error');
+      }
+    }
+
+    async function addCashCode() {
+      const password = document.getElementById('adminPassword').value;
+      const codeInput = document.getElementById('newCashCode');
+      const code = codeInput.value.trim();
+      
+      if (!password) {
+        showMessage('Please enter admin password first', 'error');
+        return;
+      }
+
+      if (!code) {
+        showMessage('Please enter a code', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/add-cash-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password, code })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage(`Code "${data.codes[data.codes.length - 1]}" added successfully!`, 'success');
+          codeInput.value = ''; // Clear input
+          loadCashCodes(); // Reload list
+        } else {
+          showMessage(data.error || 'Failed to add code', 'error');
+        }
+      } catch (error) {
+        console.error('Error adding cash code:', error);
+        showMessage('Error adding cash code: ' + error.message, 'error');
+      }
+    }
+
+    async function removeCashCode(code) {
+      const password = document.getElementById('adminPassword').value;
+      
+      if (!confirm(`Remove code "${code}"?`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/admin/remove-cash-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password, code })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage(`Code "${code}" removed successfully!`, 'success');
+          loadCashCodes(); // Reload list
+        } else {
+          showMessage(data.error || 'Failed to remove code', 'error');
+        }
+      } catch (error) {
+        console.error('Error removing cash code:', error);
+        showMessage('Error removing cash code: ' + error.message, 'error');
       }
     }
   </script>

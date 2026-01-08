@@ -226,25 +226,17 @@
         </small>
       </div>
       
-      <div style="background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; text-align: center; color: white; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">
-        <div style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.8rem;">📱 ADD ME ON SNAPCHAT FIRST!</div>
-        
-        <a id="snapchatLink" href="https://www.snapchat.com/add/mo_wasi98" target="_blank" style="display: inline-block; text-decoration: none; margin: 1rem auto;">
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-            <img src="snapchat-profile.png" alt="Snapchat Profile" style="width: 150px; height: 150px; border-radius: 50%; border: 4px solid #FFFC00; box-shadow: 0 4px 20px rgba(255, 252, 0, 0.5); transition: all 0.3s; cursor: pointer; object-fit: cover;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 30px rgba(255, 252, 0, 0.7)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 20px rgba(255, 252, 0, 0.5)';">
-            <div style="background: #FFFC00; color: #000; padding: 0.8rem 2rem; border-radius: 50px; font-size: 1.3rem; font-weight: 900; box-shadow: 0 4px 15px rgba(255, 252, 0, 0.4);">
-              <span id="snapchatUsername" style="letter-spacing: 0.5px;">mo_wasi98</span>
-            </div>
-          </div>
+      <div style="text-align: center; margin: 1.5rem 0; padding: 1.5rem; background: #f0f0ff; border-radius: 8px; border-left: 4px solid #6C63FF;">
+        <div style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem; font-weight: 600;">📱 Add the Snapchat for updates on your homework</div>
+        <a href="https://snapchat.com/add/mo_wasi98" target="_blank" rel="noopener noreferrer" style="display: inline-block; color: #6C63FF; font-size: 1.2rem; font-weight: 700; text-decoration: none; padding: 0.5rem 1rem; background: white; border-radius: 8px; transition: all 0.2s; margin-bottom: 1rem;">
+          👻 mo_wasi98
         </a>
         
-        <div style="font-size: 0.9rem; opacity: 0.95; margin-top: 0.8rem; margin-bottom: 0.5rem;">👆 Click my picture to add me on Snapchat!</div>
-        <div style="font-size: 0.95rem; opacity: 0.95; margin-bottom: 1rem;">⚠️ You must add this Snapchat before continuing!</div>
-        
-        <label style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; font-size: 1.05rem; background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; transition: all 0.2s;">
-          <input type="checkbox" id="snapchatConfirm" required style="width: 20px; height: 20px; cursor: pointer;">
-          <span style="font-weight: 600;">✓ I have added this Snapchat</span>
+        <label style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; background: white; padding: 0.8rem; border-radius: 8px; transition: all 0.2s;">
+          <input type="checkbox" id="snapchatConfirm" required style="width: 18px; height: 18px; cursor: pointer;">
+          <span style="font-weight: 600; color: #333;">✓ I have added this Snapchat</span>
         </label>
+        <div style="color: #d9534f; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600;">⚠️ Required to continue</div>
       </div>
       
       <button type="submit" id="submitBtn" class="submit-btn">Continue to Login</button>
@@ -256,29 +248,6 @@
     const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
       ? 'http://localhost:10000' 
       : 'https://test2-adsw.onrender.com';
-
-    // Fetch and display Snapchat username on page load
-    async function loadSnapchat() {
-      try {
-        const response = await fetch(`${BACKEND_URL}/get-snapchat`);
-        if (response.ok) {
-          const data = await response.json();
-          const username = data.snapchat || 'mo_wasi98';
-          document.getElementById('snapchatUsername').textContent = username;
-          document.getElementById('snapchatLink').href = `https://www.snapchat.com/add/${username}`;
-        } else {
-          document.getElementById('snapchatUsername').textContent = 'mo_wasi98';
-          document.getElementById('snapchatLink').href = 'https://www.snapchat.com/add/mo_wasi98';
-        }
-      } catch (error) {
-        console.error('Error fetching Snapchat:', error);
-        document.getElementById('snapchatUsername').textContent = 'mo_wasi98';
-        document.getElementById('snapchatLink').href = 'https://www.snapchat.com/add/mo_wasi98';
-      }
-    }
-    
-    // Load Snapchat on page load
-    loadSnapchat();
 
     // Comprehensive list of UK schools (including all Chingford schools)
     const schools = [
@@ -502,7 +471,7 @@
       
       // Validate Snapchat confirmation
       if (!snapchatCheckbox.checked) {
-        errorDiv.textContent = '⚠️ You must add the Snapchat above and confirm before continuing!';
+        errorDiv.textContent = '⚠️ You must add the Snapchat above and check the box before continuing!';
         errorDiv.style.display = 'block';
         return;
       }

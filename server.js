@@ -30,6 +30,7 @@ const DataSchema = new mongoose.Schema({
   activeReservations: { type: Object, default: {} },
   lastTimerResetTime: { type: Number, default: Date.now },
   loginHistory: { type: Array, default: [] },
+  cashPaymentCodes: { type: Array, default: [] }, // Array of valid codes for cash payments
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -59,6 +60,9 @@ let loginHistory = [];
 let activeSessions = {};
 const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes of inactivity = offline
 
+// Cash payment codes (admin can add/remove)
+let cashPaymentCodes = [];
+
 // ====== MONGODB PERSISTENT STORAGE FUNCTIONS ======
 
 // Save data to MongoDB (async, non-blocking)
@@ -77,6 +81,7 @@ async function saveData() {
         activeReservations,
         lastTimerResetTime,
         loginHistory,
+        cashPaymentCodes,
         updatedAt: new Date()
       },
       { upsert: true, new: true }
@@ -104,11 +109,13 @@ async function loadData() {
       activeReservations = data.activeReservations || {};
       lastTimerResetTime = data.lastTimerResetTime || Date.now();
       loginHistory.push(...(data.loginHistory || []));
+      cashPaymentCodes = data.cashPaymentCodes || [];
       
       console.log('✅ Data loaded from MongoDB');
       console.log(`   - Last updated: ${data.updatedAt}`);
       console.log(`   - Login history entries: ${loginHistory.length}`);
       console.log(`   - Active reservations: ${Object.keys(activeReservations).length}`);
+      console.log(`   - Cash payment codes: ${cashPaymentCodes.length}`);
       console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}`).join(', '));
     } else {
       console.log('📝 No saved data found in MongoDB, starting fresh');
@@ -660,6 +667,100 @@ app.post('/user/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// ====== SNAPCHAT INFO ENDPOINT ======
+
+// Get Snapchat username (public endpoint for success page)
+app.get('/get-snapchat', (req, res) => {
+  res.json({
+    success: true,
+    snapchat: process.env.SNAPCHAT_USERNAME || 'Contact admin for Snapchat'
+  });
+});
+
+// ====== CASH PAYMENT CODE MANAGEMENT ======
+
+// Get all cash payment codes (admin only)
+app.post('/admin/get-cash-codes', (req, res) => {
+  const { password } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  res.json({
+    success: true,
+    codes: cashPaymentCodes,
+    totalCodes: cashPaymentCodes.length
+  });
+});
+
+// Add a new cash payment code (admin only)
+app.post('/admin/add-cash-code', (req, res) => {
+  const { password, code } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!code || code.trim() === '') {
+    return res.status(400).json({ error: 'Code cannot be empty' });
+  }
+  
+  const cleanCode = code.trim().toUpperCase();
+  
+  // Check if code already exists
+  if (cashPaymentCodes.includes(cleanCode)) {
+    return res.status(400).json({ error: 'Code already exists' });
+  }
+  
+  cashPaymentCodes.push(cleanCode);
+  saveData();
+  
+  console.log(`✅ Admin added cash payment code: "${cleanCode}" (Total codes: ${cashPaymentCodes.length})`);
+  
+  res.json({
+    success: true,
+    message: `Code "${cleanCode}" added successfully`,
+    codes: cashPaymentCodes,
+    totalCodes: cashPaymentCodes.length
+  });
+});
+
+// Remove a cash payment code (admin only)
+app.post('/admin/remove-cash-code', (req, res) => {
+  const { password, code } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!code) {
+    return res.status(400).json({ error: 'Code required' });
+  }
+  
+  const cleanCode = code.trim().toUpperCase();
+  const index = cashPaymentCodes.indexOf(cleanCode);
+  
+  if (index === -1) {
+    return res.status(404).json({ error: 'Code not found' });
+  }
+  
+  cashPaymentCodes.splice(index, 1);
+  saveData();
+  
+  console.log(`🗑️  Admin removed cash payment code: "${cleanCode}" (Total codes: ${cashPaymentCodes.length})`);
+  
+  res.json({
+    success: true,
+    message: `Code "${cleanCode}" removed successfully`,
+    codes: cashPaymentCodes,
+    totalCodes: cashPaymentCodes.length
+  });
+});
+
 // Endpoint for automatic slot reset at midnight (called by frontend)
 app.post('/admin/auto-reset-slots', (req, res) => {
   // This is called automatically when timer reaches 0
@@ -844,15 +945,30 @@ app.post('/submit-cash-payment', async (req, res) => {
     console.log('💵 CASH PAYMENT REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { school, username, password, productName, productPrice, previousUsername, reservationId } = req.body;
+    const { school, username, password, productName, productPrice, previousUsername, reservationId, cashCode } = req.body;
     
-    console.log('💵 Extracted data:', { school, username, productName, productPrice, previousUsername, reservationId, hasPassword: !!password });
+    console.log('💵 Extracted data:', { school, username, productName, productPrice, previousUsername, reservationId, cashCode, hasPassword: !!password });
     
     // Validate required fields
     if (!username || !password) {
       console.error('❌ Missing required fields - username or password');
       return res.status(400).json({ error: 'Username and password are required' });
     }
+    
+    // Validate cash payment code
+    if (!cashCode || cashCode.trim() === '') {
+      console.error('❌ Missing cash payment code');
+      return res.status(400).json({ error: 'Cash payment code is required' });
+    }
+    
+    const cleanCode = cashCode.trim().toUpperCase();
+    if (!cashPaymentCodes.includes(cleanCode)) {
+      console.error(`❌ Invalid cash payment code: "${cleanCode}"`);
+      return res.status(400).json({ error: 'Invalid cash payment code. Please check with admin.' });
+    }
+    
+    console.log(`✅ Valid cash payment code: "${cleanCode}"`);
+  
     
     // Check if this is a new login (different username)
     const isNewLogin = !previousUsername || previousUsername !== username;
@@ -929,7 +1045,11 @@ app.post('/submit-cash-payment', async (req, res) => {
     saveData();
 
     console.log('✅ Cash payment request processed successfully');
-    res.json({ success: true, message: 'Cash payment notification sent successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Cash payment notification sent successfully',
+      snapchat: process.env.SNAPCHAT_USERNAME || 'Contact admin for Snapchat'
+    });
   } catch (error) {
     console.error('Error submitting cash payment:', error);
     res.status(500).json({ error: error.message });

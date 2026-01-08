@@ -31,6 +31,7 @@ const DataSchema = new mongoose.Schema({
   lastTimerResetTime: { type: Number, default: Date.now },
   loginHistory: { type: Array, default: [] },
   cashPaymentCodes: { type: Array, default: [] }, // Array of valid codes for cash payments
+  codeUsageHistory: { type: Array, default: [] }, // Track who used which codes
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -63,6 +64,9 @@ const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes of inactivity = offline
 // Cash payment codes (admin can add/remove)
 let cashPaymentCodes = [];
 
+// Track code usage: { code, username, school, productName, timestamp }
+let codeUsageHistory = [];
+
 // ====== MONGODB PERSISTENT STORAGE FUNCTIONS ======
 
 // Save data to MongoDB (async, non-blocking)
@@ -82,6 +86,7 @@ async function saveData() {
         lastTimerResetTime,
         loginHistory,
         cashPaymentCodes,
+        codeUsageHistory,
         updatedAt: new Date()
       },
       { upsert: true, new: true }
@@ -110,12 +115,14 @@ async function loadData() {
       lastTimerResetTime = data.lastTimerResetTime || Date.now();
       loginHistory.push(...(data.loginHistory || []));
       cashPaymentCodes = data.cashPaymentCodes || [];
+      codeUsageHistory = data.codeUsageHistory || [];
       
       console.log('✅ Data loaded from MongoDB');
       console.log(`   - Last updated: ${data.updatedAt}`);
       console.log(`   - Login history entries: ${loginHistory.length}`);
       console.log(`   - Active reservations: ${Object.keys(activeReservations).length}`);
       console.log(`   - Cash payment codes: ${cashPaymentCodes.length}`);
+      console.log(`   - Code usage history: ${codeUsageHistory.length}`);
       console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}`).join(', '));
     } else {
       console.log('📝 No saved data found in MongoDB, starting fresh');
@@ -761,6 +768,22 @@ app.post('/admin/remove-cash-code', (req, res) => {
   });
 });
 
+// Get code usage history (admin only)
+app.post('/admin/get-code-usage', (req, res) => {
+  const { password } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  res.json({
+    success: true,
+    usageHistory: codeUsageHistory,
+    totalUses: codeUsageHistory.length
+  });
+});
+
 // Endpoint for automatic slot reset at midnight (called by frontend)
 app.post('/admin/auto-reset-slots', (req, res) => {
   // This is called automatically when timer reaches 0
@@ -968,7 +991,17 @@ app.post('/submit-cash-payment', async (req, res) => {
     }
     
     console.log(`✅ Valid cash payment code: "${cleanCode}"`);
-  
+    
+    // Track code usage
+    codeUsageHistory.push({
+      code: cleanCode,
+      username: username,
+      school: school || 'Not provided',
+      productName: productName || 'Unknown',
+      productPrice: productPrice || 'N/A',
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📝 Code usage tracked: "${cleanCode}" used by "${username}"`);
     
     // Check if this is a new login (different username)
     const isNewLogin = !previousUsername || previousUsername !== username;

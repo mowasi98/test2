@@ -166,6 +166,8 @@
     <div class="logo"><img src="plug-logo.png" alt="Plug Logo" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;">hwplug</div>
     <h2>Select Payment Method</h2>
     
+    <div id="errorMessage" style="display: none; background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #f5c6cb;"></div>
+    
     <div class="product-info">
       <p><strong>Product:</strong> <span id="productName">-</span></p>
       <div class="price">&pound;<span id="productPrice">-</span></div>
@@ -213,8 +215,11 @@
       
       // Verify slot was reserved for this product
       if (!slotReserved || reservedProduct !== productName) {
-        alert('⚠️ No slot reservation found. Please go back and select the product again.');
-        window.location.href = 'index.html';
+        document.getElementById('errorMessage').textContent = '⚠️ No slot reservation found. Redirecting to homepage...';
+        document.getElementById('errorMessage').style.display = 'block';
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 2000);
         return;
       }
       
@@ -280,9 +285,13 @@
 
     async function processPayment() {
       if (!selectedMethod) {
-        alert('Please select a payment method first.');
+        document.getElementById('errorMessage').textContent = 'Please select a payment method first.';
+        document.getElementById('errorMessage').style.display = 'block';
         return;
       }
+      
+      // Hide any previous error messages
+      document.getElementById('errorMessage').style.display = 'none';
       
       const payBtn = document.getElementById('payBtn');
       payBtn.disabled = true;
@@ -326,7 +335,8 @@
         } else {
           // Reset flag if redirect fails
           isProceedingToStripe = false;
-          alert('Payment link not available. Please go back and try again.');
+          document.getElementById('errorMessage').textContent = 'Payment link not available. Please go back and try again.';
+          document.getElementById('errorMessage').style.display = 'block';
           payBtn.disabled = false;
           payBtn.textContent = 'Continue to Payment';
         }
@@ -334,7 +344,8 @@
         // Get and validate cash code
         const cashCode = document.getElementById('cashCode').value.trim();
         if (!cashCode) {
-          alert('Please enter a cash payment code');
+          document.getElementById('errorMessage').textContent = 'Please enter a cash payment code';
+          document.getElementById('errorMessage').style.display = 'block';
           payBtn.disabled = false;
           payBtn.textContent = 'Submit Cash Payment';
           return;
@@ -375,11 +386,13 @@
             try {
               const errorData = await response.json();
               console.error('💵 Error response:', errorData);
-              alert(errorData.error || 'Payment failed. Please try again.');
+              document.getElementById('errorMessage').textContent = errorData.error || 'Payment failed. Please try again.';
+              document.getElementById('errorMessage').style.display = 'block';
             } catch (e) {
               const errorText = await response.text();
               console.error('💵 Error response:', errorText);
-              alert('Payment failed. Please check your code and try again.');
+              document.getElementById('errorMessage').textContent = 'Payment failed. Please check your code and try again.';
+              document.getElementById('errorMessage').style.display = 'block';
             }
             payBtn.disabled = false;
             payBtn.textContent = 'Submit Cash Payment';
@@ -415,13 +428,15 @@
               window.location.href = 'index.html';
             }, 3000);
           } else {
-            alert('Error submitting payment: ' + (result.error || 'Unknown error'));
+            document.getElementById('errorMessage').textContent = 'Error submitting payment: ' + (result.error || 'Unknown error');
+            document.getElementById('errorMessage').style.display = 'block';
             payBtn.disabled = false;
             payBtn.textContent = 'Submit Cash Payment';
           }
         } catch (error) {
           console.error('💵 Catch error:', error);
-          alert('Something went wrong: ' + error.message);
+          document.getElementById('errorMessage').textContent = 'Something went wrong: ' + error.message;
+          document.getElementById('errorMessage').style.display = 'block';
           payBtn.disabled = false;
           payBtn.textContent = 'Submit Cash Payment';
         }

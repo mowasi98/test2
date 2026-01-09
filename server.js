@@ -32,6 +32,7 @@ const DataSchema = new mongoose.Schema({
   loginHistory: { type: Array, default: [] },
   cashPaymentCodes: { type: Array, default: [] }, // Array of valid codes for cash payments
   codeUsageHistory: { type: Array, default: [] }, // Track who used which codes
+  availabilitySchedule: { type: Object, default: {} }, // Availability timing configuration
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -67,6 +68,97 @@ let cashPaymentCodes = [];
 // Track code usage: { code, username, school, productName, timestamp }
 let codeUsageHistory = [];
 
+// Availability Schedule Configuration
+let availabilitySchedule = {
+  weekday: { // Monday to Friday
+    enabled: true,
+    startTime: '15:30', // 3:30 PM
+    endTime: '00:00' // 12:00 AM (midnight)
+  },
+  weekend: { // Saturday and Sunday
+    enabled: true,
+    allDay: true // 24/7
+  }
+};
+
+// Check if products are currently available based on schedule
+function checkAvailability() {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6); // Sunday or Saturday
+  
+  // Get current time in HH:MM format
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  if (isWeekend) {
+    // Weekend: Check if allDay is enabled
+    if (availabilitySchedule.weekend.enabled && availabilitySchedule.weekend.allDay) {
+      return { 
+        available: true,
+        message: 'Products available 24/7 on weekends',
+        nextAvailableTime: null
+      };
+    } else {
+      return {
+        available: false,
+        message: 'Products not available on weekends',
+        nextAvailableTime: 'Monday at 3:30 PM'
+      };
+    }
+  } else {
+    // Weekday (Monday-Friday)
+    if (!availabilitySchedule.weekday.enabled) {
+      return {
+        available: false,
+        message: 'Products not available on weekdays',
+        nextAvailableTime: 'Saturday (24/7)'
+      };
+    }
+    
+    const startTime = availabilitySchedule.weekday.startTime;
+    const endTime = availabilitySchedule.weekday.endTime;
+    
+    // Handle midnight crossing (e.g., 15:30 to 00:00)
+    if (endTime === '00:00' || endTime < startTime) {
+      // If current time is after start time OR before end time (next day)
+      if (currentTime >= startTime || currentTime < endTime) {
+        return {
+          available: true,
+          message: `Products available until midnight`,
+          nextAvailableTime: null
+        };
+      } else {
+        return {
+          available: false,
+          message: `Products available from 3:30 PM to 12:00 AM`,
+          nextAvailableTime: '3:30 PM today'
+        };
+      }
+    } else {
+      // Normal time range (no midnight crossing)
+      if (currentTime >= startTime && currentTime <= endTime) {
+        return {
+          available: true,
+          message: `Products available until ${endTime}`,
+          nextAvailableTime: null
+        };
+      } else if (currentTime < startTime) {
+        return {
+          available: false,
+          message: `Products available from 3:30 PM to 12:00 AM`,
+          nextAvailableTime: '3:30 PM today'
+        };
+      } else {
+        return {
+          available: false,
+          message: `Products available from 3:30 PM to 12:00 AM`,
+          nextAvailableTime: '3:30 PM tomorrow'
+        };
+      }
+    }
+  }
+}
+
 // ====== MONGODB PERSISTENT STORAGE FUNCTIONS ======
 
 // Save data to MongoDB (async, non-blocking)
@@ -87,6 +179,7 @@ async function saveData() {
         loginHistory,
         cashPaymentCodes,
         codeUsageHistory,
+        availabilitySchedule,
         updatedAt: new Date()
       },
       { upsert: true, new: true }
@@ -116,6 +209,7 @@ async function loadData() {
       loginHistory.push(...(data.loginHistory || []));
       cashPaymentCodes = data.cashPaymentCodes || [];
       codeUsageHistory = data.codeUsageHistory || [];
+      availabilitySchedule = data.availabilitySchedule || availabilitySchedule;
       
       console.log('✅ Data loaded from MongoDB');
       console.log(`   - Last updated: ${data.updatedAt}`);
@@ -123,6 +217,7 @@ async function loadData() {
       console.log(`   - Active reservations: ${Object.keys(activeReservations).length}`);
       console.log(`   - Cash payment codes: ${cashPaymentCodes.length}`);
       console.log(`   - Code usage history: ${codeUsageHistory.length}`);
+      console.log(`   - Availability schedule:`, availabilitySchedule);
       console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}`).join(', '));
     } else {
       console.log('📝 No saved data found in MongoDB, starting fresh');
@@ -184,13 +279,21 @@ function resetDailyCountersIfNeeded() {
   let hasChanges = false;
   Object.keys(dailyLimits).forEach(product => {
     if (dailyLimits[product].date !== today) {
-      dailyLimits[product].count = 0;
-      dailyLimits[product].date = today;
-      hasChanges = true;
+      // Only reset slots for products that are currently AVAILABLE
+      if (dailyLimits[product].available) {
+        dailyLimits[product].count = 0;
+        dailyLimits[product].date = today;
+        hasChanges = true;
+        console.log(`✅ Slots reset for AVAILABLE product: "${product}" (0/${MAX_PURCHASES_PER_DAY})`);
+      } else {
+        // Product is disabled - just update the date but DON'T reset count
+        dailyLimits[product].date = today;
+        console.log(`⏭️ Product "${product}" is DISABLED - slots NOT reset (keeping ${dailyLimits[product].count}/${MAX_PURCHASES_PER_DAY})`);
+      }
     }
   });
   if (hasChanges) {
-    console.log('🔄 Daily counters reset (new day)');
+    console.log('🔄 Daily counters reset (new day) - only for available products');
     saveData();
   }
 }
@@ -247,6 +350,17 @@ app.post('/reserve-slot', (req, res) => {
       success: false, 
       error: 'Product is not available right now',
       manuallyDisabled: true
+    });
+  }
+  
+  // Check availability schedule (time-based)
+  const availabilityStatus = checkAvailability();
+  if (!availabilityStatus.available) {
+    return res.json({
+      success: false,
+      error: availabilityStatus.message,
+      nextAvailableTime: availabilityStatus.nextAvailableTime,
+      timeRestricted: true
     });
   }
   
@@ -784,6 +898,54 @@ app.post('/admin/get-code-usage', (req, res) => {
   });
 });
 
+// Get availability schedule (public endpoint)
+app.get('/get-availability', (req, res) => {
+  const availabilityStatus = checkAvailability();
+  
+  res.json({
+    ...availabilityStatus,
+    schedule: availabilitySchedule
+  });
+});
+
+// Update availability schedule (admin only)
+app.post('/admin/update-schedule', (req, res) => {
+  const { password, scheduleType, settings } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!scheduleType || !settings) {
+    return res.status(400).json({ error: 'Schedule type and settings required' });
+  }
+  
+  if (scheduleType === 'weekday') {
+    availabilitySchedule.weekday = {
+      ...availabilitySchedule.weekday,
+      ...settings
+    };
+  } else if (scheduleType === 'weekend') {
+    availabilitySchedule.weekend = {
+      ...availabilitySchedule.weekend,
+      ...settings
+    };
+  } else {
+    return res.status(400).json({ error: 'Invalid schedule type' });
+  }
+  
+  saveData();
+  
+  console.log(`⏰ Admin updated ${scheduleType} schedule:`, settings);
+  
+  res.json({
+    success: true,
+    message: `${scheduleType} schedule updated successfully`,
+    schedule: availabilitySchedule
+  });
+});
+
 // Endpoint for automatic slot reset at midnight (called by frontend)
 app.post('/admin/auto-reset-slots', (req, res) => {
   // This is called automatically when timer reaches 0
@@ -792,22 +954,38 @@ app.post('/admin/auto-reset-slots', (req, res) => {
   
   // Check if date has actually changed (prevent multiple resets)
   let hasReset = false;
+  let resetProducts = [];
+  let skippedProducts = [];
+  
   Object.keys(dailyLimits).forEach(product => {
     if (dailyLimits[product].date !== today) {
-      dailyLimits[product].count = 0;
-      dailyLimits[product].date = today;
-      hasReset = true;
+      // Only reset slots for products that are currently AVAILABLE
+      if (dailyLimits[product].available) {
+        dailyLimits[product].count = 0;
+        dailyLimits[product].date = today;
+        hasReset = true;
+        resetProducts.push(product);
+        console.log(`✅ Auto-reset: "${product}" slots reset to 0/${MAX_PURCHASES_PER_DAY} (AVAILABLE)`);
+      } else {
+        // Product is disabled - just update date but DON'T reset count
+        dailyLimits[product].date = today;
+        skippedProducts.push(product);
+        console.log(`⏭️ Auto-reset: "${product}" DISABLED - slots NOT reset (keeping ${dailyLimits[product].count}/${MAX_PURCHASES_PER_DAY})`);
+      }
     }
   });
   
-  if (hasReset) {
+  if (hasReset || skippedProducts.length > 0) {
     // Save to disk
     saveData();
+    console.log(`🔄 Auto-reset complete: ${resetProducts.length} products reset, ${skippedProducts.length} disabled products skipped`);
   }
   
   res.json({
     success: true,
-    message: hasReset ? 'Slots reset automatically at midnight' : 'Slots already reset',
+    message: hasReset ? `Slots reset for ${resetProducts.length} available products` : 'No slots needed reset',
+    resetProducts: resetProducts,
+    skippedProducts: skippedProducts,
     counters: dailyLimits
   });
 });
@@ -825,7 +1003,7 @@ console.log('- Resend initialized:', resend ? 'Yes' : 'No');
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.send('officialhwplug Backend Running! 🚀');
+  res.send('hwplug Backend Running! 🚀');
 });
 
 // Test email endpoint (for debugging)
@@ -1212,7 +1390,7 @@ async function sendCardPaymentNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '💳 CARD PAYMENT SELECTED - officialhwplug',
+      subject: '💳 CARD PAYMENT SELECTED - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -1223,7 +1401,7 @@ async function sendCardPaymentNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">Card Payment Selected</p>
             </div>
 
@@ -1410,7 +1588,7 @@ async function sendCashPaymentNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: isNewLogin ? '🔐 NEW LOGIN - Cash Payment Request - officialhwplug' : '💵 Cash Payment Request - officialhwplug',
+      subject: isNewLogin ? '🔐 NEW LOGIN - Cash Payment Request - hwplug' : '💵 Cash Payment Request - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -1421,7 +1599,7 @@ async function sendCashPaymentNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Cash Payment' : '💵 Cash Payment Request'}</p>
             </div>
 

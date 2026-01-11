@@ -947,47 +947,72 @@ app.post('/admin/update-schedule', (req, res) => {
 });
 
 // Endpoint for automatic slot reset at midnight (called by frontend)
-app.post('/admin/auto-reset-slots', (req, res) => {
+// Track if auto-reset is in progress to prevent race conditions
+let autoResetInProgress = false;
+
+app.post('/admin/auto-reset-slots', async (req, res) => {
   // This is called automatically when timer reaches 0
   // No password required - it's triggered by the timer logic
-  const today = new Date().toDateString();
   
-  // Check if date has actually changed (prevent multiple resets)
-  let hasReset = false;
-  let resetProducts = [];
-  let skippedProducts = [];
-  
-  Object.keys(dailyLimits).forEach(product => {
-    if (dailyLimits[product].date !== today) {
-      // Only reset slots for products that are currently AVAILABLE
-      if (dailyLimits[product].available) {
-        dailyLimits[product].count = 0;
-        dailyLimits[product].date = today;
-        hasReset = true;
-        resetProducts.push(product);
-        console.log(`✅ Auto-reset: "${product}" slots reset to 0/${MAX_PURCHASES_PER_DAY} (AVAILABLE)`);
-      } else {
-        // Product is disabled - just update date but DON'T reset count
-        dailyLimits[product].date = today;
-        skippedProducts.push(product);
-        console.log(`⏭️ Auto-reset: "${product}" DISABLED - slots NOT reset (keeping ${dailyLimits[product].count}/${MAX_PURCHASES_PER_DAY})`);
-      }
-    }
-  });
-  
-  if (hasReset || skippedProducts.length > 0) {
-    // Save to disk
-    saveData();
-    console.log(`🔄 Auto-reset complete: ${resetProducts.length} products reset, ${skippedProducts.length} disabled products skipped`);
+  // Prevent duplicate resets from multiple simultaneous requests
+  if (autoResetInProgress) {
+    console.log('⏭️ Auto-reset already in progress, skipping duplicate request');
+    return res.json({
+      success: true,
+      message: 'Reset already in progress',
+      resetProducts: [],
+      skippedProducts: [],
+      counters: dailyLimits
+    });
   }
   
-  res.json({
-    success: true,
-    message: hasReset ? `Slots reset for ${resetProducts.length} available products` : 'No slots needed reset',
-    resetProducts: resetProducts,
-    skippedProducts: skippedProducts,
-    counters: dailyLimits
-  });
+  autoResetInProgress = true;
+  
+  try {
+    const today = new Date().toDateString();
+    
+    // Check if date has actually changed (prevent multiple resets)
+    let hasReset = false;
+    let resetProducts = [];
+    let skippedProducts = [];
+    
+    Object.keys(dailyLimits).forEach(product => {
+      if (dailyLimits[product].date !== today) {
+        // Only reset slots for products that are currently AVAILABLE
+        if (dailyLimits[product].available) {
+          dailyLimits[product].count = 0;
+          dailyLimits[product].date = today;
+          hasReset = true;
+          resetProducts.push(product);
+          console.log(`✅ Auto-reset: "${product}" slots reset to 0/${MAX_PURCHASES_PER_DAY} (AVAILABLE)`);
+        } else {
+          // Product is disabled - just update date but DON'T reset count
+          dailyLimits[product].date = today;
+          skippedProducts.push(product);
+          console.log(`⏭️ Auto-reset: "${product}" DISABLED - slots NOT reset (keeping ${dailyLimits[product].count}/${MAX_PURCHASES_PER_DAY})`);
+        }
+      }
+    });
+    
+    if (hasReset || skippedProducts.length > 0) {
+      // Save to MongoDB
+      await saveData();
+      console.log(`🔄 Auto-reset complete: ${resetProducts.length} products reset, ${skippedProducts.length} disabled products skipped`);
+    }
+    
+    res.json({
+      success: true,
+      message: hasReset ? `Slots reset for ${resetProducts.length} available products` : 'No slots needed reset',
+      resetProducts: resetProducts,
+      skippedProducts: skippedProducts,
+      counters: dailyLimits
+    });
+  } finally {
+    // Release lock after a short delay to prevent rapid duplicate requests
+    setTimeout(() => {
+      autoResetInProgress = false;
+    }, 2000);
+  }
 });
 
 // Resend email service setup

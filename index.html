@@ -647,9 +647,24 @@
       }
     }
     
+    // Track if reset is already in progress to prevent duplicates
+    let isResetting = false;
+    let lastResetTime = 0;
+    
     // Automatically reset slots when timer reaches midnight
     async function resetSlotsAutomatically() {
+      // Prevent duplicate resets within 5 seconds
+      const now = Date.now();
+      if (isResetting || (now - lastResetTime) < 5000) {
+        console.log('⏭️ Reset already in progress or recently completed, skipping...');
+        return;
+      }
+      
+      isResetting = true;
+      lastResetTime = now;
+      
       try {
+        console.log('🔄 Initiating automatic slot reset...');
         const response = await fetch(`${BACKEND_URL}/admin/auto-reset-slots`, {
           method: 'POST',
           headers: {
@@ -659,17 +674,21 @@
         const data = await response.json();
         if (data.success) {
           console.log('✅ Slots automatically reset at midnight');
+          console.log('📊 Reset products:', data.resetProducts);
+          console.log('⏭️ Skipped disabled products:', data.skippedProducts);
           // Refresh availability display
           checkAvailability();
         }
       } catch (error) {
-        console.error('Error auto-resetting slots:', error);
+        console.error('❌ Error auto-resetting slots:', error);
+      } finally {
+        isResetting = false;
       }
     }
     
-    // Update timer every second
-    updateResetTimer();
-    setInterval(updateResetTimer, 1000);
+    // Timer interval reference to prevent duplicates
+    let timerInterval = null;
+    let syncInterval = null;
 
     // Check if user is logged in and update UI
     window.addEventListener('DOMContentLoaded', function() {
@@ -690,15 +709,19 @@
         document.getElementById('loginBtn').textContent = 'Switch Account';
       }
       
+      // Clear any existing timers to prevent duplicates
+      if (timerInterval) clearInterval(timerInterval);
+      if (syncInterval) clearInterval(syncInterval);
+      
       // Fetch timer reset time from server and start countdown timer
       fetchTimerResetTime().then(() => {
         updateResetTimer();
-        // Update timer every second
-        setInterval(updateResetTimer, 1000);
+        // Update timer every second (store reference to prevent duplicates)
+        timerInterval = setInterval(updateResetTimer, 1000);
       });
       
       // Re-fetch timer reset time every 5 seconds to stay in sync (especially after admin resets)
-      setInterval(fetchTimerResetTime, 5000);
+      syncInterval = setInterval(fetchTimerResetTime, 5000);
     });
 
     async function logout() {

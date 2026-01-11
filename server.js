@@ -694,6 +694,36 @@ app.post('/admin/reset-timer', (req, res) => {
   });
 });
 
+// Set test timer (for testing auto-reset functionality)
+app.post('/admin/set-test-timer', (req, res) => {
+  const { password, minutes } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!minutes || minutes < 1 || minutes > 1440) {
+    return res.status(400).json({ error: 'Invalid minutes value (must be 1-1440)' });
+  }
+  
+  // Set a custom timer that expires after the specified minutes
+  const expiresAt = Date.now() + (minutes * 60 * 1000);
+  lastTimerResetTime = expiresAt - (24 * 60 * 60 * 1000); // Trick the timer to expire at expiresAt
+  
+  console.log(`🧪 TEST TIMER SET: Will expire in ${minutes} minute(s) at ${new Date(expiresAt).toISOString()}`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `Test timer set to ${minutes} minute(s)`,
+    expiresAt: expiresAt,
+    resetTime: lastTimerResetTime
+  });
+});
+
 // Endpoint to get timer reset time (for frontend sync)
 app.get('/admin/timer-reset-time', (req, res) => {
   res.json({

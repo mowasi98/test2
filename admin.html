@@ -261,6 +261,18 @@
                                     <button class="btn btn-danger" id="resetAllBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset All Counters</button>
                                     <button class="btn btn-warning" id="resetTimerBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset Timer Only</button>
                                   </div>
+                                  
+                                  <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #856404;">🧪 Test Timer (For Testing Auto-Reset)</h4>
+                                    <p style="font-size: 0.85rem; color: #856404; margin-bottom: 0.8rem;">Set a short timer to test the automatic slot reset feature:</p>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                      <input type="number" id="testTimerMinutes" min="1" max="1440" value="1" placeholder="Minutes" style="width: 100px; padding: 0.5rem; border: 2px solid #ffc107; border-radius: 4px; font-size: 1rem;">
+                                      <span style="color: #856404; font-weight: 600;">minutes</span>
+                                      <button class="btn btn-primary" id="setTestTimerBtn" style="touch-action: manipulation;">Set Test Timer</button>
+                                    </div>
+                                    <small style="color: #856404; display: block; margin-top: 0.5rem;">⚠️ This will override the 24-hour timer. Use for testing only!</small>
+                                  </div>
+                                  
                                   <p style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; margin-bottom: 1rem;">
                                     <strong>Note:</strong> "Reset Timer Only" resets the 24-hour timer but keeps current slot counts. "Reset All Counters" resets both timer and slot counts to 0.
                                   </p>
@@ -634,6 +646,54 @@
                                   }
                                 }
 
+                                async function setTestTimer() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const minutes = parseInt(document.getElementById('testTimerMinutes').value);
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!minutes || minutes < 1 || minutes > 1440) {
+                                    showMessage('Please enter a valid number of minutes (1-1440)', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Set timer to ${minutes} minute(s)? This is for TESTING ONLY. The timer will auto-reset slots when it reaches 0.`)) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-test-timer`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password, minutes: minutes }),
+                                    });
+                                    
+                                    if (!response.ok) {
+                                      const errorText = await response.text();
+                                      showMessage(`❌ Server error (${response.status}): ${errorText}`, 'error');
+                                      return;
+                                    }
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ Test timer set to ${minutes} minute(s)! Timer will expire at ${new Date(data.expiresAt).toLocaleTimeString()}`, 'success');
+                                      checkStatus(); // Refresh status
+                                      console.log('Test timer set for:', minutes, 'minutes');
+                                    } else {
+                                      showMessage(data.error || 'Error setting test timer', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server: ' + error.message, 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
                                 async function resetCounters() {
                                   const password = document.getElementById('adminPassword').value;
                                   
@@ -758,6 +818,19 @@
                                       resetTimer();
                                     });
                                     resetTimerBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Set Test Timer button
+                                  const setTestTimerBtn = document.getElementById('setTestTimerBtn');
+                                  if (setTestTimerBtn) {
+                                    setTestTimerBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      setTestTimer();
+                                    });
+                                    setTestTimerBtn.addEventListener('touchstart', function(e) {
                                       e.preventDefault();
                                       this.click();
                                     });

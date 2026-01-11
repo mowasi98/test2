@@ -794,7 +794,7 @@ app.post('/user/logout', (req, res) => {
 app.get('/get-snapchat', (req, res) => {
   res.json({
     success: true,
-    snapchat: process.env.SNAPCHAT_USERNAME || 'Contact admin for Snapchat'
+    snapchat: process.env.SNAPCHAT_USERNAME || 'homework5003'
   });
 });
 
@@ -1259,7 +1259,7 @@ app.post('/submit-cash-payment', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Cash payment notification sent successfully',
-      snapchat: process.env.SNAPCHAT_USERNAME || 'Contact admin for Snapchat'
+      snapchat: process.env.SNAPCHAT_USERNAME || 'homework5003'
     });
   } catch (error) {
     console.error('Error submitting cash payment:', error);

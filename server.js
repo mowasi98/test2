@@ -711,7 +711,18 @@ app.post('/admin/set-test-timer', (req, res) => {
   const expiresAt = Date.now() + (minutes * 60 * 1000);
   lastTimerResetTime = expiresAt - (24 * 60 * 60 * 1000); // Trick the timer to expire at expiresAt
   
+  // IMPORTANT: Set all product dates to YESTERDAY so auto-reset will trigger when timer hits 0
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayString = yesterday.toDateString();
+  
+  Object.keys(dailyLimits).forEach(product => {
+    dailyLimits[product].date = yesterdayString;
+    console.log(`📅 Set "${product}" date to ${yesterdayString} (yesterday) for test timer`);
+  });
+  
   console.log(`🧪 TEST TIMER SET: Will expire in ${minutes} minute(s) at ${new Date(expiresAt).toISOString()}`);
+  console.log(`📅 All product dates set to YESTERDAY so auto-reset will trigger`);
   
   // Save to MongoDB
   saveData();
@@ -1000,13 +1011,18 @@ app.post('/admin/auto-reset-slots', async (req, res) => {
   
   try {
     const today = new Date().toDateString();
+    console.log(`🔍 Auto-reset triggered - Today is: ${today}`);
     
     // Check if date has actually changed (prevent multiple resets)
     let hasReset = false;
     let resetProducts = [];
     let skippedProducts = [];
+    let alreadyTodayProducts = [];
     
     Object.keys(dailyLimits).forEach(product => {
+      const productDate = dailyLimits[product].date;
+      console.log(`🔍 Checking "${product}": current date="${productDate}", today="${today}", match=${productDate === today}`);
+      
       if (dailyLimits[product].date !== today) {
         // Only reset slots for products that are currently AVAILABLE
         if (dailyLimits[product].available) {
@@ -1021,8 +1037,15 @@ app.post('/admin/auto-reset-slots', async (req, res) => {
           skippedProducts.push(product);
           console.log(`⏭️ Auto-reset: "${product}" DISABLED - slots NOT reset (keeping ${dailyLimits[product].count}/${MAX_PURCHASES_PER_DAY})`);
         }
+      } else {
+        alreadyTodayProducts.push(product);
+        console.log(`⏩ "${product}" already has today's date - no reset needed`);
       }
     });
+    
+    if (alreadyTodayProducts.length > 0) {
+      console.log(`ℹ️ ${alreadyTodayProducts.length} products already had today's date:`, alreadyTodayProducts);
+    }
     
     if (hasReset || skippedProducts.length > 0) {
       // Save to MongoDB

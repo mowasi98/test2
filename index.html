@@ -609,6 +609,7 @@
     
     // Store previous reset time to detect changes
     let previousResetTime = null;
+    let hasReachedZero = false; // Track if we've already handled the zero state
     
     // Update countdown timer
     function updateResetTimer() {
@@ -616,6 +617,7 @@
       if (serverResetTime !== null && previousResetTime !== null && serverResetTime !== previousResetTime) {
         console.log('⏰ Timer reset detected! Refreshing...');
         previousResetTime = serverResetTime;
+        hasReachedZero = false; // Reset the flag when timer is manually reset
       }
       
       const time = getTimeUntilReset();
@@ -625,14 +627,31 @@
         // If timer reached 0 or negative, reset slots
         if (time.total <= 0) {
           timerElement.textContent = '00:00:00';
-          // Automatically reset slots when timer reaches 0
-          resetSlotsAutomatically();
-          // Fetch new reset time from server
-          fetchTimerResetTime().then(() => {
-            const newTime = getTimeUntilReset();
-            timerElement.textContent = `${newTime.hours}:${newTime.minutes}:${newTime.seconds}`;
-          });
+          
+          // Only trigger reset ONCE when first reaching zero
+          if (!hasReachedZero) {
+            hasReachedZero = true;
+            console.log('⏰ Timer hit 0! Triggering automatic slot reset...');
+            
+            // Automatically reset slots when timer reaches 0
+            resetSlotsAutomatically().then(() => {
+              // After reset, fetch new reset time from server
+              return fetchTimerResetTime();
+            }).then(() => {
+              hasReachedZero = false; // Reset flag for next cycle
+              const newTime = getTimeUntilReset();
+              if (newTime.total > 0) {
+                timerElement.textContent = `${newTime.hours}:${newTime.minutes}:${newTime.seconds}`;
+                console.log('✅ Timer refreshed to new 24-hour cycle');
+              }
+            }).catch(err => {
+              console.error('❌ Error during auto-reset:', err);
+              hasReachedZero = false; // Reset flag on error
+            });
+          }
         } else {
+          // Timer is positive - reset the flag
+          hasReachedZero = false;
           timerElement.textContent = `${time.hours}:${time.minutes}:${time.seconds}`;
           
           // If less than 1 hour remaining, make it more prominent
@@ -657,7 +676,7 @@
       const now = Date.now();
       if (isResetting || (now - lastResetTime) < 5000) {
         console.log('⏭️ Reset already in progress or recently completed, skipping...');
-        return;
+        return Promise.resolve();
       }
       
       isResetting = true;
@@ -665,24 +684,41 @@
       
       try {
         console.log('🔄 Initiating automatic slot reset...');
+        console.log('📍 Calling:', `${BACKEND_URL}/admin/auto-reset-slots`);
+        
         const response = await fetch(`${BACKEND_URL}/admin/auto-reset-slots`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           }
         });
-        const data = await response.json();
-        if (data.success) {
-          console.log('✅ Slots automatically reset at midnight');
-          console.log('📊 Reset products:', data.resetProducts);
-          console.log('⏭️ Skipped disabled products:', data.skippedProducts);
-          // Refresh availability display
-          checkAvailability();
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        
+        const data = await response.json();
+        console.log('📦 Server response:', data);
+        
+        if (data.success) {
+          console.log('✅ Slots automatically reset!');
+          console.log('📊 Reset products:', data.resetProducts?.length || 0, 'products -', data.resetProducts);
+          console.log('⏭️ Skipped disabled products:', data.skippedProducts?.length || 0, 'products -', data.skippedProducts);
+          
+          // Refresh availability display
+          await checkAvailability();
+          console.log('🔄 Availability display refreshed');
+        } else {
+          console.warn('⚠️ Reset response success=false:', data);
+        }
+        
+        return data;
       } catch (error) {
         console.error('❌ Error auto-resetting slots:', error);
+        throw error;
       } finally {
         isResetting = false;
+        console.log('🏁 Reset process completed');
       }
     }
     

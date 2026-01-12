@@ -545,7 +545,7 @@ app.get('/check-product-availability', (req, res) => {
 // Reserve a slot (atomically check and increment) - prevents race conditions
 app.post('/reserve-slot', (req, res) => {
   resetDailyCountersIfNeeded();
-  const { productName, isExtraSlot } = req.body;
+  const { productName, isExtraSlot, username } = req.body;
   
   if (!productName || !dailyLimits[productName]) {
     return res.status(400).json({ success: false, error: 'Product not found' });
@@ -564,14 +564,17 @@ app.post('/reserve-slot', (req, res) => {
   
   // Check if test mode is active (block purchases unless user is whitelisted)
   if (testMode) {
-    // Test mode is active - user must be whitelisted
-    // Note: Frontend should have already checked, but this is a backend safety check
-    console.log('⚠️ Test mode active - blocking reservation attempt');
-    return res.json({
-      success: false,
-      error: 'Website is in test mode. Please refresh the page.',
-      testMode: true
-    });
+    // Test mode is active - check if user is whitelisted
+    const isWhitelisted = username && whitelistedUsers.includes(username);
+    if (!isWhitelisted) {
+      console.log(`⚠️ Test mode active - blocking reservation for non-whitelisted user: ${username || 'unknown'}`);
+      return res.json({
+        success: false,
+        error: 'Website is in test mode. Please refresh the page.',
+        testMode: true
+      });
+    }
+    console.log(`✅ Test mode active but user ${username} is whitelisted - allowing purchase`);
   }
   
   // Check availability schedule (time-based)

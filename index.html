@@ -530,7 +530,7 @@
   <div id="errorMessage" style="display: none; max-width: 900px; margin: 2rem auto 0 auto; padding: 1rem 1.5rem; background: #f8d7da; color: #721c24; border-radius: 8px; border-left: 4px solid #f5c6cb; font-weight: 600;"></div>
 
   <!-- Test Mode Screen (shown when test mode is active) -->
-  <div id="testModeScreen" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); z-index: 10000; justify-content: center; align-items: center; padding: 20px;">
+  <div id="testModeScreen" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); z-index: 10000; justify-content: center; align-items: center; padding: 20px; overflow-y: auto;">
     <div style="background: #fff; padding: 3rem 2.5rem; border-radius: 16px; text-align: center; max-width: 500px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin: auto;">
       
       <!-- Test Mode Emoji -->
@@ -554,8 +554,46 @@
         </p>
       </div>
 
+      <!-- Admin/Tester Login Section -->
+      <div style="background: linear-gradient(135deg, #6c63ff 0%, #8b83ff 100%); padding: 2rem 1.5rem; border-radius: 12px; border: 2px solid #6c63ff; margin-top: 2rem;">
+        <p style="color: #fff; font-size: 1rem; font-weight: 600; margin: 0 0 1rem 0;">
+          🔑 Admin/Tester Access
+        </p>
+        <p style="color: rgba(255,255,255,0.9); font-size: 0.85rem; margin: 0 0 1.2rem 0;">
+          If you're on the whitelist, login to access:
+        </p>
+        
+        <!-- Error Message -->
+        <div id="testModeLoginError" style="display: none; background: #f8d7da; color: #721c24; padding: 0.8rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; font-weight: 600;"></div>
+        
+        <!-- Success Message -->
+        <div id="testModeLoginSuccess" style="display: none; background: #d4edda; color: #155724; padding: 0.8rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; font-weight: 600;"></div>
+        
+        <!-- Login Form -->
+        <form id="testModeLoginForm" onsubmit="handleTestModeLogin(event)" style="display: flex; flex-direction: column; gap: 0.8rem;">
+          <input 
+            type="text" 
+            id="testModeUsername" 
+            placeholder="Username" 
+            required 
+            style="width: 100%; padding: 0.8rem; border: 2px solid #fff; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box;"
+          >
+          <button 
+            type="submit" 
+            id="testModeLoginBtn"
+            style="background: #fff; color: #6c63ff; padding: 0.8rem 1.5rem; border: none; border-radius: 6px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: transform 0.2s; touch-action: manipulation; min-height: 48px;"
+          >
+            Login to Access
+          </button>
+        </form>
+        
+        <p style="color: rgba(255,255,255,0.8); font-size: 0.75rem; margin: 1rem 0 0 0; line-height: 1.3;">
+          ⚠️ Only whitelisted users can bypass test mode
+        </p>
+      </div>
+
       <!-- Footer Text -->
-      <p style="color: #999; font-size: 0.85rem; margin: 0;">
+      <p style="color: #999; font-size: 0.85rem; margin: 1.5rem 0 0 0;">
         This usually only takes a few minutes
       </p>
     </div>
@@ -951,6 +989,29 @@
         const data = await response.json();
         
         if (data.testMode) {
+          // Check if user is logged in and whitelisted
+          const savedUsername = localStorage.getItem('savedUsername');
+          
+          if (savedUsername) {
+            // User is logged in - check if whitelisted
+            console.log('🧪 Test mode active - checking if user is whitelisted:', savedUsername);
+            
+            const whitelistResponse = await fetch(`${BACKEND_URL}/check-whitelist`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: savedUsername })
+            });
+            
+            const whitelistData = await whitelistResponse.json();
+            
+            if (whitelistData.isWhitelisted) {
+              console.log('✅ User is whitelisted - bypassing test mode!');
+              return false; // Allow access
+            } else {
+              console.log('🔒 User not whitelisted - showing test mode screen');
+            }
+          }
+          
           // Show test mode screen and hide everything else
           document.getElementById('testModeScreen').style.display = 'flex';
           document.querySelector('header').style.display = 'none';
@@ -966,6 +1027,69 @@
       } catch (error) {
         console.error('Error checking test mode:', error);
         return false;
+      }
+    }
+
+    // Handle test mode login form submission
+    async function handleTestModeLogin(event) {
+      event.preventDefault();
+      
+      const usernameInput = document.getElementById('testModeUsername');
+      const loginBtn = document.getElementById('testModeLoginBtn');
+      const errorDiv = document.getElementById('testModeLoginError');
+      const successDiv = document.getElementById('testModeLoginSuccess');
+      
+      const username = usernameInput.value.trim();
+      
+      if (!username) {
+        errorDiv.textContent = 'Please enter a username';
+        errorDiv.style.display = 'block';
+        successDiv.style.display = 'none';
+        return;
+      }
+      
+      // Disable button during check
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Checking...';
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      
+      try {
+        // Check if user is whitelisted
+        const response = await fetch(`${BACKEND_URL}/check-whitelist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username })
+        });
+        
+        const data = await response.json();
+        
+        if (data.isWhitelisted) {
+          // User is whitelisted! Save username and reload
+          localStorage.setItem('savedUsername', username);
+          
+          successDiv.textContent = '✅ Access granted! Loading...';
+          successDiv.style.display = 'block';
+          
+          console.log('✅ Test mode login successful - user whitelisted:', username);
+          
+          // Reload page to bypass test mode
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          // Not whitelisted
+          errorDiv.textContent = '🔒 Access denied - You are not on the whitelist';
+          errorDiv.style.display = 'block';
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Login to Access';
+        }
+      } catch (error) {
+        console.error('Error checking whitelist:', error);
+        errorDiv.textContent = '❌ Error connecting to server. Please try again.';
+        errorDiv.style.display = 'block';
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login to Access';
       }
     }
 

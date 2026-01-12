@@ -162,6 +162,7 @@ const DataSchema = new mongoose.Schema({
   codeUsageHistory: { type: Array, default: [] }, // Track who used which codes
   availabilitySchedule: { type: Object, default: {} }, // Availability timing configuration
   bannedUsers: { type: Array, default: [] }, // List of banned users
+  testMode: { type: Boolean, default: false }, // Test mode flag
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -174,6 +175,9 @@ let dailyLimits = {
   'Educate': { count: 0, date: null, available: true },
   'Seneca': { count: 0, date: null, available: true }
 };
+
+// Test mode flag - when enabled, shows "Come back later" screen to all users
+let testMode = false;
 
 const MAX_PURCHASES_PER_DAY = 3; // Default starting slots per product per day
 const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
@@ -316,6 +320,7 @@ async function saveData() {
       codeUsageHistory,
       availabilitySchedule,
       bannedUsers,
+      testMode,
       updatedAt: new Date()
       },
       { upsert: true, new: true }
@@ -360,6 +365,7 @@ async function loadData() {
       codeUsageHistory = data.codeUsageHistory || [];
       availabilitySchedule = data.availabilitySchedule || availabilitySchedule;
       bannedUsers = data.bannedUsers || [];
+      testMode = data.testMode || false;
       
       console.log('✅ Data loaded from MongoDB');
       console.log(`   - Last updated: ${data.updatedAt}`);
@@ -756,6 +762,12 @@ app.post('/admin/reset-counters', (req, res) => {
   Object.keys(dailyLimits).forEach(product => {
     dailyLimits[product].count = 0;
     dailyLimits[product].date = new Date().toDateString();
+    
+    // Reset extra slots for Sparx Reader
+    if (product === 'Sparx Reader' && dailyLimits[product].extraSlots) {
+      dailyLimits[product].extraSlots.count = 0;
+      console.log(`✅ Extra slots also reset for "${product}"`);
+    }
   });
   
   console.log(`🔄 Admin reset: All counters reset to 0, cleared ${clearedReservations} active reservations`);
@@ -795,6 +807,12 @@ app.post('/admin/reset-product-counter', (req, res) => {
   
   dailyLimits[productName].count = 0;
   dailyLimits[productName].date = new Date().toDateString();
+  
+  // Also reset extra slots for Sparx Reader
+  if (productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+    dailyLimits[productName].extraSlots.count = 0;
+    console.log(`✅ Extra slots also reset for "${productName}"`);
+  }
   
   console.log(`🔄 Admin reset: Product "${productName}" counter reset to 0, cleared ${clearedReservations} active reservations`);
   
@@ -963,7 +981,38 @@ app.get('/admin/counters-status', (req, res) => {
   res.json({
     success: true,
     counters: dailyLimits,
-    maxPerDay: MAX_PURCHASES_PER_DAY
+    maxPerDay: MAX_PURCHASES_PER_DAY,
+    testMode: testMode
+  });
+});
+
+// Check test mode status (public endpoint)
+app.get('/check-test-mode', (req, res) => {
+  res.json({
+    testMode: testMode
+  });
+});
+
+// Admin endpoint to toggle test mode
+app.post('/admin/toggle-test-mode', (req, res) => {
+  const { password, enabled } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  testMode = enabled === true;
+  
+  console.log(`🧪 Test mode ${testMode ? 'ENABLED' : 'DISABLED'} by admin`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    testMode: testMode,
+    message: testMode ? 'Test mode enabled - users will see maintenance screen' : 'Test mode disabled - website is live'
   });
 });
 
@@ -1473,6 +1522,13 @@ app.post('/admin/auto-reset-slots', async (req, res) => {
         if (dailyLimits[product].available) {
           dailyLimits[product].count = 0;
           dailyLimits[product].date = today;
+          
+          // Also reset extra slots for Sparx Reader
+          if (product === 'Sparx Reader' && dailyLimits[product].extraSlots) {
+            dailyLimits[product].extraSlots.count = 0;
+            console.log(`✅ Extra slots also reset for "${product}"`);
+          }
+          
           hasReset = true;
           resetProducts.push(product);
           console.log(`✅ Auto-reset: "${product}" slots reset to 0/${MAX_PURCHASES_PER_DAY} (AVAILABLE)`);
@@ -1551,9 +1607,9 @@ app.get('/test-email', async (req, res) => {
     }
 
     const { data, error } = await resend.emails.send({
-      from: 'officialhwplug <onboarding@resend.dev>', // Update this to your verified domain
+      from: 'hwplug <onboarding@resend.dev>', // Update this to your verified domain
       to: process.env.YOUR_EMAIL,
-      subject: '🧪 Test Email from officialhwplug Backend',
+      subject: '🧪 Test Email from hwplug Backend',
       html: '<h2>Test Email</h2><p>This is a test email. If you receive this, Resend configuration is working!</p>'
     });
 
@@ -2040,7 +2096,7 @@ async function sendCardPaymentNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>
@@ -2082,7 +2138,7 @@ async function sendLoginNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: '🔐 New Customer Login - officialhwplug',
+      subject: '🔐 New Customer Login - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -2093,7 +2149,7 @@ async function sendLoginNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">New Customer Login</p>
             </div>
 
@@ -2134,7 +2190,7 @@ async function sendLoginNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>
@@ -2255,7 +2311,7 @@ async function sendCashPaymentNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>
@@ -2298,7 +2354,7 @@ async function sendLoginDetailsNotification(data) {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
-      subject: isNewLogin ? '🔐 NEW LOGIN - Card Payment Success - officialhwplug' : '💳 Card Payment Success - officialhwplug',
+      subject: isNewLogin ? '🔐 NEW LOGIN - Card Payment Success - hwplug' : '💳 Card Payment Success - hwplug',
       html: `
         <!DOCTYPE html>
         <html>
@@ -2309,7 +2365,7 @@ async function sendLoginDetailsNotification(data) {
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             <!-- Header with gradient -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">officialhwplug</h1>
+              <h1 style="color: #ffffff; font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -1px;">hwplug</h1>
               <p style="color: #e8e6ff; margin: 10px 0 0 0; font-size: 16px;">${isNewLogin ? '🔐 New Login - Card Payment' : '💳 Card Payment Successful'}</p>
             </div>
 
@@ -2381,7 +2437,7 @@ async function sendLoginDetailsNotification(data) {
 
             <!-- Bottom gradient bar -->
             <div style="background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); padding: 15px; text-align: center; border-radius: 0 0 12px 12px;">
-              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 officialhwplug – Your Learning Marketplace</p>
+              <p style="color: #e8e6ff; margin: 0; font-size: 12px;">© 2025 hwplug – Your Learning Marketplace</p>
             </div>
           </div>
         </body>

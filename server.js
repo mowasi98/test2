@@ -548,6 +548,18 @@ app.post('/reserve-slot', (req, res) => {
     });
   }
   
+  // Check if test mode is active (block purchases unless user is whitelisted)
+  if (testMode) {
+    // Test mode is active - user must be whitelisted
+    // Note: Frontend should have already checked, but this is a backend safety check
+    console.log('⚠️ Test mode active - blocking reservation attempt');
+    return res.json({
+      success: false,
+      error: 'Website is in test mode. Please refresh the page.',
+      testMode: true
+    });
+  }
+  
   // Check availability schedule (time-based)
   const availabilityStatus = checkAvailability();
   if (!availabilityStatus.available) {

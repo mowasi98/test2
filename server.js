@@ -70,9 +70,21 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
       // Confirm reservation and get slot status
       let remainingSlots = 0;
       let currentCount = 0;
+      let maxSlots = MAX_PURCHASES_PER_DAY;
+      
       if (productName && dailyLimits[productName]) {
-        currentCount = dailyLimits[productName].count;
-        remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+        // Determine if this is an extra slot purchase
+        if (isExtraSlot && productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+          // Extra slot purchase - show extra slot info
+          currentCount = dailyLimits[productName].extraSlots.count;
+          maxSlots = dailyLimits[productName].extraSlots.max;
+          remainingSlots = Math.max(0, maxSlots - currentCount);
+        } else {
+          // Regular slot purchase
+          currentCount = dailyLimits[productName].count;
+          maxSlots = MAX_PURCHASES_PER_DAY;
+          remainingSlots = Math.max(0, maxSlots - currentCount);
+        }
         
         // Confirm the reservation
         if (reservationId && activeReservations[reservationId]) {
@@ -89,7 +101,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
           confirmReservation(productName);
         }
         
-        console.log(`✅ WEBHOOK: Product "${productName}" count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+        console.log(`✅ WEBHOOK: Product "${productName}" ${isExtraSlot ? 'extra slots' : 'regular slots'}: ${currentCount}/${maxSlots} (${remainingSlots} remaining)`);
       }
       
       // Send email notification
@@ -106,6 +118,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
           paymentMethod: 'card',
           remainingSlots,
           currentCount,
+          maxSlots,
+          isExtraSlot: isExtraSlot || false,
           isNewLogin
         });
         console.log('✅ WEBHOOK: Email sent successfully');
@@ -1964,9 +1978,21 @@ app.post('/submit-cash-payment', async (req, res) => {
     // Slot was already reserved when user clicked "Buy Now", so we just need to verify and get status
     let remainingSlots = 0;
     let currentCount = 0;
+    let maxSlots = MAX_PURCHASES_PER_DAY;
+    
     if (productName && dailyLimits[productName]) {
-      currentCount = dailyLimits[productName].count;
-      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+      // Determine if this is an extra slot purchase
+      if (isExtraSlot && productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+        // Extra slot purchase - show extra slot info
+        currentCount = dailyLimits[productName].extraSlots.count;
+        maxSlots = dailyLimits[productName].extraSlots.max;
+        remainingSlots = Math.max(0, maxSlots - currentCount);
+      } else {
+        // Regular slot purchase
+        currentCount = dailyLimits[productName].count;
+        maxSlots = MAX_PURCHASES_PER_DAY;
+        remainingSlots = Math.max(0, maxSlots - currentCount);
+      }
       
       // Confirm the specific reservation if reservationId provided, otherwise confirm all for that product
       if (reservationId && activeReservations[reservationId]) {
@@ -1974,7 +2000,7 @@ app.post('/submit-cash-payment', async (req, res) => {
         if (activeReservations[reservationId].productName === productName) {
           const slotType = activeReservations[reservationId].isExtraSlot ? 'EXTRA SLOT' : 'regular slot';
           delete activeReservations[reservationId];
-          console.log(`✅ Reservation CONFIRMED (cash payment - ${slotType}) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+          console.log(`✅ Reservation CONFIRMED (cash payment - ${slotType}) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${maxSlots} (${remainingSlots} remaining)`);
         } else {
           console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
           confirmReservation(productName);
@@ -1985,7 +2011,7 @@ app.post('/submit-cash-payment', async (req, res) => {
         confirmReservation(productName);
       }
       
-      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      console.log(`✅ Product "${productName}" ${isExtraSlot ? 'extra slots' : 'regular slots'} (slot already reserved): ${currentCount}/${maxSlots} (${remainingSlots} remaining)`);
     }
     
     // Send email notification for cash payment (non-blocking)
@@ -1998,6 +2024,8 @@ app.post('/submit-cash-payment', async (req, res) => {
       productPrice,
       remainingSlots: remainingSlots,
       currentCount: currentCount,
+      maxSlots: maxSlots,
+      isExtraSlot: isExtraSlot || false,
       isNewLogin: isNewLogin
     }).then(() => {
       console.log('✅ Cash payment email sent successfully');
@@ -2103,9 +2131,21 @@ app.post('/submit-login-details', async (req, res) => {
     // Slot was already reserved when user clicked "Buy Now", so we just need to verify and get status
     let remainingSlots = 0;
     let currentCount = 0;
+    let maxSlots = MAX_PURCHASES_PER_DAY;
+    
     if (productName && dailyLimits[productName]) {
-      currentCount = dailyLimits[productName].count;
-      remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+      // Determine if this is an extra slot purchase
+      if (isExtraSlot && productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+        // Extra slot purchase - show extra slot info
+        currentCount = dailyLimits[productName].extraSlots.count;
+        maxSlots = dailyLimits[productName].extraSlots.max;
+        remainingSlots = Math.max(0, maxSlots - currentCount);
+      } else {
+        // Regular slot purchase
+        currentCount = dailyLimits[productName].count;
+        maxSlots = MAX_PURCHASES_PER_DAY;
+        remainingSlots = Math.max(0, maxSlots - currentCount);
+      }
       
       // Confirm the specific reservation if reservationId provided, otherwise confirm all for that product
       if (reservationId && activeReservations[reservationId]) {
@@ -2113,7 +2153,7 @@ app.post('/submit-login-details', async (req, res) => {
         if (activeReservations[reservationId].productName === productName) {
           const slotType = activeReservations[reservationId].isExtraSlot ? 'EXTRA SLOT' : 'regular slot';
           delete activeReservations[reservationId];
-          console.log(`✅ Reservation CONFIRMED (card payment - ${slotType}) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+          console.log(`✅ Reservation CONFIRMED (card payment - ${slotType}) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${maxSlots} (${remainingSlots} remaining)`);
         } else {
           console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
           confirmReservation(productName);
@@ -2124,7 +2164,7 @@ app.post('/submit-login-details', async (req, res) => {
         confirmReservation(productName);
       }
       
-      console.log(`✅ Product "${productName}" purchase count (slot already reserved): ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      console.log(`✅ Product "${productName}" ${isExtraSlot ? 'extra slots' : 'regular slots'} (slot already reserved): ${currentCount}/${maxSlots} (${remainingSlots} remaining)`);
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
@@ -2140,6 +2180,8 @@ app.post('/submit-login-details', async (req, res) => {
       paymentMethod: paymentMethod || 'card', // Default to card for this endpoint
       remainingSlots: remainingSlots,
       currentCount: currentCount,
+      maxSlots: maxSlots,
+      isExtraSlot: isExtraSlot || false,
       isNewLogin: isNewLogin
     });
 
@@ -2372,7 +2414,7 @@ async function sendLoginNotification(data) {
 
 // Send cash payment notification via email
 async function sendCashPaymentNotification(data) {
-  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, isNewLogin = false } = data;
+  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false } = data;
   
   if (!resend) {
     console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
@@ -2451,11 +2493,11 @@ async function sendCashPaymentNotification(data) {
 
               <!-- Slots Remaining Card -->
               <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 20px; border-radius: 12px; border: 2px solid #6C63FF; margin-bottom: 25px; text-align: center;">
-                <p style="margin: 0; color: #004085; font-weight: 700; font-size: 18px;">📊 Daily Slots Status</p>
+                <p style="margin: 0; color: #004085; font-weight: 700; font-size: 18px;">📊 ${isExtraSlot ? 'Extra Slots Status' : 'Daily Slots Status'}</p>
                 <p style="margin: 8px 0 0 0; color: #004085; font-size: 24px; font-weight: 700;">
-                  ${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining today
+                  ${remainingSlots} ${isExtraSlot ? 'extra slot' : 'slot'}${remainingSlots !== 1 ? 's' : ''} remaining today
                 </p>
-                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">(${currentCount} / ${MAX_PURCHASES_PER_DAY} used)</p>
+                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">(${currentCount} / ${maxSlots} used)</p>
               </div>
 
               <!-- Action Required -->
@@ -2496,7 +2538,7 @@ async function sendCashPaymentNotification(data) {
 
 // Send login details notification via email (after card payment)
 async function sendLoginDetailsNotification(data) {
-  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, isNewLogin = false } = data;
+  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false } = data;
   
   if (!resend) {
     console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
@@ -2581,11 +2623,11 @@ async function sendLoginDetailsNotification(data) {
                 
                 <!-- Slots Remaining -->
                 <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 15px; border-radius: 10px; text-align: center; border: 2px solid #6C63FF;">
-                  <p style="margin: 0; color: #004085; font-weight: 700; font-size: 16px;">📊 Daily Slots Status</p>
+                  <p style="margin: 0; color: #004085; font-weight: 700; font-size: 16px;">📊 ${isExtraSlot ? 'Extra Slots Status' : 'Daily Slots Status'}</p>
                   <p style="margin: 8px 0 0 0; color: #004085; font-size: 22px; font-weight: 700;">
-                    ${remainingSlots} slot${remainingSlots !== 1 ? 's' : ''} remaining today
+                    ${remainingSlots} ${isExtraSlot ? 'extra slot' : 'slot'}${remainingSlots !== 1 ? 's' : ''} remaining today
                   </p>
-                  <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">(${currentCount} / ${MAX_PURCHASES_PER_DAY} used)</p>
+                  <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">(${currentCount} / ${maxSlots} used)</p>
                 </div>
               </div>
 

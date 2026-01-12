@@ -175,7 +175,8 @@ let dailyLimits = {
   'Seneca': { count: 0, date: null, available: true }
 };
 
-const MAX_PURCHASES_PER_DAY = 3;
+const MAX_PURCHASES_PER_DAY = 3; // Default starting slots per product per day
+const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
 const EXTRA_SLOT_PRICE = 3; // £3 total for extra slots (when regular slots are full)
 const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots for Sparx Reader
 const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
@@ -338,7 +339,20 @@ async function loadData() {
     
     if (data) {
       // Restore data
-      dailyLimits = data.dailyLimits || dailyLimits;
+      const loadedLimits = data.dailyLimits || dailyLimits;
+      
+      // Merge loaded data with default structure to ensure extraSlots is always present
+      dailyLimits = {
+        'Sparx Reader': {
+          ...dailyLimits['Sparx Reader'],
+          ...loadedLimits['Sparx Reader'],
+          extraSlots: loadedLimits['Sparx Reader']?.extraSlots || { count: 0, max: 2 }
+        },
+        'Sparx Maths': loadedLimits['Sparx Maths'] || dailyLimits['Sparx Maths'],
+        'Educate': loadedLimits['Educate'] || dailyLimits['Educate'],
+        'Seneca': loadedLimits['Seneca'] || dailyLimits['Seneca']
+      };
+      
       activeReservations = data.activeReservations || {};
       lastTimerResetTime = data.lastTimerResetTime || Date.now();
       loginHistory.push(...(data.loginHistory || []));
@@ -354,7 +368,7 @@ async function loadData() {
       console.log(`   - Cash payment codes: ${cashPaymentCodes.length}`);
       console.log(`   - Code usage history: ${codeUsageHistory.length}`);
       console.log(`   - Availability schedule:`, availabilitySchedule);
-      console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}`).join(', '));
+      console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}${k === 'Sparx Reader' && v.extraSlots ? ` (extra: ${v.extraSlots.count}/${v.extraSlots.max})` : ''}`).join(', '));
     } else {
       console.log('📝 No saved data found in MongoDB, starting fresh');
       await saveData(); // Create initial document
@@ -866,9 +880,9 @@ app.post('/admin/set-slot-count', (req, res) => {
     return res.status(400).json({ error: 'Invalid slot count. Must be a positive number.' });
   }
   
-  if (newCount > MAX_PURCHASES_PER_DAY) {
+  if (newCount > ADMIN_MAX_SLOTS) {
     return res.status(400).json({ 
-      error: `Slot count cannot exceed maximum (${MAX_PURCHASES_PER_DAY}). Change MAX_PURCHASES_PER_DAY if you need more slots.` 
+      error: `Slot count cannot exceed maximum (${ADMIN_MAX_SLOTS}).` 
     });
   }
   

@@ -420,7 +420,10 @@
                                   <div class="login-history-section" style="margin-top: 2rem;">
                                     <h3 style="margin-top: 0; color: #6C63FF;">🛒 Purchase History</h3>
                                     <p style="color: #666; margin-bottom: 1rem;">View all purchases and payments</p>
-                                    <button class="btn" id="showHistoryBtn" style="margin-bottom: 1rem; touch-action: manipulation;">Load Purchase History</button>
+                                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                                      <button class="btn" id="showHistoryBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Load Purchase History</button>
+                                      <button class="btn btn-danger" id="clearAllHistoryBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Clear All History</button>
+                                    </div>
                                     <div id="loginHistoryContent" style="display: none;">
                                       <div id="loginHistoryStats" style="margin-bottom: 1rem; padding: 1rem; background: #e3f2fd; border-radius: 8px; color: #1976d2;">
                                         <strong>Total Purchases:</strong> <span id="totalLogins">0</span>
@@ -1140,6 +1143,18 @@
                                       this.click();
                                     }, {passive: true});
                                   }
+
+                                  // Clear All History button
+                                  const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
+                                  if (clearAllHistoryBtn) {
+                                    clearAllHistoryBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      clearAllPurchaseHistory();
+                                    });
+                                    clearAllHistoryBtn.addEventListener('touchstart', function(e) {
+                                      this.click();
+                                    }, {passive: true});
+                                  }
                                 });
 
                                 let activeUsersInterval = null;
@@ -1436,6 +1451,42 @@
                                   } catch (error) {
                                     console.error('Error removing purchase record:', error);
                                     showMessage('Error removing purchase record: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function clearAllPurchaseHistory() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('⚠️ Are you sure you want to CLEAR ALL purchase history? This cannot be undone!')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/clear-all-purchase-history`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ All purchase history cleared! (${data.count} records removed)`, 'success');
+                                      // Hide the history content and reset
+                                      document.getElementById('loginHistoryContent').style.display = 'none';
+                                      document.getElementById('totalLogins').textContent = '0';
+                                      document.getElementById('loginHistoryList').innerHTML = '';
+                                    } else {
+                                      showMessage(data.error || 'Failed to clear purchase history', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error clearing purchase history:', error);
+                                    showMessage('Error clearing purchase history: ' + error.message, 'error');
                                   }
                                 }
 

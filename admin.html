@@ -18,6 +18,17 @@
                                   padding: 2rem;
                                   min-height: 100vh;
                                 }
+                                
+                                /* Smooth scrolling for mobile and iPad only */
+                                @media (max-width: 1024px) {
+                                  html {
+                                    scroll-behavior: smooth;
+                                    -webkit-overflow-scrolling: touch;
+                                  }
+                                  body {
+                                    -webkit-overflow-scrolling: touch;
+                                  }
+                                }
                                 .admin-container {
                                   max-width: 800px;
                                   margin: 0 auto;
@@ -947,9 +958,8 @@
                                     });
                                     // Add touch event for better mobile response
                                     resetAllBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Reset Timer Only button
@@ -960,9 +970,8 @@
                                       resetTimer();
                                     });
                                     resetTimerBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Set Test Timer button
@@ -973,9 +982,8 @@
                                       setTestTimer();
                                     });
                                     setTestTimerBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Toggle Test Mode button
@@ -986,9 +994,8 @@
                                       toggleTestMode();
                                     });
                                     toggleTestModeBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Whitelist user management buttons (whitelist is now part of test mode)
@@ -999,9 +1006,8 @@
                                       addToWhitelist();
                                     });
                                     addToWhitelistBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Allow Enter key to add to whitelist
@@ -1023,9 +1029,8 @@
                                       setAllAvailable(false);
                                     });
                                     markAllUnavailableBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Mark All Available button
@@ -1036,9 +1041,8 @@
                                       setAllAvailable(true);
                                     });
                                     markAllAvailableBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Check Status button
@@ -1049,9 +1053,8 @@
                                       checkStatus();
                                     });
                                     checkStatusBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Save Weekday Schedule button
@@ -1062,9 +1065,8 @@
                                       updateWeekdaySchedule();
                                     });
                                     saveWeekdayBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Save Weekend Schedule button
@@ -1075,9 +1077,8 @@
                                       updateWeekendSchedule();
                                     });
                                     saveWeekendBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Add Cash Code button
@@ -1088,9 +1089,8 @@
                                       addCashCode();
                                     });
                                     addCashCodeBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Show Codes button
@@ -1101,9 +1101,8 @@
                                       loadCashCodes();
                                     });
                                     showCodesBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Show Code Usage button
@@ -1114,9 +1113,8 @@
                                       loadCodeUsage();
                                     });
                                     showCodeUsageBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Show Who's Online button
@@ -1127,9 +1125,8 @@
                                       loadActiveUsers();
                                     });
                                     showOnlineBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
 
                                   // Show Purchase History button
@@ -1140,9 +1137,8 @@
                                       loadLoginHistory();
                                     });
                                     showHistoryBtn.addEventListener('touchstart', function(e) {
-                                      e.preventDefault();
                                       this.click();
-                                    });
+                                    }, {passive: true});
                                   }
                                 });
 

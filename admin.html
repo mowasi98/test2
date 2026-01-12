@@ -262,6 +262,18 @@
                                     <button class="btn btn-warning" id="resetTimerBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset Timer Only</button>
                                   </div>
                                   
+                                  <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 2px solid #dc3545;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #fff;">🧪 Test Mode</h4>
+                                    <p style="font-size: 0.85rem; color: #fff; margin-bottom: 0.8rem;">Enable test mode to show "Come back later" screen to all users while you test new features:</p>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                      <button class="btn" id="toggleTestModeBtn" style="background: #fff; color: #dc3545; font-weight: 700; touch-action: manipulation;">
+                                        <span id="testModeButtonText">Enable Test Mode</span>
+                                      </button>
+                                      <span id="testModeStatus" style="color: #fff; font-weight: 600; padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border-radius: 6px;">Status: Live</span>
+                                    </div>
+                                    <p style="font-size: 0.75rem; color: #fff; margin: 0.5rem 0 0 0;">⚠️ Users will see: "🧪 In Test Mode - Come back later"</p>
+                                  </div>
+                                  
                                   <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
                                     <h4 style="margin: 0 0 0.5rem 0; color: #856404;">🧪 Test Timer (For Testing Auto-Reset)</h4>
                                     <p style="font-size: 0.85rem; color: #856404; margin-bottom: 0.8rem;">Set a short timer to test the automatic slot reset feature:</p>
@@ -445,6 +457,7 @@
                                     if (data.success) {
                                       document.getElementById('statusSection').style.display = 'block';
                                       displayStatus(data.counters);
+                                      updateTestModeUI(data.testMode || false);
                                       showMessage('✅ Admin access granted!', 'success');
                                     } else {
                                       showMessage('Error fetching status', 'error');
@@ -947,6 +960,19 @@
                                       setTestTimer();
                                     });
                                     setTestTimerBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Toggle Test Mode button
+                                  const toggleTestModeBtn = document.getElementById('toggleTestModeBtn');
+                                  if (toggleTestModeBtn) {
+                                    toggleTestModeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      toggleTestMode();
+                                    });
+                                    toggleTestModeBtn.addEventListener('touchstart', function(e) {
                                       e.preventDefault();
                                       this.click();
                                     });
@@ -1598,6 +1624,60 @@
                                 // Load availability status on page load and refresh every 30 seconds
                                 loadAvailabilityStatus();
                                 setInterval(loadAvailabilityStatus, 30000);
+
+                                // ====== TEST MODE FUNCTIONS ======
+                                function updateTestModeUI(isTestMode) {
+                                  const buttonText = document.getElementById('testModeButtonText');
+                                  const status = document.getElementById('testModeStatus');
+                                  
+                                  if (isTestMode) {
+                                    buttonText.textContent = 'Disable Test Mode';
+                                    status.textContent = 'Status: 🧪 Test Mode Active';
+                                    status.style.background = '#fff';
+                                    status.style.color = '#dc3545';
+                                  } else {
+                                    buttonText.textContent = 'Enable Test Mode';
+                                    status.textContent = 'Status: ✅ Live';
+                                    status.style.background = 'rgba(255,255,255,0.2)';
+                                    status.style.color = '#fff';
+                                  }
+                                }
+
+                                async function toggleTestMode() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  // Get current status first
+                                  try {
+                                    const statusResponse = await fetch(`${BACKEND_URL}/admin/counters-status`);
+                                    const statusData = await statusResponse.json();
+                                    const currentTestMode = statusData.testMode || false;
+                                    const newTestMode = !currentTestMode;
+
+                                    // Toggle test mode
+                                    const response = await fetch(`${BACKEND_URL}/admin/toggle-test-mode`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, enabled: newTestMode })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      updateTestModeUI(data.testMode);
+                                      showMessage(data.testMode ? '🧪 Test mode ENABLED - Users see "Come back later"' : '✅ Test mode DISABLED - Website is live!', 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to toggle test mode', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error toggling test mode:', error);
+                                    showMessage('Error toggling test mode: ' + error.message, 'error');
+                                  }
+                                }
                               </script>
                             </body>
                             </html>

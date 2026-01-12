@@ -433,14 +433,24 @@
 
     async function handleAutoLogin(username, password, productName, productPrice, stripeLink) {
       try {
+        // Check if this is an extra slot purchase
+        const urlParams = new URLSearchParams(window.location.search);
+        const isExtraSlot = urlParams.get('isExtraSlot') === 'true';
+        
+        // Clean product name (remove " - Extra Slot" suffix if present)
+        let cleanProductName = productName.replace(' - Extra Slot', '').trim();
+        
         // First, reserve a slot for the product (prevents race condition)
-        console.log('🔒 Auto-login: Reserving slot for:', productName);
+        console.log(`🔒 Auto-login: Reserving ${isExtraSlot ? 'EXTRA' : 'regular'} slot for:`, cleanProductName);
         const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ productName: productName })
+          body: JSON.stringify({ 
+            productName: cleanProductName,
+            isExtraSlot: isExtraSlot
+          })
         });
         
         const reservationData = await reservationResponse.json();
@@ -452,18 +462,19 @@
         }
         
         // Slot reserved successfully! Store reservation details
-        console.log('✅ Auto-login: Slot reserved:', reservationData.reservationId);
+        console.log(`✅ Auto-login: ${isExtraSlot ? 'Extra' : 'Regular'} slot reserved:`, reservationData.reservationId);
         
         // Store login info in sessionStorage for payment page
         sessionStorage.setItem('school', ''); // No school info on auto-login
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
-        sessionStorage.setItem('productName', productName);
+        sessionStorage.setItem('productName', productName); // Keep original display name
         sessionStorage.setItem('productPrice', productPrice);
         sessionStorage.setItem('stripeLink', stripeLink);
         sessionStorage.setItem('slotReserved', 'true');
-        sessionStorage.setItem('reservedProduct', productName);
+        sessionStorage.setItem('reservedProduct', cleanProductName); // Use clean name for backend
         sessionStorage.setItem('reservationId', reservationData.reservationId);
+        sessionStorage.setItem('isExtraSlot', isExtraSlot ? 'true' : 'false');
         
         // Redirect to payment selection page
         window.location.href = 'payment.html';
@@ -528,14 +539,23 @@
       }
 
       try {
+        // Check if this is an extra slot purchase
+        const isExtraSlot = urlParams.get('isExtraSlot') === 'true';
+        
+        // Clean product name (remove " - Extra Slot" suffix if present)
+        let cleanProductName = productName.replace(' - Extra Slot', '').trim();
+        
         // First, reserve a slot for the product (prevents race condition)
-        console.log('🔒 Reserving slot for:', productName);
+        console.log(`🔒 Reserving ${isExtraSlot ? 'EXTRA' : 'regular'} slot for:`, cleanProductName);
         const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ productName: productName })
+          body: JSON.stringify({ 
+            productName: cleanProductName,
+            isExtraSlot: isExtraSlot
+          })
         });
         
         const reservationData = await reservationResponse.json();
@@ -547,6 +567,8 @@
           
           if (reservationData.manuallyDisabled) {
             errorDiv.textContent = '⚠️ This product is not available right now. Please try again later.';
+          } else if (isExtraSlot) {
+            errorDiv.textContent = '⚠️ Extra slots are finished for today. Please try again tomorrow.';
           } else {
             errorDiv.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
           }
@@ -555,18 +577,19 @@
         }
         
         // Slot reserved successfully! Store reservation details
-        console.log('✅ Slot reserved:', reservationData.reservationId);
+        console.log(`✅ ${isExtraSlot ? 'Extra' : 'Regular'} slot reserved:`, reservationData.reservationId);
         
         // Store login info in sessionStorage for payment page (email sent after payment)
         sessionStorage.setItem('school', school);
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
-        sessionStorage.setItem('productName', productName);
+        sessionStorage.setItem('productName', productName); // Keep original display name
         sessionStorage.setItem('productPrice', productPrice);
         sessionStorage.setItem('stripeLink', stripeLink);
         sessionStorage.setItem('slotReserved', 'true');
-        sessionStorage.setItem('reservedProduct', productName);
+        sessionStorage.setItem('reservedProduct', cleanProductName); // Use clean name for backend
         sessionStorage.setItem('reservationId', reservationData.reservationId);
+        sessionStorage.setItem('isExtraSlot', isExtraSlot ? 'true' : 'false');
         
         console.log('Stored data:', { productName, productPrice, stripeLink, reservationId: reservationData.reservationId });
         

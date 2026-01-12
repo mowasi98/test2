@@ -250,7 +250,7 @@
                                     <label>Admin Password</label>
                                     <input type="password" id="adminPassword" placeholder="Enter admin password">
                                   </div>
-                                  <button class="btn" onclick="checkStatus()">Check Counter Status</button>
+                                  <button class="btn" id="checkStatusBtn" style="touch-action: manipulation;">Check Counter Status</button>
                                 </div>
                                 
                                 <div class="status-section" id="statusSection" style="display: none;">
@@ -342,7 +342,7 @@
                                         </div>
                                       </div>
                                       
-                                      <button class="btn" onclick="updateWeekdaySchedule()" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); touch-action: manipulation;">Save Weekday Schedule</button>
+                                      <button class="btn" id="saveWeekdayBtn" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); touch-action: manipulation;">Save Weekday Schedule</button>
                                     </div>
                                     
                                     <div style="background: #fff; padding: 1.5rem; border-radius: 8px;">
@@ -360,7 +360,7 @@
                                         </label>
                                       </div>
                                       
-                                      <button class="btn" onclick="updateWeekendSchedule()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); touch-action: manipulation;">Save Weekend Schedule</button>
+                                      <button class="btn" id="saveWeekendBtn" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); touch-action: manipulation;">Save Weekend Schedule</button>
                                     </div>
                                     
                                     <div style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
@@ -375,12 +375,12 @@
                                     
                                     <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
                                       <input type="text" id="newCashCode" placeholder="Enter new code (e.g., CASH123)" style="flex: 1; min-width: 200px; padding: 0.8rem; border: 2px solid #17a2b8; border-radius: 8px; font-size: 1rem; text-transform: uppercase;" />
-                                      <button class="btn btn-success" onclick="addCashCode()" style="touch-action: manipulation;">Add Code</button>
+                                      <button class="btn btn-success" id="addCashCodeBtn" style="touch-action: manipulation;">Add Code</button>
                                     </div>
                                     
                                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                      <button class="btn" onclick="loadCashCodes()" style="flex: 1; min-width: 200px; margin-bottom: 1rem; touch-action: manipulation;">Show All Codes</button>
-                                      <button class="btn btn-success" onclick="loadCodeUsage()" style="flex: 1; min-width: 200px; margin-bottom: 1rem; touch-action: manipulation;">Show Who Used Codes</button>
+                                      <button class="btn" id="showCodesBtn" style="flex: 1; min-width: 200px; margin-bottom: 1rem; touch-action: manipulation;">Show All Codes</button>
+                                      <button class="btn btn-success" id="showCodeUsageBtn" style="flex: 1; min-width: 200px; margin-bottom: 1rem; touch-action: manipulation;">Show Who Used Codes</button>
                                     </div>
                                     
                                     <div id="cashCodesContent" style="display: none;">
@@ -401,7 +401,7 @@
                                   <div class="active-users-section" style="margin-top: 2rem;">
                                     <h3 style="margin-top: 0; color: #28a745;">🟢 Active Users Browsing Now</h3>
                                     <p style="color: #666; margin-bottom: 1rem;">See who is currently online browsing the website (updates every 15 seconds)</p>
-                                    <button class="btn btn-success" onclick="loadActiveUsers()" style="margin-bottom: 1rem;">Show Who's Online</button>
+                                    <button class="btn btn-success" id="showOnlineBtn" style="margin-bottom: 1rem; touch-action: manipulation;">Show Who's Online</button>
                                     <div id="activeUsersContent" style="display: none;">
                                       <div id="activeUsersStats" style="margin-bottom: 1rem; padding: 1rem; background: #d4edda; border-radius: 8px; color: #155724; font-size: 1.1rem;">
                                         <strong>👁️ Currently Browsing:</strong> <span id="totalActive" style="font-size: 1.5rem; font-weight: 700;">0</span> users online
@@ -413,7 +413,7 @@
                                   <div class="login-history-section" style="margin-top: 2rem;">
                                     <h3 style="margin-top: 0; color: #6C63FF;">🛒 Purchase History</h3>
                                     <p style="color: #666; margin-bottom: 1rem;">View all purchases and payments</p>
-                                    <button class="btn" onclick="loadLoginHistory()" style="margin-bottom: 1rem;">Load Purchase History</button>
+                                    <button class="btn" id="showHistoryBtn" style="margin-bottom: 1rem; touch-action: manipulation;">Load Purchase History</button>
                                     <div id="loginHistoryContent" style="display: none;">
                                       <div id="loginHistoryStats" style="margin-bottom: 1rem; padding: 1rem; background: #e3f2fd; border-radius: 8px; color: #1976d2;">
                                         <strong>Total Purchases:</strong> <span id="totalLogins">0</span>
@@ -513,22 +513,22 @@
                                         <!-- Regular Slot Management Controls -->
                                         <div class="slot-control">
                                           <label style="font-size: 0.85rem; color: #666; margin-right: 0.5rem;">Regular:</label>
-                                          <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)">−</button>
+                                          <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
                                           <input type="number" 
                                                 id="slot-${safeProductId}" 
                                                 value="${count}" 
                                                 min="0" 
                                                 max="20" 
                                                 onchange="setSlotCount('${product}', this.value)">
-                                          <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)">+</button>
-                                          <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)">Set</button>
+                                          <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Set</button>
                                         </div>
                                         
                                         ${hasExtraSlots ? `
                                         <!-- Extra Slot Management Controls (Sparx Reader only) -->
                                         <div class="slot-control" style="margin-top: 0.8rem; background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 0.8rem; border-radius: 8px; border: 2px solid #ffc107;">
                                           <label style="font-size: 0.85rem; color: #856404; font-weight: 700; margin-right: 0.5rem;">💎 Extra Slots:</label>
-                                          <button class="btn btn-small btn-danger" onclick="adjustExtraSlotMax('${product}', -1)">−</button>
+                                          <button class="btn btn-small btn-danger" onclick="adjustExtraSlotMax('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
                                           <input type="number" 
                                                 id="extraslot-${safeProductId}" 
                                                 value="${extraSlotMax}" 
@@ -536,16 +536,16 @@
                                                 max="50" 
                                                 onchange="setExtraSlotMax('${product}', this.value)"
                                                 style="width: 80px;">
-                                          <button class="btn btn-small btn-success" onclick="adjustExtraSlotMax('${product}', 1)">+</button>
-                                          <button class="btn btn-small" onclick="setExtraSlotMax('${product}', document.getElementById('extraslot-${safeProductId}').value)">Set Max</button>
+                                          <button class="btn btn-small btn-success" onclick="adjustExtraSlotMax('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          <button class="btn btn-small" onclick="setExtraSlotMax('${product}', document.getElementById('extraslot-${safeProductId}').value)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Set Max</button>
                                           <span style="font-size: 0.85rem; color: #856404; margin-left: 0.5rem;">Used: ${extraSlotCount}/${extraSlotMax}</span>
                                         </div>
                                         ` : ''}
                                         
                                         <div class="product-controls">
-                                          <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')">Reset to 0</button>
+                                          <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Reset to 0</button>
                                           <button class="btn btn-small ${isUnavailable ? 'btn-success' : 'btn-warning'}" 
-                                                  onclick="toggleProductAvailability('${product}', ${!isUnavailable})">
+                                                  onclick="toggleProductAvailability('${product}', ${!isUnavailable})" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                             ${isUnavailable ? 'Mark Available' : 'Mark Not Available'}
                                           </button>
                                         </div>
@@ -1044,6 +1044,110 @@
                                       this.click();
                                     });
                                   }
+
+                                  // Check Status button
+                                  const checkStatusBtn = document.getElementById('checkStatusBtn');
+                                  if (checkStatusBtn) {
+                                    checkStatusBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      checkStatus();
+                                    });
+                                    checkStatusBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Save Weekday Schedule button
+                                  const saveWeekdayBtn = document.getElementById('saveWeekdayBtn');
+                                  if (saveWeekdayBtn) {
+                                    saveWeekdayBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      updateWeekdaySchedule();
+                                    });
+                                    saveWeekdayBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Save Weekend Schedule button
+                                  const saveWeekendBtn = document.getElementById('saveWeekendBtn');
+                                  if (saveWeekendBtn) {
+                                    saveWeekendBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      updateWeekendSchedule();
+                                    });
+                                    saveWeekendBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Add Cash Code button
+                                  const addCashCodeBtn = document.getElementById('addCashCodeBtn');
+                                  if (addCashCodeBtn) {
+                                    addCashCodeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      addCashCode();
+                                    });
+                                    addCashCodeBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Show Codes button
+                                  const showCodesBtn = document.getElementById('showCodesBtn');
+                                  if (showCodesBtn) {
+                                    showCodesBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadCashCodes();
+                                    });
+                                    showCodesBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Show Code Usage button
+                                  const showCodeUsageBtn = document.getElementById('showCodeUsageBtn');
+                                  if (showCodeUsageBtn) {
+                                    showCodeUsageBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadCodeUsage();
+                                    });
+                                    showCodeUsageBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Show Who's Online button
+                                  const showOnlineBtn = document.getElementById('showOnlineBtn');
+                                  if (showOnlineBtn) {
+                                    showOnlineBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadActiveUsers();
+                                    });
+                                    showOnlineBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Show Purchase History button
+                                  const showHistoryBtn = document.getElementById('showHistoryBtn');
+                                  if (showHistoryBtn) {
+                                    showHistoryBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadLoginHistory();
+                                    });
+                                    showHistoryBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
                                 });
 
                                 let activeUsersInterval = null;
@@ -1200,15 +1304,15 @@
                                                   </div>
                                                   <div style="display: flex; gap: 0.5rem;">
                                                     ${!isBanned ? `
-                                                      <button class="btn btn-small btn-warning" onclick="banUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                                      <button class="btn btn-small btn-warning" onclick="banUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                                         🚫 Ban
                                                       </button>
                                                     ` : `
-                                                      <button class="btn btn-small btn-success" onclick="unbanUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                                      <button class="btn btn-small btn-success" onclick="unbanUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                                         ✅ Unban
                                                       </button>
                                                     `}
-                                                    <button class="btn btn-small btn-danger" onclick="removePurchaseHistory(${index})" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                                    <button class="btn btn-small btn-danger" onclick="removePurchaseHistory(${index})" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                                       🗑️ Remove
                                                     </button>
                                                   </div>

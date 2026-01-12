@@ -37,13 +37,19 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
     
     // Extract metadata we attached during checkout session creation
     const metadata = session.metadata || {};
-    const { reservationId, school, username, password, productName, productPrice, previousUsername } = metadata;
+    const { reservationId, school, username, password, productName: rawProductName, productPrice, previousUsername } = metadata;
+    
+    // Clean product name (remove " - Extra Slot" suffix for backend processing)
+    const productName = rawProductName ? rawProductName.replace(' - Extra Slot', '').trim() : '';
+    const isExtraSlot = rawProductName && rawProductName.includes(' - Extra Slot');
     
     console.log('💳 WEBHOOK: Extracted metadata:', {
       reservationId,
       school,
       username,
       productName,
+      rawProductName,
+      isExtraSlot,
       productPrice,
       previousUsername,
       hasPassword: !!password
@@ -72,7 +78,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
         if (reservationId && activeReservations[reservationId]) {
           if (activeReservations[reservationId].productName === productName) {
             delete activeReservations[reservationId];
-            console.log(`✅ WEBHOOK: Reservation CONFIRMED for "${productName}" - ID: ${reservationId}`);
+            const slotType = activeReservations[reservationId].isExtraSlot ? 'EXTRA SLOT' : 'regular slot';
+            console.log(`✅ WEBHOOK: Reservation CONFIRMED (${slotType}) for "${productName}" - ID: ${reservationId}`);
           } else {
             console.warn(`⚠️ WEBHOOK: Reservation ID mismatch, confirming all for ${productName}`);
             confirmReservation(productName);
@@ -87,14 +94,14 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
       
       // Send email notification
       if (username && password && productName) {
-        console.log('📧 WEBHOOK: Sending card payment email...');
+        console.log(`📧 WEBHOOK: Sending card payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
         await sendLoginDetailsNotification({
           school: school || 'Not provided',
           username,
           password,
-          platform: productName,
+          platform: rawProductName || productName, // Use raw name for display (includes "- Extra Slot")
           sessionId: session.id,
-          productName,
+          productName: rawProductName || productName, // Use raw name for display
           productPrice,
           paymentMethod: 'card',
           remainingSlots,
@@ -108,7 +115,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
       loginHistory.push({
         username,
         school: school || 'Not provided',
-        productName: productName || 'Unknown',
+        productName: rawProductName || productName || 'Unknown', // Use raw name for display
         productPrice: productPrice || 'Unknown',
         paymentMethod: 'Card (Webhook)',
         timestamp: new Date().toISOString(),
@@ -163,6 +170,8 @@ const DataSchema = new mongoose.Schema({
   availabilitySchedule: { type: Object, default: {} }, // Availability timing configuration
   bannedUsers: { type: Array, default: [] }, // List of banned users
   testMode: { type: Boolean, default: false }, // Test mode flag
+  whitelistMode: { type: Boolean, default: false }, // Whitelist mode - only approved users can access
+  whitelistedUsers: { type: Array, default: [] }, // List of approved usernames
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -178,6 +187,10 @@ let dailyLimits = {
 
 // Test mode flag - when enabled, shows "Come back later" screen to all users
 let testMode = false;
+
+// Whitelist mode - when enabled, only approved users can access the website
+let whitelistMode = false;
+let whitelistedUsers = []; // Array of approved usernames
 
 const MAX_PURCHASES_PER_DAY = 3; // Default starting slots per product per day
 const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
@@ -321,6 +334,8 @@ async function saveData() {
       availabilitySchedule,
       bannedUsers,
       testMode,
+      whitelistMode,
+      whitelistedUsers,
       updatedAt: new Date()
       },
       { upsert: true, new: true }
@@ -366,6 +381,8 @@ async function loadData() {
       availabilitySchedule = data.availabilitySchedule || availabilitySchedule;
       bannedUsers = data.bannedUsers || [];
       testMode = data.testMode || false;
+      whitelistMode = data.whitelistMode || false;
+      whitelistedUsers = data.whitelistedUsers || [];
       
       console.log('✅ Data loaded from MongoDB');
       console.log(`   - Last updated: ${data.updatedAt}`);
@@ -374,6 +391,7 @@ async function loadData() {
       console.log(`   - Cash payment codes: ${cashPaymentCodes.length}`);
       console.log(`   - Code usage history: ${codeUsageHistory.length}`);
       console.log(`   - Availability schedule:`, availabilitySchedule);
+      console.log(`   - Whitelist mode: ${whitelistMode ? 'ENABLED' : 'disabled'} (${whitelistedUsers.length} users)`);
       console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}${k === 'Sparx Reader' && v.extraSlots ? ` (extra: ${v.extraSlots.count}/${v.extraSlots.max})` : ''}`).join(', '));
     } else {
       console.log('📝 No saved data found in MongoDB, starting fresh');
@@ -982,7 +1000,9 @@ app.get('/admin/counters-status', (req, res) => {
     success: true,
     counters: dailyLimits,
     maxPerDay: MAX_PURCHASES_PER_DAY,
-    testMode: testMode
+    testMode: testMode,
+    whitelistMode: whitelistMode,
+    whitelistedUsers: whitelistedUsers
   });
 });
 
@@ -1013,6 +1033,123 @@ app.post('/admin/toggle-test-mode', (req, res) => {
     success: true,
     testMode: testMode,
     message: testMode ? 'Test mode enabled - users will see maintenance screen' : 'Test mode disabled - website is live'
+  });
+});
+
+// ====== WHITELIST MODE ENDPOINTS ======
+
+// Check if a username is whitelisted (public endpoint - used by frontend)
+app.post('/check-whitelist', (req, res) => {
+  const { username } = req.body;
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  res.json({
+    whitelistMode: whitelistMode,
+    isWhitelisted: whitelistMode ? whitelistedUsers.includes(username) : true // If whitelist disabled, everyone is allowed
+  });
+});
+
+// Admin endpoint to toggle whitelist mode
+app.post('/admin/toggle-whitelist-mode', (req, res) => {
+  const { password, enabled } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  whitelistMode = enabled === true;
+  
+  console.log(`🔒 Whitelist mode ${whitelistMode ? 'ENABLED' : 'DISABLED'} by admin`);
+  console.log(`   Currently whitelisted users: ${whitelistedUsers.length > 0 ? whitelistedUsers.join(', ') : 'none'}`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    whitelistMode: whitelistMode,
+    whitelistedUsers: whitelistedUsers,
+    message: whitelistMode ? 'Whitelist mode enabled - only approved users can access' : 'Whitelist mode disabled - all users can access'
+  });
+});
+
+// Admin endpoint to add user to whitelist
+app.post('/admin/add-to-whitelist', (req, res) => {
+  const { password, username } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!username || username.trim() === '') {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  const cleanUsername = username.trim();
+  
+  if (whitelistedUsers.includes(cleanUsername)) {
+    return res.json({
+      success: false,
+      error: 'User already whitelisted',
+      whitelistedUsers: whitelistedUsers
+    });
+  }
+  
+  whitelistedUsers.push(cleanUsername);
+  
+  console.log(`✅ User "${cleanUsername}" added to whitelist by admin`);
+  console.log(`   Total whitelisted users: ${whitelistedUsers.length}`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    whitelistedUsers: whitelistedUsers,
+    message: `User "${cleanUsername}" added to whitelist`
+  });
+});
+
+// Admin endpoint to remove user from whitelist
+app.post('/admin/remove-from-whitelist', (req, res) => {
+  const { password, username } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  const index = whitelistedUsers.indexOf(username);
+  
+  if (index === -1) {
+    return res.json({
+      success: false,
+      error: 'User not found in whitelist',
+      whitelistedUsers: whitelistedUsers
+    });
+  }
+  
+  whitelistedUsers.splice(index, 1);
+  
+  console.log(`❌ User "${username}" removed from whitelist by admin`);
+  console.log(`   Remaining whitelisted users: ${whitelistedUsers.length}`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    whitelistedUsers: whitelistedUsers,
+    message: `User "${username}" removed from whitelist`
   });
 });
 
@@ -1764,9 +1901,13 @@ app.post('/submit-cash-payment', async (req, res) => {
     console.log('💵 CASH PAYMENT REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { school, username, password, productName, productPrice, previousUsername, reservationId, cashCode } = req.body;
+    const { school, username, password, productName: rawProductName, productPrice, previousUsername, reservationId, cashCode } = req.body;
     
-    console.log('💵 Extracted data:', { school, username, productName, productPrice, previousUsername, reservationId, cashCode, hasPassword: !!password });
+    // Clean product name (remove " - Extra Slot" suffix for backend processing)
+    const productName = rawProductName ? rawProductName.replace(' - Extra Slot', '').trim() : '';
+    const isExtraSlot = rawProductName && rawProductName.includes(' - Extra Slot');
+    
+    console.log('💵 Extracted data:', { school, username, productName, rawProductName, isExtraSlot, productPrice, previousUsername, reservationId, cashCode, hasPassword: !!password });
     
     // Validate required fields
     if (!username || !password) {
@@ -1793,7 +1934,7 @@ app.post('/submit-cash-payment', async (req, res) => {
       code: cleanCode,
       username: username,
       school: school || 'Not provided',
-      productName: productName || 'Unknown',
+      productName: rawProductName || productName || 'Unknown', // Use raw name for display
       productPrice: productPrice || 'N/A',
       timestamp: new Date().toISOString()
     });
@@ -1819,8 +1960,9 @@ app.post('/submit-cash-payment', async (req, res) => {
       if (reservationId && activeReservations[reservationId]) {
         // Verify it's for the correct product
         if (activeReservations[reservationId].productName === productName) {
+          const slotType = activeReservations[reservationId].isExtraSlot ? 'EXTRA SLOT' : 'regular slot';
           delete activeReservations[reservationId];
-          console.log(`✅ Reservation CONFIRMED (cash payment completed) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+          console.log(`✅ Reservation CONFIRMED (cash payment - ${slotType}) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
         } else {
           console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
           confirmReservation(productName);
@@ -1835,12 +1977,12 @@ app.post('/submit-cash-payment', async (req, res) => {
     }
     
     // Send email notification for cash payment (non-blocking)
-    console.log('📧 Attempting to send cash payment email...');
+    console.log(`📧 Attempting to send cash payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
     sendCashPaymentNotification({
       school: school || 'Not provided',
       username,
       password,
-      productName,
+      productName: rawProductName || productName, // Use raw name for display
       productPrice,
       remainingSlots: remainingSlots,
       currentCount: currentCount,
@@ -1857,7 +1999,7 @@ app.post('/submit-cash-payment', async (req, res) => {
     loginHistory.push({
       username,
       school: school || 'Not provided',
-      productName: productName || 'Unknown',
+      productName: rawProductName || productName || 'Unknown', // Use raw name for display
       productPrice: productPrice || 'Unknown',
       paymentMethod: 'Cash',
       timestamp: new Date().toISOString(),
@@ -1891,14 +2033,18 @@ app.post('/submit-login-details', async (req, res) => {
     console.log('💳 CARD PAYMENT - LOGIN DETAILS REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername, reservationId, isWebhookFallback } = req.body;
+    const { school, username, password, platform, sessionId, productName: rawProductName, productPrice, paymentMethod, previousUsername, reservationId, isWebhookFallback } = req.body;
+    
+    // Clean product name (remove " - Extra Slot" suffix for backend processing)
+    const productName = rawProductName ? rawProductName.replace(' - Extra Slot', '').trim() : '';
+    const isExtraSlot = rawProductName && rawProductName.includes(' - Extra Slot');
     
     // Check if this purchase was already processed (by webhook or previous call)
     // Look for recent duplicate entries (within last 5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const isDuplicate = loginHistory.some(entry => {
       const matchesUser = entry.username === username;
-      const matchesProduct = entry.productName === productName;
+      const matchesProduct = entry.productName === rawProductName || entry.productName === productName; // Check both forms
       const isRecent = entry.timestamp > fiveMinutesAgo;
       const matchesPaymentMethod = entry.paymentMethod === 'Card' || entry.paymentMethod === 'Card (Webhook)';
       
@@ -1907,7 +2053,7 @@ app.post('/submit-login-details', async (req, res) => {
     
     if (isDuplicate) {
       console.log('⏭️ CARD PAYMENT: Duplicate purchase detected - already processed (likely by webhook)');
-      console.log('   Username:', username, 'Product:', productName);
+      console.log('   Username:', username, 'Product:', rawProductName);
       return res.json({ 
         success: true, 
         message: 'Purchase already processed',
@@ -1922,7 +2068,9 @@ app.post('/submit-login-details', async (req, res) => {
       username, 
       platform, 
       sessionId, 
-      productName, 
+      productName,
+      rawProductName,
+      isExtraSlot,
       productPrice, 
       paymentMethod,
       previousUsername, 
@@ -1951,8 +2099,9 @@ app.post('/submit-login-details', async (req, res) => {
       if (reservationId && activeReservations[reservationId]) {
         // Verify it's for the correct product
         if (activeReservations[reservationId].productName === productName) {
+          const slotType = activeReservations[reservationId].isExtraSlot ? 'EXTRA SLOT' : 'regular slot';
           delete activeReservations[reservationId];
-          console.log(`✅ Reservation CONFIRMED (card payment completed) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+          console.log(`✅ Reservation CONFIRMED (card payment - ${slotType}) for "${productName}" - Reservation ID: ${reservationId} - Count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
         } else {
           console.warn(`⚠️ Reservation ID ${reservationId} product mismatch. Confirming all reservations for ${productName}`);
           confirmReservation(productName);
@@ -1967,14 +2116,14 @@ app.post('/submit-login-details', async (req, res) => {
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
-    console.log('📧 Attempting to send card payment email...');
+    console.log(`📧 Attempting to send card payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
     await sendLoginDetailsNotification({
       school: school || 'Not provided',
       username,
       password,
       platform,
       sessionId,
-      productName: productName || 'Unknown Product',
+      productName: rawProductName || productName || 'Unknown Product', // Use raw name for display
       productPrice: productPrice || 'N/A',
       paymentMethod: paymentMethod || 'card', // Default to card for this endpoint
       remainingSlots: remainingSlots,
@@ -1986,7 +2135,7 @@ app.post('/submit-login-details', async (req, res) => {
     loginHistory.push({
       username,
       school: school || 'Not provided',
-      productName: productName || 'Unknown',
+      productName: rawProductName || productName || 'Unknown', // Use raw name for display
       productPrice: productPrice || 'Unknown',
       paymentMethod: 'Card',
       timestamp: new Date().toISOString(),

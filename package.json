@@ -1,6 +1,6 @@
 {
   "name": "officialhwplug-backend",
-  "version": "1.0.0",
+  "version": "5.0.0",
   "description": "Backend for officialhwplug payments",
   "main": "server.js",
   "scripts": {
@@ -15,3 +15,4 @@
     "mongoose": "^8.0.0"
   }
 }
+

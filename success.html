@@ -142,7 +142,7 @@
     <div class="checkmark">✓</div>
     <h1>Payment Successful!</h1>
     <p id="thankYouMessage">THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.</p>
-    
+      
     <div id="redirectMessage" style="display: none; margin-top: 2rem; color: #6C63FF; font-weight: 600;">
       Redirecting you back to homepage...
     </div>
@@ -196,14 +196,14 @@
       // This serves as a fallback if webhook hasn't processed yet
       if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
         console.log('💳 SUCCESS PAGE: Sending email (webhook fallback) with data...');
-        
-        try {
-          const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
               school: school,
               username: savedUsername,
               password: savedPassword,
@@ -215,15 +215,15 @@
               previousUsername: previousUsername,
               reservationId: reservationId, // Pass reservation ID
               isWebhookFallback: true // Flag to indicate this is from success page
-            }),
-          });
+          }),
+        });
 
           if (!response.ok) {
             const errorText = await response.text();
             console.error('💳 SUCCESS PAGE: Email send error:', response.status, errorText);
             console.log('⚠️ SUCCESS PAGE: Webhook should have handled this purchase');
           } else {
-            const result = await response.json();
+        const result = await response.json();
             console.log('✅ SUCCESS PAGE: Email response:', response.status, result);
           }
         } catch (error) {
@@ -284,7 +284,7 @@
         }).catch(error => {
           console.error('Heartbeat error:', error);
         });
-      }
+    }
     });
   </script>
 </body>

@@ -20,6 +20,17 @@
       margin: 0;
       padding: 20px;
     }
+    
+    /* Smooth scrolling for mobile and iPad only */
+    @media (max-width: 1024px) {
+      html {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+      }
+      body {
+        -webkit-overflow-scrolling: touch;
+      }
+    }
     .login-box {
       background: #fff;
       padding: 3rem;

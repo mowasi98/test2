@@ -488,7 +488,7 @@
                                                 id="slot-${safeProductId}" 
                                                 value="${count}" 
                                                 min="0" 
-                                                max="3" 
+                                                max="20" 
                                                 onchange="setSlotCount('${product}', this.value)">
                                           <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)">+</button>
                                           <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)">Set</button>
@@ -1064,13 +1064,27 @@
                                   }
 
                                   try {
-                                    const response = await fetch(`${BACKEND_URL}/admin/login-history`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ password })
-                                    });
+                                    // Fetch login history AND banned users list together
+                                    const [historyResponse, bannedResponse] = await Promise.all([
+                                      fetch(`${BACKEND_URL}/admin/login-history`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ password })
+                                      }),
+                                      fetch(`${BACKEND_URL}/admin/get-banned-users`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ password })
+                                      })
+                                    ]);
 
-                                    const data = await response.json();
+                                    const data = await historyResponse.json();
+                                    const bannedData = await bannedResponse.json();
+                                    
+                                    // Create set of banned usernames for fast lookup
+                                    const bannedUsernames = new Set(
+                                      (bannedData.bannedUsers || []).map(u => u.username.toLowerCase())
+                                    );
 
                                     if (data.success) {
                                       document.getElementById('loginHistoryContent').style.display = 'block';
@@ -1096,9 +1110,10 @@
                                             hour12: false
                                           });
                                           
-                                          // Check if this user is banned
-                                          checkIfUserBanned(login.username).then(isBanned => {
-                                            loginItem.innerHTML = `
+                                          // Check if this user is banned (from the set we fetched)
+                                          const isBanned = bannedUsernames.has(login.username.toLowerCase());
+                                          
+                                          loginItem.innerHTML = `
                                               <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap;">
                                                 <div style="flex: 1; min-width: 200px;">
                                                   <div style="font-weight: 600; color: #333; margin-bottom: 0.3rem;">
@@ -1130,10 +1145,9 @@
                                                       🗑️ Remove
                                                     </button>
                                                   </div>
-                                                </div>
                                               </div>
-                                            `;
-                                          });
+                                            </div>
+                                          `;
                                           
                                           historyList.appendChild(loginItem);
                                         });
@@ -1482,11 +1496,21 @@
                                       `;
                                     }
                                     
-                                    // Update form fields with current schedule
+                                    // Update form fields with current schedule (only if not being edited)
                                     if (data.schedule) {
                                       document.getElementById('weekdayEnabled').checked = data.schedule.weekday.enabled;
-                                      document.getElementById('weekdayStart').value = data.schedule.weekday.startTime;
-                                      document.getElementById('weekdayEnd').value = data.schedule.weekday.endTime;
+                                      
+                                      // Only update time inputs if they're not currently focused (being edited)
+                                      const weekdayStart = document.getElementById('weekdayStart');
+                                      const weekdayEnd = document.getElementById('weekdayEnd');
+                                      
+                                      if (document.activeElement !== weekdayStart) {
+                                        weekdayStart.value = data.schedule.weekday.startTime;
+                                      }
+                                      if (document.activeElement !== weekdayEnd) {
+                                        weekdayEnd.value = data.schedule.weekday.endTime;
+                                      }
+                                      
                                       document.getElementById('weekendEnabled').checked = data.schedule.weekend.enabled;
                                       document.getElementById('weekendAllDay').checked = data.schedule.weekend.allDay;
                                     }

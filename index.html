@@ -89,6 +89,9 @@
       transition: all 0.2s;
       text-decoration: none;
       display: inline-block;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 44px;
     }
     .auth-btn:hover {
       background: rgba(255, 255, 255, 0.3);
@@ -286,6 +289,9 @@
       transition: all 0.2s;
       text-decoration: none;
       display: inline-block;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 48px;
     }
     .extra-slot-buy-btn:hover {
       transform: translateY(-2px);
@@ -330,6 +336,10 @@
       pointer-events: auto;
       z-index: 10;
       position: relative;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 44px;
+      min-width: 44px;
     }
     .buy-btn:hover {
       background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
@@ -403,6 +413,9 @@
       border-radius: 8px;
       transition: all 0.2s;
       box-shadow: 0 2px 6px rgba(255,252,0,0.3);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 44px;
     }
     .snapchat-link:hover {
       transform: translateY(-2px);
@@ -548,7 +561,7 @@
         <p style="color: #856404; font-size: 0.95rem; margin: 0 0 1.2rem 0; line-height: 1.4;">
           Contact us on Snapchat to<br>appeal your ban:
         </p>
-        <a href="https://snapchat.com/add/homework5003" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #FFFC00; color: #000; padding: 0.9rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.2s; margin-bottom: 1rem;">
+        <a href="https://snapchat.com/add/homework5003" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #FFFC00; color: #000; padding: 0.9rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.2s; margin-bottom: 1rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent; min-height: 48px;">
           👻 hwplug
         </a>
         <p style="color: #856404; font-size: 0.9rem; margin: 0; line-height: 1.3;">
@@ -857,6 +870,41 @@
     // Check if user is banned
     async function checkBanStatus() {
       const savedUsername = localStorage.getItem('savedUsername');
+      
+      // Check if user was previously marked as banned (persists across refreshes)
+      const wasBanned = localStorage.getItem('userBanned');
+      const bannedUsername = localStorage.getItem('bannedUsername');
+      
+      // If marked as banned, verify with server (in case they were unbanned)
+      if (wasBanned === 'true' && bannedUsername) {
+        try {
+          const response = await fetch(`${BACKEND_URL}/check-ban-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: bannedUsername })
+          });
+          
+          const data = await response.json();
+          
+          if (data.banned) {
+            // Still banned - show screen
+            showBannedScreen(data.reason || 'Policy violation');
+            return true;
+          } else {
+            // Unbanned! Clear ban markers
+            localStorage.removeItem('userBanned');
+            localStorage.removeItem('banReason');
+            localStorage.removeItem('bannedUsername');
+            console.log('✅ User was unbanned - clearing ban markers');
+            return false;
+          }
+        } catch (error) {
+          // If can't reach server, show cached ban screen
+          showBannedScreen(localStorage.getItem('banReason') || 'Policy violation');
+          return true;
+        }
+      }
+      
       if (!savedUsername) return false; // Not logged in, can't be banned
       
       try {
@@ -869,19 +917,13 @@
         const data = await response.json();
         
         if (data.banned) {
+          // Mark as banned in localStorage (persists across refreshes)
+          localStorage.setItem('userBanned', 'true');
+          localStorage.setItem('banReason', data.reason || 'Policy violation');
+          localStorage.setItem('bannedUsername', savedUsername); // Remember who was banned
+          
           // Show banned screen
-          document.getElementById('bannedScreen').style.display = 'flex';
-          document.getElementById('banReasonText').textContent = data.reason || 'Policy violation';
-          
-          // Hide all other content
-          document.querySelector('header').style.display = 'none';
-          document.querySelector('.items').style.display = 'none';
-          document.querySelector('footer').style.display = 'none';
-          
-          // Clear credentials
-          localStorage.removeItem('savedUsername');
-          localStorage.removeItem('savedPassword');
-          sessionStorage.clear();
+          showBannedScreen(data.reason || 'Policy violation');
           
           return true;
         }
@@ -891,6 +933,28 @@
         console.error('Error checking ban status:', error);
         return false;
       }
+    }
+    
+    function showBannedScreen(reason) {
+      // Show banned screen
+      document.getElementById('bannedScreen').style.display = 'flex';
+      document.getElementById('banReasonText').textContent = reason;
+      
+      // Hide all other content
+      const header = document.querySelector('header');
+      const items = document.querySelector('.items');
+      const footer = document.querySelector('footer');
+      const availability = document.querySelector('.availability-banner');
+      
+      if (header) header.style.display = 'none';
+      if (items) items.style.display = 'none';
+      if (footer) footer.style.display = 'none';
+      if (availability) availability.style.display = 'none';
+      
+      // Clear sensitive credentials (but keep ban markers)
+      localStorage.removeItem('savedUsername');
+      localStorage.removeItem('savedPassword');
+      sessionStorage.clear();
     }
 
     // Check if user is logged in and update UI
@@ -1106,15 +1170,19 @@
               if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else {
               // Regular slots finished - check for extra slots (Sparx Reader only)
+              console.log(`🔍 Regular slots finished for "${product}". Extra slot data:`, data.extraSlots);
+              
               if (product === 'Sparx Reader' && data.extraSlots && data.extraSlots.available) {
                 // Extra slots available! Show overlay
-                console.log('💎 Extra slots available for Sparx Reader');
+                console.log('💎 Extra slots available for Sparx Reader:', data.extraSlots);
                 if (extraSlotOverlay) {
                   extraSlotOverlay.classList.add('active');
+                  console.log('✅ Extra slot overlay activated');
                 }
                 slotsDiv.innerHTML = '<div class="slots-message">Regular slots finished</div>';
               } else {
                 // No extra slots or all extra slots finished
+                console.log(`❌ No extra slots available. Product: ${product}, extraSlots:`, data.extraSlots);
                 buyBtn.classList.add('disabled');
                 buyBtn.style.pointerEvents = 'none';
                 buyBtn.onclick = function(e) {

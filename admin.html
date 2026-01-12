@@ -274,6 +274,31 @@
                                     <p style="font-size: 0.75rem; color: #fff; margin: 0.5rem 0 0 0;">⚠️ Users will see: "🧪 In Test Mode - Come back later"</p>
                                   </div>
                                   
+                                  <div style="background: linear-gradient(135deg, #6c63ff 0%, #8b83ff 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 2px solid #6c63ff;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #fff;">🔒 Whitelist Mode (Private Testing)</h4>
+                                    <p style="font-size: 0.85rem; color: #fff; margin-bottom: 0.8rem;">Only allow specific users to access the website:</p>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+                                      <button class="btn" id="toggleWhitelistModeBtn" style="background: #fff; color: #6c63ff; font-weight: 700; touch-action: manipulation;">
+                                        <span id="whitelistModeButtonText">Enable Whitelist</span>
+                                      </button>
+                                      <span id="whitelistModeStatus" style="color: #fff; font-weight: 600; padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border-radius: 6px;">Status: Disabled</span>
+                                    </div>
+                                    <div style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 6px; margin-bottom: 0.8rem;">
+                                      <p style="font-size: 0.85rem; color: #fff; margin: 0 0 0.5rem 0; font-weight: 600;">Add User to Whitelist:</p>
+                                      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="text" id="whitelistUsernameInput" placeholder="Enter username" style="flex: 1; min-width: 200px; padding: 0.5rem; border: 2px solid #fff; border-radius: 4px; font-size: 1rem;">
+                                        <button class="btn" id="addToWhitelistBtn" style="background: #fff; color: #6c63ff; font-weight: 700; touch-action: manipulation;">Add User</button>
+                                      </div>
+                                    </div>
+                                    <div id="whitelistedUsersContainer" style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 6px;">
+                                      <p style="font-size: 0.85rem; color: #fff; margin: 0 0 0.5rem 0; font-weight: 600;">Whitelisted Users (<span id="whitelistCount">0</span>):</p>
+                                      <div id="whitelistedUsersList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0;">No users whitelisted yet</p>
+                                      </div>
+                                    </div>
+                                    <p style="font-size: 0.75rem; color: #fff; margin: 0.5rem 0 0 0;">⚠️ Non-whitelisted users will see: "🔒 Access Restricted"</p>
+                                  </div>
+                                  
                                   <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
                                     <h4 style="margin: 0 0 0.5rem 0; color: #856404;">🧪 Test Timer (For Testing Auto-Reset)</h4>
                                     <p style="font-size: 0.85rem; color: #856404; margin-bottom: 0.8rem;">Set a short timer to test the automatic slot reset feature:</p>
@@ -458,6 +483,7 @@
                                       document.getElementById('statusSection').style.display = 'block';
                                       displayStatus(data.counters);
                                       updateTestModeUI(data.testMode || false);
+                                      updateWhitelistModeUI(data.whitelistMode || false, data.whitelistedUsers || []);
                                       showMessage('✅ Admin access granted!', 'success');
                                     } else {
                                       showMessage('Error fetching status', 'error');
@@ -975,6 +1001,42 @@
                                     toggleTestModeBtn.addEventListener('touchstart', function(e) {
                                       e.preventDefault();
                                       this.click();
+                                    });
+                                  }
+
+                                  // Whitelist Mode buttons
+                                  const toggleWhitelistModeBtn = document.getElementById('toggleWhitelistModeBtn');
+                                  if (toggleWhitelistModeBtn) {
+                                    toggleWhitelistModeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      toggleWhitelistMode();
+                                    });
+                                    toggleWhitelistModeBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  const addToWhitelistBtn = document.getElementById('addToWhitelistBtn');
+                                  if (addToWhitelistBtn) {
+                                    addToWhitelistBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      addToWhitelist();
+                                    });
+                                    addToWhitelistBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      this.click();
+                                    });
+                                  }
+
+                                  // Allow Enter key to add to whitelist
+                                  const whitelistUsernameInput = document.getElementById('whitelistUsernameInput');
+                                  if (whitelistUsernameInput) {
+                                    whitelistUsernameInput.addEventListener('keypress', function(e) {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addToWhitelist();
+                                      }
                                     });
                                   }
 
@@ -1676,6 +1738,151 @@
                                   } catch (error) {
                                     console.error('Error toggling test mode:', error);
                                     showMessage('Error toggling test mode: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== WHITELIST MODE FUNCTIONS ======
+                                function updateWhitelistModeUI(isWhitelistMode, users) {
+                                  const buttonText = document.getElementById('whitelistModeButtonText');
+                                  const status = document.getElementById('whitelistModeStatus');
+                                  const count = document.getElementById('whitelistCount');
+                                  const usersList = document.getElementById('whitelistedUsersList');
+                                  
+                                  if (isWhitelistMode) {
+                                    buttonText.textContent = 'Disable Whitelist';
+                                    status.textContent = 'Status: 🔒 Active';
+                                    status.style.background = '#fff';
+                                    status.style.color = '#6c63ff';
+                                  } else {
+                                    buttonText.textContent = 'Enable Whitelist';
+                                    status.textContent = 'Status: Disabled';
+                                    status.style.background = 'rgba(255,255,255,0.2)';
+                                    status.style.color = '#fff';
+                                  }
+                                  
+                                  // Update users list
+                                  count.textContent = users.length;
+                                  
+                                  if (users.length === 0) {
+                                    usersList.innerHTML = '<p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0;">No users whitelisted yet</p>';
+                                  } else {
+                                    usersList.innerHTML = users.map(user => `
+                                      <div style="background: rgba(255,255,255,0.2); padding: 0.5rem 0.8rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="color: #fff; font-weight: 600;">${user}</span>
+                                        <button onclick="removeFromWhitelist('${user}')" style="background: #dc3545; color: #fff; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; touch-action: manipulation;">Remove</button>
+                                      </div>
+                                    `).join('');
+                                  }
+                                }
+
+                                async function toggleWhitelistMode() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const statusResponse = await fetch(`${BACKEND_URL}/admin/counters-status`);
+                                    const statusData = await statusResponse.json();
+                                    const currentWhitelistMode = statusData.whitelistMode || false;
+                                    const newWhitelistMode = !currentWhitelistMode;
+
+                                    const response = await fetch(`${BACKEND_URL}/admin/toggle-whitelist-mode`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, enabled: newWhitelistMode })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      updateWhitelistModeUI(data.whitelistMode, data.whitelistedUsers);
+                                      showMessage(data.whitelistMode ? '🔒 Whitelist mode ENABLED - Only approved users can access' : '✅ Whitelist mode DISABLED - All users can access', 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to toggle whitelist mode', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error toggling whitelist mode:', error);
+                                    showMessage('Error toggling whitelist mode: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function addToWhitelist() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const username = document.getElementById('whitelistUsernameInput').value.trim();
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!username) {
+                                    showMessage('Please enter a username', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/add-to-whitelist`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      // Get current whitelist mode status
+                                      const statusResponse = await fetch(`${BACKEND_URL}/admin/counters-status`);
+                                      const statusData = await statusResponse.json();
+                                      
+                                      updateWhitelistModeUI(statusData.whitelistMode, data.whitelistedUsers);
+                                      document.getElementById('whitelistUsernameInput').value = ''; // Clear input
+                                      showMessage(`✅ User "${username}" added to whitelist`, 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to add user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error adding to whitelist:', error);
+                                    showMessage('Error adding to whitelist: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function removeFromWhitelist(username) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Remove "${username}" from whitelist?`)) {
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/remove-from-whitelist`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      // Get current whitelist mode status
+                                      const statusResponse = await fetch(`${BACKEND_URL}/admin/counters-status`);
+                                      const statusData = await statusResponse.json();
+                                      
+                                      updateWhitelistModeUI(statusData.whitelistMode, data.whitelistedUsers);
+                                      showMessage(`✅ User "${username}" removed from whitelist`, 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to remove user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error removing from whitelist:', error);
+                                    showMessage('Error removing from whitelist: ' + error.message, 'error');
                                   }
                                 }
                               </script>

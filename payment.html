@@ -317,25 +317,72 @@
         isProceedingToStripe = true;
         console.log('✅ Setting flag: proceeding to Stripe - slot will NOT be released');
         
-        // Store product info in localStorage for success page (persists across redirects)
-        localStorage.setItem('cardPaymentProductName', productName);
-        localStorage.setItem('cardPaymentProductPrice', productPrice);
-        localStorage.setItem('cardPaymentSchool', school || ''); // Save school for success page
-        localStorage.setItem('cardPaymentUsername', username || ''); // Save username
-        localStorage.setItem('cardPaymentPassword', password || ''); // Save password
-        localStorage.setItem('cardPaymentPreviousUsername', previousUsername || ''); // Save previous username
-        localStorage.setItem('cardPaymentReservationId', reservationId || ''); // Save reservation ID
-        
-        // Redirect to Stripe payment (email will be sent after payment is confirmed)
-        if (stripeLink && stripeLink.startsWith('http')) {
-          // Small delay to ensure flag is set and localStorage is saved before navigation
-          setTimeout(() => {
-            window.location.href = stripeLink;
-          }, 50);
-        } else {
-          // Reset flag if redirect fails
+        // Create Stripe checkout session with metadata (for webhook)
+        try {
+          console.log('💳 Creating Stripe checkout session with data:', {
+            reservationId,
+            school,
+            username,
+            productName,
+            productPrice,
+            previousUsername,
+            hasPassword: !!password
+          });
+          
+          const checkoutResponse = await fetch(`${BACKEND_URL}/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservationId: reservationId || '',
+              school: school || 'Not provided',
+              username: username,
+              password: password,
+              productName: productName,
+              productPrice: productPrice,
+              previousUsername: previousUsername || '',
+              successUrl: `${window.location.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+              cancelUrl: `${window.location.origin}/payment.html`
+            }),
+          });
+          
+          if (!checkoutResponse.ok) {
+            const errorData = await checkoutResponse.json();
+            console.error('💳 Checkout session creation failed:', errorData);
+            isProceedingToStripe = false;
+            document.getElementById('errorMessage').textContent = errorData.error || 'Failed to create checkout session. Please try again.';
+            document.getElementById('errorMessage').style.display = 'block';
+            payBtn.disabled = false;
+            payBtn.textContent = 'Continue to Payment';
+            return;
+          }
+          
+          const checkoutData = await checkoutResponse.json();
+          console.log('✅ Stripe checkout session created:', checkoutData.sessionId);
+          
+          // Store minimal data in localStorage for success page fallback
+          localStorage.setItem('cardPaymentProductName', productName);
+          localStorage.setItem('cardPaymentProductPrice', productPrice);
+          localStorage.setItem('cardPaymentSchool', school || '');
+          localStorage.setItem('cardPaymentUsername', username || '');
+          localStorage.setItem('cardPaymentPassword', password || '');
+          localStorage.setItem('cardPaymentPreviousUsername', previousUsername || '');
+          localStorage.setItem('cardPaymentReservationId', reservationId || '');
+          
+          // Redirect to Stripe checkout (webhook will handle purchase completion)
+          if (checkoutData.url) {
+            console.log('🔀 Redirecting to Stripe checkout...');
+            setTimeout(() => {
+              window.location.href = checkoutData.url;
+            }, 50);
+          } else {
+            throw new Error('No checkout URL received from server');
+          }
+        } catch (error) {
+          console.error('💳 Error creating checkout session:', error);
           isProceedingToStripe = false;
-          document.getElementById('errorMessage').textContent = 'Payment link not available. Please go back and try again.';
+          document.getElementById('errorMessage').textContent = 'Something went wrong: ' + error.message;
           document.getElementById('errorMessage').style.display = 'block';
           payBtn.disabled = false;
           payBtn.textContent = 'Continue to Payment';

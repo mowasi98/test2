@@ -697,7 +697,7 @@
       <div class="item-desc">Improve reading comprehension with interactive tasks</div>
       <div class="price">&pound;2</div>
       <div id="slots-Sparx Reader"></div>
-      <a href="login.html?product=Sparx%20Reader&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h" class="buy-btn" data-product="Sparx Reader">Buy Now</a>
+      <a href="login.html?product=Sparx%20Reader&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h" class="buy-btn" data-product="Sparx Reader" onclick="return handleBuyClick(event, this)">Buy Now</a>
       
       <!-- Extra Slot Overlay (only shown when regular slots are full) -->
       <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Reader">
@@ -715,7 +715,7 @@
       <div class="item-desc">Master maths with adaptive problem sets</div>
       <div class="price">&pound;2</div>
       <div id="slots-Sparx Maths"></div>
-      <a href="login.html?product=Sparx%20Maths&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F5kQ00b64c7j7g5IbSMcfK0g" class="buy-btn" data-product="Sparx Maths">Buy Now</a>
+      <a href="login.html?product=Sparx%20Maths&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F5kQ00b64c7j7g5IbSMcfK0g" class="buy-btn" data-product="Sparx Maths" onclick="return handleBuyClick(event, this)">Buy Now</a>
     </div>
     
     <div class="item-card" data-product="Educate">
@@ -723,7 +723,7 @@
       <div class="item-desc">Explore science topics with engaging resources</div>
       <div class="price">&pound;2</div>
       <div id="slots-Educate"></div>
-      <a href="login.html?product=Educate&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2FfZubITfEM32R6v81e8cfK0i" class="buy-btn" data-product="Educate">Buy Now</a>
+      <a href="login.html?product=Educate&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2FfZubITfEM32R6v81e8cfK0i" class="buy-btn" data-product="Educate" onclick="return handleBuyClick(event, this)">Buy Now</a>
     </div>
     
     <div class="item-card" data-product="Seneca">
@@ -731,7 +731,7 @@
       <div class="item-desc">Learn smarter with bite-sized lessons and quizzes</div>
       <div class="price">&pound;2</div>
       <div id="slots-Seneca"></div>
-      <a href="login.html?product=Seneca&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F6oUfZ978g1YNcTw6yscfK01" class="buy-btn" data-product="Seneca">Buy Now</a>
+      <a href="login.html?product=Seneca&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F6oUfZ978g1YNcTw6yscfK01" class="buy-btn" data-product="Seneca" onclick="return handleBuyClick(event, this)">Buy Now</a>
     </div>
   </section>
 
@@ -1319,10 +1319,74 @@
       }, 1000);
     }
 
+    // Check if purchase is allowed (test mode check)
+    async function checkPurchaseAllowed() {
+      try {
+        // Check if test mode is active
+        const testModeResponse = await fetch(`${BACKEND_URL}/check-test-mode`);
+        const testModeData = await testModeResponse.json();
+        
+        if (testModeData.testMode) {
+          // Test mode is active - check if user is whitelisted
+          const savedUsername = localStorage.getItem('savedUsername');
+          
+          if (!savedUsername) {
+            // Not logged in - block purchase
+            alert('⚠️ Website is in test mode. Please refresh the page to login.');
+            return false;
+          }
+          
+          // Check if whitelisted
+          const whitelistResponse = await fetch(`${BACKEND_URL}/check-whitelist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: savedUsername })
+          });
+          
+          const whitelistData = await whitelistResponse.json();
+          
+          if (!whitelistData.isWhitelisted) {
+            // Not whitelisted - block purchase
+            alert('⚠️ Website is in test mode and you are not on the whitelist. Please refresh the page.');
+            return false;
+          }
+        }
+        
+        return true; // Purchase allowed
+      } catch (error) {
+        console.error('Error checking purchase permissions:', error);
+        return true; // On error, allow (fail open)
+      }
+    }
+
+    // Handle Buy Now button clicks with test mode check
+    async function handleBuyClick(event, element) {
+      event.preventDefault();
+      
+      // Check if purchase is allowed
+      const allowed = await checkPurchaseAllowed();
+      
+      if (allowed) {
+        // Allow navigation
+        window.location.href = element.href;
+      } else {
+        console.log('❌ Purchase blocked - test mode active');
+      }
+      
+      return false; // Prevent default link behavior
+    }
+
     // Buy extra slot function (Sparx Reader only)
     async function buyExtraSlot(event, productName) {
       event.preventDefault();
       console.log(`💎 Buying extra slot for ${productName}`);
+      
+      // Check if purchase is allowed (test mode check)
+      const allowed = await checkPurchaseAllowed();
+      if (!allowed) {
+        console.log('❌ Purchase blocked - test mode active');
+        return;
+      }
       
       // Check if slots are actually full by verifying with backend
       try {
@@ -1507,6 +1571,47 @@
     
     // Auto-refresh slot availability every 5 seconds (no page reload needed)
     setInterval(checkAvailability, 5000);
+
+    // Periodic test mode check (every 10 seconds) - catches when admin enables test mode
+    async function periodicTestModeCheck() {
+      try {
+        const testModeResponse = await fetch(`${BACKEND_URL}/check-test-mode`);
+        const testModeData = await testModeResponse.json();
+        
+        if (testModeData.testMode) {
+          // Test mode just got enabled! Check if user is whitelisted
+          const savedUsername = localStorage.getItem('savedUsername');
+          
+          if (!savedUsername) {
+            // Not logged in - reload to show test mode screen
+            console.log('⚠️ Test mode activated - reloading page');
+            window.location.reload();
+            return;
+          }
+          
+          // Check if whitelisted
+          const whitelistResponse = await fetch(`${BACKEND_URL}/check-whitelist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: savedUsername })
+          });
+          
+          const whitelistData = await whitelistResponse.json();
+          
+          if (!whitelistData.isWhitelisted) {
+            // Not whitelisted - reload to show test mode screen
+            console.log('⚠️ Test mode activated and user not whitelisted - reloading page');
+            window.location.reload();
+          }
+          // If whitelisted, do nothing (let them continue browsing)
+        }
+      } catch (error) {
+        console.error('Error in periodic test mode check:', error);
+      }
+    }
+
+    // Run periodic test mode check every 10 seconds
+    setInterval(periodicTestModeCheck, 10000);
 
     // Intercept buy button clicks to check availability before redirecting
     document.querySelectorAll('.buy-btn').forEach(btn => {

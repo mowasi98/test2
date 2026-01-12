@@ -7,6 +7,134 @@ const mongoose = require('mongoose');
 
 const app = express();
 app.use(cors());
+
+// ⚠️ IMPORTANT: Stripe webhook endpoint MUST come BEFORE express.json()
+// Stripe needs the raw body to verify webhook signatures
+app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  
+  if (!webhookSecret) {
+    console.error('❌ STRIPE_WEBHOOK_SECRET not set in environment variables');
+    return res.status(500).send('Webhook secret not configured');
+  }
+  
+  let event;
+  
+  try {
+    // Verify webhook signature
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    console.log('✅ Webhook signature verified:', event.type);
+  } catch (err) {
+    console.error('❌ Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  
+  // Handle the checkout.session.completed event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    console.log('💳 WEBHOOK: Payment completed for session:', session.id);
+    
+    // Extract metadata we attached during checkout session creation
+    const metadata = session.metadata || {};
+    const { reservationId, school, username, password, productName, productPrice, previousUsername } = metadata;
+    
+    console.log('💳 WEBHOOK: Extracted metadata:', {
+      reservationId,
+      school,
+      username,
+      productName,
+      productPrice,
+      previousUsername,
+      hasPassword: !!password
+    });
+    
+    // Check if this is a new login
+    const isNewLogin = !previousUsername || previousUsername !== username;
+    
+    // Process the purchase (same logic as /submit-login-details)
+    try {
+      // Check if product is available
+      resetDailyCountersIfNeeded();
+      if (productName && dailyLimits[productName] && !dailyLimits[productName].available) {
+        console.error(`❌ WEBHOOK: Product "${productName}" is not available`);
+        return res.json({ received: true, warning: 'Product not available' });
+      }
+      
+      // Confirm reservation and get slot status
+      let remainingSlots = 0;
+      let currentCount = 0;
+      if (productName && dailyLimits[productName]) {
+        currentCount = dailyLimits[productName].count;
+        remainingSlots = Math.max(0, MAX_PURCHASES_PER_DAY - currentCount);
+        
+        // Confirm the reservation
+        if (reservationId && activeReservations[reservationId]) {
+          if (activeReservations[reservationId].productName === productName) {
+            delete activeReservations[reservationId];
+            console.log(`✅ WEBHOOK: Reservation CONFIRMED for "${productName}" - ID: ${reservationId}`);
+          } else {
+            console.warn(`⚠️ WEBHOOK: Reservation ID mismatch, confirming all for ${productName}`);
+            confirmReservation(productName);
+          }
+        } else {
+          console.log(`✅ WEBHOOK: Confirming all reservations for "${productName}"`);
+          confirmReservation(productName);
+        }
+        
+        console.log(`✅ WEBHOOK: Product "${productName}" count: ${currentCount}/${MAX_PURCHASES_PER_DAY} (${remainingSlots} remaining)`);
+      }
+      
+      // Send email notification
+      if (username && password && productName) {
+        console.log('📧 WEBHOOK: Sending card payment email...');
+        await sendLoginDetailsNotification({
+          school: school || 'Not provided',
+          username,
+          password,
+          platform: productName,
+          sessionId: session.id,
+          productName,
+          productPrice,
+          paymentMethod: 'card',
+          remainingSlots,
+          currentCount,
+          isNewLogin
+        });
+        console.log('✅ WEBHOOK: Email sent successfully');
+      }
+      
+      // Track login history
+      loginHistory.push({
+        username,
+        school: school || 'Not provided',
+        productName: productName || 'Unknown',
+        productPrice: productPrice || 'Unknown',
+        paymentMethod: 'Card (Webhook)',
+        timestamp: new Date().toISOString(),
+        isNewLogin
+      });
+      console.log(`📊 WEBHOOK: Login tracked: ${username} (Total: ${loginHistory.length})`);
+      
+      // Update active session
+      if (username && activeSessions[username]) {
+        activeSessions[username].lastActive = Date.now();
+      }
+      
+      // Save to MongoDB
+      await saveData();
+      console.log('✅ WEBHOOK: Purchase processed successfully');
+      
+    } catch (error) {
+      console.error('❌ WEBHOOK: Error processing purchase:', error);
+    }
+  }
+  
+  // Return 200 to acknowledge receipt
+  res.json({ received: true });
+});
+
+// NOW apply express.json() for all other routes
 app.use(express.json());
 
 // MongoDB Connection
@@ -1130,39 +1258,76 @@ app.get('/test-email', async (req, res) => {
   }
 });
 
-// Create Stripe Checkout Session
+// Create Stripe Checkout Session (with webhook support)
 app.post('/create-checkout-session', async (req, res) => {
   try {
-    const { items, customerEmail, homeworkEmail, homeworkPassword } = req.body;
-    const total = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const lineItems = items.map(item => ({
+    const { 
+      reservationId, 
+      school, 
+      username, 
+      password, 
+      productName, 
+      productPrice,
+      previousUsername,
+      successUrl,
+      cancelUrl
+    } = req.body;
+    
+    console.log('💳 Creating Stripe checkout session with metadata:', {
+      reservationId,
+      school,
+      username,
+      productName,
+      productPrice,
+      previousUsername,
+      hasPassword: !!password
+    });
+    
+    // Validate required fields
+    if (!username || !password || !productName || !productPrice) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: username, password, productName, productPrice' 
+      });
+    }
+    
+    // Create line items for Stripe
+    const lineItems = [{
       price_data: {
         currency: 'gbp',
         product_data: {
-          name: item.name,
+          name: productName,
         },
-        unit_amount: item.price * 100,
+        unit_amount: Math.round(parseFloat(productPrice) * 100), // Convert to pence
       },
-      quantity: item.qty,
-    }));
-
+      quantity: 1,
+    }];
+    
+    // Create checkout session with metadata
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${req.headers.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin}/cancel.html`,
-      customer_email: customerEmail,
+      success_url: successUrl || `${req.headers.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${req.headers.origin}/payment.html`,
       metadata: {
-        homeworkEmail: homeworkEmail,
-        homeworkPassword: homeworkPassword,
-        items: JSON.stringify(items)
+        // Attach all data needed to process purchase via webhook
+        reservationId: reservationId || '',
+        school: school || 'Not provided',
+        username: username,
+        password: password,
+        productName: productName,
+        productPrice: productPrice,
+        previousUsername: previousUsername || ''
       }
     });
-
-    res.json({ id: session.id });
+    
+    console.log('✅ Stripe checkout session created:', session.id);
+    res.json({ 
+      sessionId: session.id,
+      url: session.url // Return the Stripe checkout URL
+    });
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    console.error('❌ Error creating checkout session:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1351,7 +1516,31 @@ app.post('/submit-login-details', async (req, res) => {
     console.log('💳 CARD PAYMENT - LOGIN DETAILS REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername, reservationId } = req.body;
+    const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, previousUsername, reservationId, isWebhookFallback } = req.body;
+    
+    // Check if this purchase was already processed (by webhook or previous call)
+    // Look for recent duplicate entries (within last 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const isDuplicate = loginHistory.some(entry => {
+      const matchesUser = entry.username === username;
+      const matchesProduct = entry.productName === productName;
+      const isRecent = entry.timestamp > fiveMinutesAgo;
+      const matchesPaymentMethod = entry.paymentMethod === 'Card' || entry.paymentMethod === 'Card (Webhook)';
+      
+      return matchesUser && matchesProduct && isRecent && matchesPaymentMethod;
+    });
+    
+    if (isDuplicate) {
+      console.log('⏭️ CARD PAYMENT: Duplicate purchase detected - already processed (likely by webhook)');
+      console.log('   Username:', username, 'Product:', productName);
+      return res.json({ 
+        success: true, 
+        message: 'Purchase already processed',
+        alreadyProcessed: true
+      });
+    }
+    
+    console.log('✅ CARD PAYMENT: New purchase - processing...');
     
     console.log('💳 Extracted data:', { 
       school, 

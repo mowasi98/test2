@@ -1313,6 +1313,32 @@ app.post('/admin/remove-purchase-history', (req, res) => {
   });
 });
 
+// Clear all purchase history
+app.post('/admin/clear-all-purchase-history', (req, res) => {
+  const { password } = req.body;
+  
+  // Check admin password
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid admin password' });
+  }
+  
+  const count = loginHistory.length;
+  
+  // Clear all purchase history
+  loginHistory = [];
+  
+  console.log(`🗑️ Admin cleared ALL purchase history (${count} records removed)`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    count: count,
+    message: `${count} purchase records cleared`
+  });
+});
+
 // Admin endpoint to get active users
 app.post('/admin/active-users', (req, res) => {
   const { password } = req.body;

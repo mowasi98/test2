@@ -1259,12 +1259,8 @@
         return; // Stop all other initialization
       }
       
-      // Check whitelist status THIRD
-      const isWhitelistRestricted = await checkWhitelistStatus();
-      if (isWhitelistRestricted) {
-        console.log('🔒 User not whitelisted - showing restricted screen');
-        return; // Stop all other initialization
-      }
+      // NOTE: Whitelist check is now integrated into test mode check above
+      // Whitelist only applies when test mode is enabled
       
       const savedUsername = localStorage.getItem('savedUsername');
       if (savedUsername) {

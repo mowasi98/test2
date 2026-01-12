@@ -221,6 +221,80 @@
       box-shadow: 0 6px 28px rgba(100,100,250,0.18);
       border-color: #c8c4ff;
     }
+    .extra-slot-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.97) 0%, rgba(255, 152, 0, 0.97) 100%);
+      border-radius: 16px;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 1.5rem;
+      z-index: 10;
+      animation: fadeIn 0.3s ease-in;
+    }
+    .extra-slot-overlay.active {
+      display: flex;
+    }
+    .extra-slot-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.8rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      line-height: 1.2;
+    }
+    .extra-slot-price {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .extra-slot-badge {
+      background: #d32f2f;
+      color: #fff;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 8px rgba(211, 47, 47, 0.4);
+    }
+    .extra-slot-info {
+      color: #fff;
+      font-size: 0.9rem;
+      margin-bottom: 1.2rem;
+      font-weight: 600;
+    }
+    .extra-slot-buy-btn {
+      background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+      color: #fff;
+      padding: 0.9rem 1.8rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 4px 12px rgba(211, 47, 47, 0.4);
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .extra-slot-buy-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(211, 47, 47, 0.5);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
     .item-title {
       font-size: 1.45rem;
       font-weight: 700;
@@ -445,6 +519,51 @@
 
   <div id="errorMessage" style="display: none; max-width: 900px; margin: 2rem auto 0 auto; padding: 1rem 1.5rem; background: #f8d7da; color: #721c24; border-radius: 8px; border-left: 4px solid #f5c6cb; font-weight: 600;"></div>
 
+  <!-- Banned Screen (shown if user is banned) -->
+  <div id="bannedScreen" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+    <div style="background: #fff; padding: 3rem 2.5rem; border-radius: 16px; text-align: center; max-width: 500px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin: auto;">
+      
+      <!-- Ban Emoji -->
+      <div style="font-size: 5rem; margin-bottom: 1.5rem; line-height: 1;">🚫</div>
+      
+      <!-- Title -->
+      <h1 style="color: #d32f2f; margin: 0 0 1.5rem 0; font-size: 2rem; font-weight: 700;">Account Banned</h1>
+      
+      <!-- Description -->
+      <p style="color: #666; font-size: 1.05rem; line-height: 1.5; margin: 0 0 2rem 0;">
+        You have been banned from<br>using this website.
+      </p>
+      
+      <!-- Reason Box -->
+      <div style="background: #f8d7da; color: #721c24; padding: 1.2rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #d32f2f; text-align: left;">
+        <strong style="font-size: 0.95rem;">Reason:</strong><br>
+        <span id="banReasonText" style="font-size: 0.95rem;">Policy violation</span>
+      </div>
+      
+      <!-- Contact/Appeal Box -->
+      <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 1.8rem 1.5rem; border-radius: 12px; border: 2px solid #ffc107; margin-bottom: 1.5rem;">
+        <p style="color: #856404; font-size: 1.05rem; font-weight: 600; margin: 0 0 1rem 0;">
+          🤔 Think this was a mistake?
+        </p>
+        <p style="color: #856404; font-size: 0.95rem; margin: 0 0 1.2rem 0; line-height: 1.4;">
+          Contact us on Snapchat to<br>appeal your ban:
+        </p>
+        <a href="https://snapchat.com/add/homework5003" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #FFFC00; color: #000; padding: 0.9rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.2s; margin-bottom: 1rem;">
+          👻 hwplug
+        </a>
+        <p style="color: #856404; font-size: 0.9rem; margin: 0; line-height: 1.3;">
+          We'll review your case within<br>24 hours
+        </p>
+      </div>
+      
+      <!-- Warning -->
+      <p style="color: #999; font-size: 0.88rem; margin: 0; line-height: 1.4;">
+        Please do not create new accounts<br>or you may be permanently banned.
+      </p>
+      
+    </div>
+  </div>
+
   <section class="items">
     <div class="item-card" data-product="Sparx Reader">
       <div class="item-title">Sparx Reader</div>
@@ -452,6 +571,15 @@
       <div class="price">&pound;2</div>
       <div id="slots-Sparx Reader"></div>
       <a href="login.html?product=Sparx%20Reader&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h" class="buy-btn" data-product="Sparx Reader">Buy Now</a>
+      
+      <!-- Extra Slot Overlay (only shown when regular slots are full) -->
+      <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Reader">
+        <div class="extra-slot-title">🔥 Slots Finished!</div>
+        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-badge">Limited Time</div>
+        <div class="extra-slot-info">Extra Slot Available</div>
+        <a href="#" class="extra-slot-buy-btn" data-product="Sparx Reader" data-is-extra="true" onclick="buyExtraSlot(event, 'Sparx Reader')">Buy Extra Slot</a>
+      </div>
     </div>
     
     <div class="item-card" data-product="Sparx Maths">
@@ -726,8 +854,47 @@
     let timerInterval = null;
     let syncInterval = null;
 
+    // Check if user is banned
+    async function checkBanStatus() {
+      const savedUsername = localStorage.getItem('savedUsername');
+      if (!savedUsername) return false; // Not logged in, can't be banned
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/check-ban-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: savedUsername })
+        });
+        
+        const data = await response.json();
+        
+        if (data.banned) {
+          // Show banned screen
+          document.getElementById('bannedScreen').style.display = 'flex';
+          document.getElementById('banReasonText').textContent = data.reason || 'Policy violation';
+          
+          // Hide all other content
+          document.querySelector('header').style.display = 'none';
+          document.querySelector('.items').style.display = 'none';
+          document.querySelector('footer').style.display = 'none';
+          
+          // Clear credentials
+          localStorage.removeItem('savedUsername');
+          localStorage.removeItem('savedPassword');
+          sessionStorage.clear();
+          
+          return true;
+        }
+        
+        return false;
+      } catch (error) {
+        console.error('Error checking ban status:', error);
+        return false;
+      }
+    }
+
     // Check if user is logged in and update UI
-    window.addEventListener('DOMContentLoaded', function() {
+    window.addEventListener('DOMContentLoaded', async function() {
       console.log('✅ Homepage loaded - index.html');
       
       // Make absolutely sure we're staying on the homepage - no redirects
@@ -735,6 +902,13 @@
         console.warn('⚠️ Somehow ended up on login.html - redirecting back to homepage');
         window.location.href = 'index.html';
         return;
+      }
+      
+      // Check if user is banned FIRST
+      const isBanned = await checkBanStatus();
+      if (isBanned) {
+        console.log('🚫 User is banned - showing banned screen');
+        return; // Stop all other initialization
       }
       
       const savedUsername = localStorage.getItem('savedUsername');
@@ -792,6 +966,41 @@
       setTimeout(() => {
         window.location.reload();
       }, 1000);
+    }
+
+    // Buy extra slot function (Sparx Reader only)
+    async function buyExtraSlot(event, productName) {
+      event.preventDefault();
+      console.log(`💎 Buying extra slot for ${productName}`);
+      
+      // Check if slots are actually full by verifying with backend
+      try {
+        const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(productName)}`);
+        const data = await response.json();
+        
+        // Verify extra slots are available
+        if (!data.extraSlots || !data.extraSlots.available) {
+          const errorMsg = document.getElementById('errorMessage');
+          errorMsg.textContent = '⚠️ Extra slots are no longer available!';
+          errorMsg.style.display = 'block';
+          setTimeout(() => {
+            window.location.reload(); // Refresh to update UI
+          }, 2000);
+          return;
+        }
+        
+        // Redirect to login page with extra slot parameters
+        // Price for extra slot is £3 (when regular slots are full)
+        const extraPrice = 3;
+        const stripeLink = 'https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h'; // Same Stripe link, price difference handled by backend
+        window.location.href = `login.html?product=${encodeURIComponent(productName)}&price=${extraPrice}&stripe=${stripeLink}&isExtraSlot=true`;
+        
+      } catch (error) {
+        console.error('Error checking extra slot availability:', error);
+        const errorMsg = document.getElementById('errorMessage');
+        errorMsg.textContent = '⚠️ Error connecting to server. Please try again.';
+        errorMsg.style.display = 'block';
+      }
     }
 
     // Send heartbeat to keep user active in admin panel
@@ -871,6 +1080,9 @@
           
           // Only update if button is not currently disabled due to reservation in progress
           if (buyBtn && !buyBtn.hasAttribute('data-reserving')) {
+            // Check for extra slot overlay (Sparx Reader only)
+            const extraSlotOverlay = document.getElementById(`extraSlotOverlay-${product}`);
+            
             if (data.manuallyDisabled) {
               // Product manually disabled
               buyBtn.classList.add('disabled');
@@ -880,25 +1092,38 @@
                 return false;
               };
               slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
+              if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else if (data.available) {
-              // Product is available
+              // Regular product is available
               buyBtn.classList.remove('disabled');
               buyBtn.style.pointerEvents = 'auto';
-              // Highlight if only 1 slot remaining - only ONE person can reserve it
+              // Highlight if only 1 slot remaining
               if (data.remaining === 1) {
                 slotsDiv.innerHTML = `<div class="slots-remaining" style="color: #ff6b6b; font-weight: 700; animation: pulse 2s infinite;">⚠️ Only 1 slot remaining today!</div>`;
               } else {
                 slotsDiv.innerHTML = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
               }
+              if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else {
-              // Slots finished
-              buyBtn.classList.add('disabled');
-              buyBtn.style.pointerEvents = 'none';
-              buyBtn.onclick = function(e) {
-                e.preventDefault();
-                return false;
-              };
-              slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
+              // Regular slots finished - check for extra slots (Sparx Reader only)
+              if (product === 'Sparx Reader' && data.extraSlots && data.extraSlots.available) {
+                // Extra slots available! Show overlay
+                console.log('💎 Extra slots available for Sparx Reader');
+                if (extraSlotOverlay) {
+                  extraSlotOverlay.classList.add('active');
+                }
+                slotsDiv.innerHTML = '<div class="slots-message">Regular slots finished</div>';
+              } else {
+                // No extra slots or all extra slots finished
+                buyBtn.classList.add('disabled');
+                buyBtn.style.pointerEvents = 'none';
+                buyBtn.onclick = function(e) {
+                  e.preventDefault();
+                  return false;
+                };
+                slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
+                if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
+              }
             }
           }
         } catch (error) {

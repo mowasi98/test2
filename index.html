@@ -91,7 +91,6 @@
       display: inline-block;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      min-height: 44px;
     }
     .auth-btn:hover {
       background: rgba(255, 255, 255, 0.3);
@@ -291,7 +290,6 @@
       display: inline-block;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      min-height: 48px;
     }
     .extra-slot-buy-btn:hover {
       transform: translateY(-2px);
@@ -338,8 +336,6 @@
       position: relative;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      min-height: 44px;
-      min-width: 44px;
     }
     .buy-btn:hover {
       background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
@@ -415,7 +411,6 @@
       box-shadow: 0 2px 6px rgba(255,252,0,0.3);
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      min-height: 44px;
     }
     .snapchat-link:hover {
       transform: translateY(-2px);
@@ -478,6 +473,7 @@
       .buy-btn {
         padding: 0.6rem 1.5rem;
         font-size: 1rem;
+        min-height: 44px;
       }
       .reset-timer {
         font-size: 0.8rem;
@@ -490,6 +486,7 @@
       .auth-btn {
         font-size: 0.85rem;
         padding: 0.4rem 0.8rem;
+        min-height: 44px;
       }
     }
   </style>
@@ -531,6 +528,38 @@
   </div>
 
   <div id="errorMessage" style="display: none; max-width: 900px; margin: 2rem auto 0 auto; padding: 1rem 1.5rem; background: #f8d7da; color: #721c24; border-radius: 8px; border-left: 4px solid #f5c6cb; font-weight: 600;"></div>
+
+  <!-- Test Mode Screen (shown when test mode is active) -->
+  <div id="testModeScreen" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); z-index: 10000; justify-content: center; align-items: center; padding: 20px;">
+    <div style="background: #fff; padding: 3rem 2.5rem; border-radius: 16px; text-align: center; max-width: 500px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin: auto;">
+      
+      <!-- Test Mode Emoji -->
+      <div style="font-size: 5rem; margin-bottom: 1.5rem; line-height: 1;">🧪</div>
+
+      <!-- Title -->
+      <h1 style="color: #dc3545; font-size: 2rem; margin: 0 0 1rem 0; font-weight: 900;">In Test Mode</h1>
+      
+      <!-- Message -->
+      <p style="color: #666; font-size: 1.2rem; margin-bottom: 2rem; line-height: 1.6;">
+        We're currently testing new features.<br>
+        Please <strong style="color: #dc3545;">come back later!</strong>
+      </p>
+      
+      <!-- Info Box -->
+      <div style="background: #fff3cd; padding: 1.5rem; border-radius: 12px; border-left: 4px solid #ffc107; margin-bottom: 1.5rem;">
+        <p style="color: #856404; margin: 0; font-size: 0.95rem; line-height: 1.6;">
+          <strong>🔧 Maintenance in progress</strong><br>
+          The website will be back online shortly.<br>
+          Thank you for your patience!
+        </p>
+      </div>
+
+      <!-- Footer Text -->
+      <p style="color: #999; font-size: 0.85rem; margin: 0;">
+        This usually only takes a few minutes
+      </p>
+    </div>
+  </div>
 
   <!-- Banned Screen (shown if user is banned) -->
   <div id="bannedScreen" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
@@ -588,6 +617,7 @@
       <!-- Extra Slot Overlay (only shown when regular slots are full) -->
       <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Reader">
         <div class="extra-slot-title">🔥 Slots Finished!</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Sparx Reader</div>
         <div class="extra-slot-price">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
@@ -867,6 +897,31 @@
     let timerInterval = null;
     let syncInterval = null;
 
+    // Check if test mode is active
+    async function checkTestMode() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/check-test-mode`);
+        const data = await response.json();
+        
+        if (data.testMode) {
+          // Show test mode screen and hide everything else
+          document.getElementById('testModeScreen').style.display = 'flex';
+          document.querySelector('header').style.display = 'none';
+          document.querySelector('h1').style.display = 'none';
+          document.querySelector('.tagline').style.display = 'none';
+          document.querySelector('.items').style.display = 'none';
+          document.querySelector('footer').style.display = 'none';
+          const banner = document.querySelector('.availability-banner');
+          if (banner) banner.style.display = 'none';
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error checking test mode:', error);
+        return false;
+      }
+    }
+
     // Check if user is banned
     async function checkBanStatus() {
       const savedUsername = localStorage.getItem('savedUsername');
@@ -968,7 +1023,14 @@
         return;
       }
       
-      // Check if user is banned FIRST
+      // Check test mode FIRST
+      const testModeActive = await checkTestMode();
+      if (testModeActive) {
+        console.log('🧪 Test mode active - showing maintenance screen');
+        return; // Stop all other initialization
+      }
+      
+      // Check if user is banned SECOND
       const isBanned = await checkBanStatus();
       if (isBanned) {
         console.log('🚫 User is banned - showing banned screen');
@@ -1056,8 +1118,9 @@
         // Redirect to login page with extra slot parameters
         // Price for extra slot is £3 (when regular slots are full)
         const extraPrice = 3;
-        const stripeLink = 'https%3A%2F%2Fbuy.stripe.com%2F3cI8wHeAI1YN4n03mgcfK0h'; // Same Stripe link, price difference handled by backend
-        window.location.href = `login.html?product=${encodeURIComponent(productName)}&price=${extraPrice}&stripe=${stripeLink}&isExtraSlot=true`;
+        // Stripe link for £3 extra slot with promotion codes enabled
+        const stripeLink = 'https://buy.stripe.com/3cIdR1dwEcDr6v8bSMcfK0j';
+        window.location.href = `login.html?product=${encodeURIComponent(productName + ' - Extra Slot')}&price=${extraPrice}&stripe=${encodeURIComponent(stripeLink)}&isExtraSlot=true`;
         
       } catch (error) {
         console.error('Error checking extra slot availability:', error);

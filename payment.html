@@ -217,9 +217,13 @@
       const productPrice = sessionStorage.getItem('productPrice');
       const slotReserved = sessionStorage.getItem('slotReserved');
       const reservedProduct = sessionStorage.getItem('reservedProduct');
+      const isExtraSlot = sessionStorage.getItem('isExtraSlot') === 'true';
+      
+      // Clean product name for comparison (remove " - Extra Slot" suffix if present)
+      const cleanProductName = productName ? productName.replace(' - Extra Slot', '').trim() : '';
       
       // Verify slot was reserved for this product
-      if (!slotReserved || reservedProduct !== productName) {
+      if (!slotReserved || reservedProduct !== cleanProductName) {
         document.getElementById('errorMessage').textContent = '⚠️ No slot reservation found. Redirecting to homepage...';
         document.getElementById('errorMessage').style.display = 'block';
         setTimeout(() => {
@@ -229,7 +233,8 @@
       }
       
       if (productName) {
-        document.getElementById('productName').textContent = productName;
+        const displayName = isExtraSlot ? `${productName} 💎` : productName;
+        document.getElementById('productName').textContent = displayName;
       }
       if (productPrice) {
         document.getElementById('productPrice').textContent = productPrice;

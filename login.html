@@ -408,25 +408,35 @@
       const savedPassword = localStorage.getItem('savedPassword');
       
       if (savedUsername && savedPassword) {
-        // Update title to "Switch Account"
-        document.getElementById('loginTitle').textContent = 'Switch Account';
-        // Update button text
-        document.getElementById('submitBtn').textContent = 'Switch Account';
-        
-        // Auto-fill the form
-        document.getElementById('username').value = savedUsername;
-        document.getElementById('password').value = savedPassword;
-        
         // Get product info from URL
         const urlParams = new URLSearchParams(window.location.search);
         const productName = urlParams.get('product');
         const productPrice = urlParams.get('price');
         const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
         
-        // If product info exists, auto-submit (skip login page)
+        // If product info exists, hide form and auto-submit immediately (skip login page entirely)
         if (productName && productPrice && stripeLink) {
-          // Auto-login and proceed
+          // Hide the login box immediately to prevent any flash
+          document.querySelector('.login-box').style.display = 'none';
+          // Show clean loading screen
+          document.body.innerHTML = `
+            <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+              <div style="background: white; padding: 3rem; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">⚡</div>
+                <div style="font-size: 1.3rem; color: #6C63FF; font-weight: 700; margin-bottom: 0.5rem;">Processing Purchase</div>
+                <div style="font-size: 0.95rem; color: #666;">Please wait...</div>
+              </div>
+            </div>
+          `;
+          // Auto-login and proceed immediately
           handleAutoLogin(savedUsername, savedPassword, productName, productPrice, stripeLink);
+        } else {
+          // No product selected, show "Switch Account" UI for account switching
+          document.getElementById('loginTitle').textContent = 'Switch Account';
+          document.getElementById('submitBtn').textContent = 'Switch Account';
+          // Auto-fill the form
+          document.getElementById('username').value = savedUsername;
+          document.getElementById('password').value = savedPassword;
         }
       }
     });

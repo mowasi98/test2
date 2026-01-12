@@ -161,6 +161,7 @@ const DataSchema = new mongoose.Schema({
   cashPaymentCodes: { type: Array, default: [] }, // Array of valid codes for cash payments
   codeUsageHistory: { type: Array, default: [] }, // Track who used which codes
   availabilitySchedule: { type: Object, default: {} }, // Availability timing configuration
+  bannedUsers: { type: Array, default: [] }, // List of banned users
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -168,13 +169,15 @@ const DataModel = mongoose.model('Data', DataSchema);
 
 // Daily purchase limit tracking (3 per product per day)
 let dailyLimits = {
-  'Sparx Reader': { count: 0, date: null, available: true },
+  'Sparx Reader': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
   'Sparx Maths': { count: 0, date: null, available: true },
   'Educate': { count: 0, date: null, available: true },
   'Seneca': { count: 0, date: null, available: true }
 };
 
 const MAX_PURCHASES_PER_DAY = 3;
+const EXTRA_SLOT_PRICE = 3; // £3 total for extra slots (when regular slots are full)
+const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots for Sparx Reader
 const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
 
 // Track active reservations: { reservationId: { productName, timestamp } }
@@ -195,6 +198,9 @@ let cashPaymentCodes = [];
 
 // Track code usage: { code, username, school, productName, timestamp }
 let codeUsageHistory = [];
+
+// Banned users list: { username, reason, bannedAt, bannedBy }
+let bannedUsers = [];
 
 // Availability Schedule Configuration
 let availabilitySchedule = {
@@ -301,14 +307,15 @@ async function saveData() {
       { key: 'main' },
       {
         key: 'main',
-        dailyLimits,
-        activeReservations,
-        lastTimerResetTime,
-        loginHistory,
-        cashPaymentCodes,
-        codeUsageHistory,
-        availabilitySchedule,
-        updatedAt: new Date()
+      dailyLimits,
+      activeReservations,
+      lastTimerResetTime,
+      loginHistory,
+      cashPaymentCodes,
+      codeUsageHistory,
+      availabilitySchedule,
+      bannedUsers,
+      updatedAt: new Date()
       },
       { upsert: true, new: true }
     );
@@ -338,6 +345,7 @@ async function loadData() {
       cashPaymentCodes = data.cashPaymentCodes || [];
       codeUsageHistory = data.codeUsageHistory || [];
       availabilitySchedule = data.availabilitySchedule || availabilitySchedule;
+      bannedUsers = data.bannedUsers || [];
       
       console.log('✅ Data loaded from MongoDB');
       console.log(`   - Last updated: ${data.updatedAt}`);
@@ -411,6 +419,13 @@ function resetDailyCountersIfNeeded() {
       if (dailyLimits[product].available) {
         dailyLimits[product].count = 0;
         dailyLimits[product].date = today;
+        
+        // Reset extra slots for Sparx Reader
+        if (product === 'Sparx Reader' && dailyLimits[product].extraSlots) {
+          dailyLimits[product].extraSlots.count = 0;
+          console.log(`✅ Extra slots also reset for "${product}"`);
+        }
+        
         hasChanges = true;
         console.log(`✅ Slots reset for AVAILABLE product: "${product}" (0/${MAX_PURCHASES_PER_DAY})`);
       } else {
@@ -444,27 +459,41 @@ app.get('/check-product-availability', (req, res) => {
       remaining: 0,
       count: product.count,
       max: MAX_PURCHASES_PER_DAY,
-      manuallyDisabled: true
+      manuallyDisabled: true,
+      extraSlots: productName === 'Sparx Reader' ? product.extraSlots : null
     });
   }
   
-  // Check if slots are full
-  const available = product.count < MAX_PURCHASES_PER_DAY;
+  // Check if regular slots are full
+  const regularAvailable = product.count < MAX_PURCHASES_PER_DAY;
   const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - product.count);
   
+  // For Sparx Reader, check extra slots availability
+  let extraSlotsInfo = null;
+  if (productName === 'Sparx Reader' && product.extraSlots) {
+    const extraSlotsAvailable = !regularAvailable && product.extraSlots.count < product.extraSlots.max;
+    extraSlotsInfo = {
+      available: extraSlotsAvailable,
+      count: product.extraSlots.count,
+      max: product.extraSlots.max,
+      price: EXTRA_SLOT_PRICE
+    };
+  }
+  
   res.json({
-    available: available,
+    available: regularAvailable,
     remaining: remaining,
     count: product.count,
     max: MAX_PURCHASES_PER_DAY,
-    manuallyDisabled: false
+    manuallyDisabled: false,
+    extraSlots: extraSlotsInfo
   });
 });
 
 // Reserve a slot (atomically check and increment) - prevents race conditions
 app.post('/reserve-slot', (req, res) => {
   resetDailyCountersIfNeeded();
-  const { productName } = req.body;
+  const { productName, isExtraSlot } = req.body;
   
   if (!productName || !dailyLimits[productName]) {
     return res.status(400).json({ success: false, error: 'Product not found' });
@@ -492,9 +521,68 @@ app.post('/reserve-slot', (req, res) => {
     });
   }
   
+  // Handle EXTRA SLOT for Sparx Reader
+  if (isExtraSlot && productName === 'Sparx Reader') {
+    // Check if regular slots are full
+    if (product.count < MAX_PURCHASES_PER_DAY) {
+      return res.json({
+        success: false,
+        error: 'Regular slots are still available. Extra slots only available when regular slots are full.'
+      });
+    }
+    
+    // Check if extra slots are available
+    if (!product.extraSlots || product.extraSlots.count >= product.extraSlots.max) {
+      return res.json({
+        success: false,
+        error: 'Extra slots are finished for today',
+        extraSlotsFull: true
+      });
+    }
+    
+    // Reserve extra slot
+    const oldExtraCount = product.extraSlots.count;
+    product.extraSlots.count++;
+    const extraRemaining = product.extraSlots.max - product.extraSlots.count;
+    
+    const reservationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    activeReservations[reservationId] = {
+      productName: productName,
+      timestamp: Date.now(),
+      isExtraSlot: true
+    };
+    
+    console.log(`💎 EXTRA SLOT RESERVED for "${productName}": ${oldExtraCount} → ${product.extraSlots.count}/${product.extraSlots.max} (${extraRemaining} remaining) - Reservation ID: ${reservationId}`);
+    
+    saveData();
+    
+    return res.json({
+      success: true,
+      reserved: true,
+      reservationId: reservationId,
+      isExtraSlot: true,
+      extraSlotCount: product.extraSlots.count,
+      extraSlotMax: product.extraSlots.max,
+      extraSlotPrice: EXTRA_SLOT_PRICE,
+      wasLastExtraSlot: extraRemaining === 0
+    });
+  }
+  
+  // REGULAR SLOT RESERVATION
   // ATOMIC check and increment (prevents race condition)
-  // This ensures only ONE person can reserve the last slot, even if multiple requests arrive simultaneously
   if (product.count >= MAX_PURCHASES_PER_DAY) {
+    // Check if this is Sparx Reader with extra slots available
+    if (productName === 'Sparx Reader' && product.extraSlots && product.extraSlots.count < product.extraSlots.max) {
+      return res.json({ 
+        success: false, 
+        error: 'Regular slots are finished',
+        remaining: 0,
+        count: product.count,
+        extraSlotsAvailable: true,
+        extraSlotPrice: EXTRA_SLOT_PRICE
+      });
+    }
+    
     return res.json({ 
       success: false, 
       error: 'Slots are finished for today',
@@ -504,7 +592,6 @@ app.post('/reserve-slot', (req, res) => {
   }
   
   // CRITICAL: Increment IMMEDIATELY before any other operation
-  // This atomic operation ensures only one person gets the last slot
   const oldCount = product.count;
   product.count++;
   const remaining = MAX_PURCHASES_PER_DAY - product.count;
@@ -513,7 +600,8 @@ app.post('/reserve-slot', (req, res) => {
   const reservationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   activeReservations[reservationId] = {
     productName: productName,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    isExtraSlot: false
   };
   
   const wasLastSlot = remaining === 0;
@@ -529,7 +617,8 @@ app.post('/reserve-slot', (req, res) => {
     count: product.count,
     remaining: remaining,
     max: MAX_PURCHASES_PER_DAY,
-    wasLastSlot: wasLastSlot
+    wasLastSlot: wasLastSlot,
+    isExtraSlot: false
   });
 });
 
@@ -558,7 +647,29 @@ app.post('/release-slot', (req, res) => {
     return res.status(400).json({ success: false, error: 'Product name mismatch' });
   }
   
-  // Release the slot by decrementing
+  // Check if this was an extra slot reservation
+  if (reservation.isExtraSlot && productName === 'Sparx Reader') {
+    // Release extra slot
+    if (dailyLimits[productName].extraSlots && dailyLimits[productName].extraSlots.count > 0) {
+      dailyLimits[productName].extraSlots.count--;
+      const extraRemaining = dailyLimits[productName].extraSlots.max - dailyLimits[productName].extraSlots.count;
+      
+      delete activeReservations[reservationId];
+      console.log(`🔓 EXTRA SLOT RELEASED for "${productName}": ${dailyLimits[productName].extraSlots.count}/${dailyLimits[productName].extraSlots.max} - Reservation ID: ${reservationId}`);
+      
+      saveData();
+      
+      return res.json({
+        success: true,
+        released: true,
+        isExtraSlot: true,
+        extraSlotCount: dailyLimits[productName].extraSlots.count,
+        extraSlotMax: dailyLimits[productName].extraSlots.max
+      });
+    }
+  }
+  
+  // Release regular slot by decrementing
   if (dailyLimits[productName] && dailyLimits[productName].count > 0) {
     dailyLimits[productName].count--;
     const remaining = MAX_PURCHASES_PER_DAY - dailyLimits[productName].count;
@@ -576,7 +687,8 @@ app.post('/release-slot', (req, res) => {
       released: true,
       count: dailyLimits[productName].count,
       remaining: remaining,
-      max: MAX_PURCHASES_PER_DAY
+      max: MAX_PURCHASES_PER_DAY,
+      isExtraSlot: false
     });
   } else {
     // Already released or count is 0
@@ -780,6 +892,57 @@ app.post('/admin/set-slot-count', (req, res) => {
   });
 });
 
+// Admin endpoint to set extra slot max for a product (Sparx Reader)
+app.post('/admin/set-extra-slot-max', (req, res) => {
+  const { password, productName, maxSlots } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  // Check if product has extra slots feature
+  if (!dailyLimits[productName].extraSlots) {
+    return res.status(400).json({ error: 'This product does not support extra slots' });
+  }
+  
+  // Validate max slots
+  const newMax = parseInt(maxSlots);
+  if (isNaN(newMax) || newMax < 0) {
+    return res.status(400).json({ error: 'Invalid max slots. Must be 0 or greater.' });
+  }
+  
+  if (newMax > 50) {
+    return res.status(400).json({ error: 'Extra slot max cannot exceed 50.' });
+  }
+  
+  const oldMax = dailyLimits[productName].extraSlots.max;
+  dailyLimits[productName].extraSlots.max = newMax;
+  
+  // If current count exceeds new max, adjust it
+  if (dailyLimits[productName].extraSlots.count > newMax) {
+    dailyLimits[productName].extraSlots.count = newMax;
+  }
+  
+  console.log(`💎 Admin: Set extra slot max for "${productName}": ${oldMax} → ${newMax}`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `Extra slot max for ${productName} set to ${newMax}`,
+    product: productName,
+    oldMax: oldMax,
+    newMax: newMax,
+    currentCount: dailyLimits[productName].extraSlots.count
+  });
+});
+
 // Admin endpoint to get current counter status
 app.get('/admin/counters-status', (req, res) => {
   resetDailyCountersIfNeeded();
@@ -888,6 +1051,36 @@ app.post('/admin/login-history', (req, res) => {
     success: true,
     loginHistory: sortedHistory,
     totalLogins: loginHistory.length
+  });
+});
+
+// Admin endpoint to remove purchase history entry
+app.post('/admin/remove-purchase-history', (req, res) => {
+  const { password, index } = req.body;
+  
+  // Check admin password
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid admin password' });
+  }
+  
+  // Validate index
+  if (typeof index !== 'number' || index < 0 || index >= loginHistory.length) {
+    return res.status(400).json({ error: 'Invalid index' });
+  }
+  
+  // Remove the entry (note: index is from reversed array, so calculate actual index)
+  const actualIndex = loginHistory.length - 1 - index;
+  const removed = loginHistory.splice(actualIndex, 1);
+  
+  console.log(`🗑️ Admin removed purchase history entry: ${removed[0]?.username} - ${removed[0]?.productName}`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    message: 'Purchase record removed successfully',
+    removed: removed[0]
   });
 });
 
@@ -1074,6 +1267,116 @@ app.get('/get-availability', (req, res) => {
   res.json({
     ...availabilityStatus,
     schedule: availabilitySchedule
+  });
+});
+
+// ====== BAN/UNBAN SYSTEM ======
+
+// Check if user is banned (public endpoint)
+app.post('/check-ban-status', (req, res) => {
+  const { username } = req.body;
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  const bannedUser = bannedUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+  
+  if (bannedUser) {
+    return res.json({
+      banned: true,
+      reason: bannedUser.reason || 'No reason provided',
+      bannedAt: bannedUser.bannedAt
+    });
+  }
+  
+  res.json({ banned: false });
+});
+
+// Ban a user (admin only)
+app.post('/admin/ban-user', (req, res) => {
+  const { password, username, reason } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  // Check if already banned
+  const existingBan = bannedUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (existingBan) {
+    return res.status(400).json({ error: 'User is already banned' });
+  }
+  
+  // Add to banned list
+  bannedUsers.push({
+    username: username,
+    reason: reason || 'Spamming / Abuse',
+    bannedAt: new Date().toISOString(),
+    bannedBy: 'admin'
+  });
+  
+  console.log(`🚫 User banned: "${username}" - Reason: ${reason || 'Spamming / Abuse'}`);
+  
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `User "${username}" has been banned`,
+    bannedUser: bannedUsers[bannedUsers.length - 1]
+  });
+});
+
+// Unban a user (admin only)
+app.post('/admin/unban-user', (req, res) => {
+  const { password, username } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+  
+  // Find and remove from banned list
+  const index = bannedUsers.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
+  
+  if (index === -1) {
+    return res.status(404).json({ error: 'User is not banned' });
+  }
+  
+  const unbannedUser = bannedUsers.splice(index, 1)[0];
+  
+  console.log(`✅ User unbanned: "${username}"`);
+  
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `User "${username}" has been unbanned`,
+    unbannedUser: unbannedUser
+  });
+});
+
+// Get list of banned users (admin only)
+app.post('/admin/get-banned-users', (req, res) => {
+  const { password } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  res.json({
+    success: true,
+    bannedUsers: bannedUsers,
+    totalBanned: bannedUsers.length
   });
 });
 
@@ -1309,6 +1612,8 @@ app.post('/create-checkout-session', async (req, res) => {
       mode: 'payment',
       success_url: successUrl || `${req.headers.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${req.headers.origin}/payment.html`,
+      allow_promotion_codes: true, // ✅ Enable promo codes!
+      billing_address_collection: 'auto', // Only collect if needed (not required)
       metadata: {
         // Attach all data needed to process purchase via webhook
         reservationId: reservationId || '',

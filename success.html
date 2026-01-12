@@ -173,17 +173,26 @@
       const urlParams = new URLSearchParams(window.location.search);
       const sessionId = urlParams.get('session_id');
       
+      console.log('💳 SUCCESS PAGE: Payment successful, checking webhook status...');
+      console.log('💳 SUCCESS PAGE: Data available:', { 
+        school, 
+        username: savedUsername, 
+        productName, 
+        productPrice,
+        previousUsername, 
+        reservationId,
+        sessionId,
+        hasPassword: !!savedPassword
+      });
+      
+      // ⚠️ IMPORTANT: Webhook may have already processed this payment!
+      // We'll send the email as a fallback in case webhook hasn't fired yet (race condition)
+      // The backend will handle duplicate processing gracefully
+      
       // Send email notification automatically (MUST send email before clearing storage)
+      // This serves as a fallback if webhook hasn't processed yet
       if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
-        console.log('💳 CARD PAYMENT SUCCESS - Sending email with:', { 
-          school, 
-          username: savedUsername, 
-          productName, 
-          productPrice,
-          previousUsername, 
-          reservationId,
-          sessionId
-        });
+        console.log('💳 SUCCESS PAGE: Sending email (webhook fallback) with data...');
         
         try {
           const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
@@ -201,28 +210,32 @@
               productPrice: productPrice,
               paymentMethod: 'card',
               previousUsername: previousUsername,
-              reservationId: reservationId // Pass reservation ID
+              reservationId: reservationId, // Pass reservation ID
+              isWebhookFallback: true // Flag to indicate this is from success page
             }),
           });
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('💳 Email send error response:', response.status, errorText);
+            console.error('💳 SUCCESS PAGE: Email send error:', response.status, errorText);
+            console.log('⚠️ SUCCESS PAGE: Webhook should have handled this purchase');
           } else {
             const result = await response.json();
-            console.log('✅ Card payment email response:', response.status, result);
+            console.log('✅ SUCCESS PAGE: Email response:', response.status, result);
           }
         } catch (error) {
-          console.error('💳 Error sending card payment email:', error);
-          // Continue anyway - email might still work on backend
+          console.error('💳 SUCCESS PAGE: Error sending email:', error);
+          console.log('⚠️ SUCCESS PAGE: This is okay - webhook likely already processed the purchase');
+          // Continue anyway - webhook should have handled it
         }
       } else {
-        console.error('❌ Missing data for card payment email:', { 
+        console.error('❌ SUCCESS PAGE: Missing data for email:', { 
           savedUsername: !!savedUsername, 
           savedPassword: !!savedPassword, 
           productName,
           school 
         });
+        console.log('⚠️ SUCCESS PAGE: Webhook should have all the data to process this purchase');
       }
       
       // Clear storage AFTER sending email (payment completed - don't release slot)

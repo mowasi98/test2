@@ -414,13 +414,38 @@
                                 async function checkStatus() {
                                   const password = document.getElementById('adminPassword').value;
                                   
+                                  // ⚠️ VALIDATE PASSWORD FIRST - Don't show anything if wrong password!
+                                  if (!password) {
+                                    showMessage('Please enter admin password', 'error');
+                                    document.getElementById('statusSection').style.display = 'none';
+                                    return;
+                                  }
+                                  
                                   try {
+                                    // Test password by trying to access a protected endpoint
+                                    const testResponse = await fetch(`${BACKEND_URL}/admin/login-history`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+                                    
+                                    const testData = await testResponse.json();
+                                    
+                                    // If password is wrong, show error and hide everything
+                                    if (testResponse.status === 401 || testData.error === 'Invalid admin password') {
+                                      showMessage('❌ WRONG PASSWORD! Please try again.', 'error');
+                                      document.getElementById('statusSection').style.display = 'none';
+                                      return;
+                                    }
+                                    
+                                    // Password is correct! Now fetch status
                                     const response = await fetch(`${BACKEND_URL}/admin/counters-status`);
                                     const data = await response.json();
                                     
                                     if (data.success) {
                                       document.getElementById('statusSection').style.display = 'block';
                                       displayStatus(data.counters);
+                                      showMessage('✅ Admin access granted!', 'success');
                                     } else {
                                       showMessage('Error fetching status', 'error');
                                     }
@@ -442,6 +467,12 @@
                                     
                                     const itemDiv = document.createElement('div');
                                     itemDiv.className = `status-item ${isFull ? 'full' : ''} ${isUnavailable ? 'unavailable' : ''}`;
+                                    
+                                    // Check if this product has extra slots (Sparx Reader)
+                                    const hasExtraSlots = counters[product].extraSlots;
+                                    const extraSlotCount = hasExtraSlots ? counters[product].extraSlots.count : 0;
+                                    const extraSlotMax = hasExtraSlots ? counters[product].extraSlots.max : 0;
+                                    
                                     itemDiv.innerHTML = `
                                       <div style="flex: 1;">
                                         <div class="product-name">${product} ${isUnavailable ? '⚠️ (Not Available)' : ''}</div>
@@ -449,8 +480,9 @@
                                           ${counters[product].date ? 'Last reset: ' + counters[product].date : ''}
                                         </div>
                                         
-                                        <!-- Slot Management Controls -->
+                                        <!-- Regular Slot Management Controls -->
                                         <div class="slot-control">
+                                          <label style="font-size: 0.85rem; color: #666; margin-right: 0.5rem;">Regular:</label>
                                           <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)">−</button>
                                           <input type="number" 
                                                 id="slot-${safeProductId}" 
@@ -462,6 +494,24 @@
                                           <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)">Set</button>
                                         </div>
                                         
+                                        ${hasExtraSlots ? `
+                                        <!-- Extra Slot Management Controls (Sparx Reader only) -->
+                                        <div class="slot-control" style="margin-top: 0.8rem; background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 0.8rem; border-radius: 8px; border: 2px solid #ffc107;">
+                                          <label style="font-size: 0.85rem; color: #856404; font-weight: 700; margin-right: 0.5rem;">💎 Extra Slots:</label>
+                                          <button class="btn btn-small btn-danger" onclick="adjustExtraSlotMax('${product}', -1)">−</button>
+                                          <input type="number" 
+                                                id="extraslot-${safeProductId}" 
+                                                value="${extraSlotMax}" 
+                                                min="0" 
+                                                max="50" 
+                                                onchange="setExtraSlotMax('${product}', this.value)"
+                                                style="width: 80px;">
+                                          <button class="btn btn-small btn-success" onclick="adjustExtraSlotMax('${product}', 1)">+</button>
+                                          <button class="btn btn-small" onclick="setExtraSlotMax('${product}', document.getElementById('extraslot-${safeProductId}').value)">Set Max</button>
+                                          <span style="font-size: 0.85rem; color: #856404; margin-left: 0.5rem;">Used: ${extraSlotCount}/${extraSlotMax}</span>
+                                        </div>
+                                        ` : ''}
+                                        
                                         <div class="product-controls">
                                           <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')">Reset to 0</button>
                                           <button class="btn btn-small ${isUnavailable ? 'btn-success' : 'btn-warning'}" 
@@ -470,7 +520,7 @@
                                           </button>
                                         </div>
                                       </div>
-                                      <div class="count">${count} / 3</div>
+                                      <div class="count">${count} / 3${hasExtraSlots ? `<br><span style="font-size: 0.8rem; color: #ffc107;">+${extraSlotCount}/${extraSlotMax} extra</span>` : ''}</div>
                                     `;
                                     statusItemsDiv.appendChild(itemDiv);
                                   });
@@ -794,6 +844,72 @@
                                   await setSlotCount(productName, newValue);
                                 }
 
+                                // Extra Slot Management Functions (Sparx Reader)
+                                async function setExtraSlotMax(productName, maxSlots) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const max = parseInt(maxSlots);
+                                  if (isNaN(max) || max < 0) {
+                                    showMessage('Invalid extra slot count. Must be 0 or greater.', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (max > 50) {
+                                    showMessage('Extra slot max cannot exceed 50.', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-extra-slot-max`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        maxSlots: max
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${productName}: Extra slot max set to ${max}`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error setting extra slot max', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function adjustExtraSlotMax(productName, delta) {
+                                  const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                  const input = document.getElementById(`extraslot-${safeProductId}`);
+                                  const currentValue = parseInt(input.value) || 0;
+                                  const newValue = Math.max(0, Math.min(50, currentValue + delta));
+                                  
+                                  if (newValue === currentValue) {
+                                    if (newValue === 0 && delta < 0) {
+                                      showMessage('Extra slot max is already at minimum (0)', 'error');
+                                    } else if (newValue === 50 && delta > 0) {
+                                      showMessage('Extra slot max is already at maximum (50)', 'error');
+                                    }
+                                    return;
+                                  }
+                                  
+                                  input.value = newValue;
+                                  await setExtraSlotMax(productName, newValue);
+                                }
+
                                 // Add mobile-friendly event listeners when page loads
                                 document.addEventListener('DOMContentLoaded', function() {
                                   // Reset All Counters button
@@ -980,24 +1096,44 @@
                                             hour12: false
                                           });
                                           
-                                          loginItem.innerHTML = `
-                                            <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap;">
-                                              <div style="flex: 1; min-width: 200px;">
-                                                <div style="font-weight: 600; color: #333; margin-bottom: 0.3rem;">
-                                                  ${login.username}
-                                                  ${login.isNewLogin ? '<span style="background: #ffc107; color: #000; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">NEW</span>' : ''}
+                                          // Check if this user is banned
+                                          checkIfUserBanned(login.username).then(isBanned => {
+                                            loginItem.innerHTML = `
+                                              <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap;">
+                                                <div style="flex: 1; min-width: 200px;">
+                                                  <div style="font-weight: 600; color: #333; margin-bottom: 0.3rem;">
+                                                    ${login.username}
+                                                    ${login.isNewLogin ? '<span style="background: #ffc107; color: #000; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">NEW</span>' : ''}
+                                                    ${isBanned ? '<span style="background: #d9534f; color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">🚫 BANNED</span>' : ''}
+                                                  </div>
+                                                  <div style="color: #666; font-size: 0.9rem;">
+                                                    <strong>School:</strong> ${login.school}<br>
+                                                    <strong>Product:</strong> ${login.productName} (£${login.productPrice})<br>
+                                                    <strong>Payment:</strong> <span style="color: ${login.paymentMethod === 'Card' ? '#6C63FF' : '#28a745'}; font-weight: 600;">${login.paymentMethod}</span>
+                                                  </div>
                                                 </div>
-                                                <div style="color: #666; font-size: 0.9rem;">
-                                                  <strong>School:</strong> ${login.school}<br>
-                                                  <strong>Product:</strong> ${login.productName} (£${login.productPrice})<br>
-                                                  <strong>Payment:</strong> <span style="color: ${login.paymentMethod === 'Card' ? '#6C63FF' : '#28a745'}; font-weight: 600;">${login.paymentMethod}</span>
+                                                <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
+                                                  <div style="color: #999; font-size: 0.85rem; white-space: nowrap;">
+                                                    ${formattedDate}
+                                                  </div>
+                                                  <div style="display: flex; gap: 0.5rem;">
+                                                    ${!isBanned ? `
+                                                      <button class="btn btn-small btn-warning" onclick="banUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                                        🚫 Ban
+                                                      </button>
+                                                    ` : `
+                                                      <button class="btn btn-small btn-success" onclick="unbanUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                                        ✅ Unban
+                                                      </button>
+                                                    `}
+                                                    <button class="btn btn-small btn-danger" onclick="removePurchaseHistory(${index})" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                                      🗑️ Remove
+                                                    </button>
+                                                  </div>
                                                 </div>
                                               </div>
-                                              <div style="text-align: right; color: #999; font-size: 0.85rem; white-space: nowrap;">
-                                                ${formattedDate}
-                                              </div>
-                                            </div>
-                                          `;
+                                            `;
+                                          });
                                           
                                           historyList.appendChild(loginItem);
                                         });
@@ -1010,6 +1146,119 @@
                                   } catch (error) {
                                     console.error('Error loading login history:', error);
                                     showMessage('Error loading login history: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== BAN/UNBAN SYSTEM ======
+                                async function checkIfUserBanned(username) {
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/check-ban-status`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ username })
+                                    });
+                                    const data = await response.json();
+                                    return data.banned || false;
+                                  } catch (error) {
+                                    console.error('Error checking ban status:', error);
+                                    return false;
+                                  }
+                                }
+
+                                async function banUser(username) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const reason = prompt(`Ban user "${username}"?\n\nReason (optional):`, 'Spamming / Abuse');
+                                  if (reason === null) return; // Cancelled
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/ban-user`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username, reason })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ User "${username}" has been banned!`, 'success');
+                                      loadLoginHistory(); // Reload to show banned badge
+                                    } else {
+                                      showMessage(data.error || 'Failed to ban user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error banning user:', error);
+                                    showMessage('Error banning user: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function unbanUser(username) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Unban user "${username}"?`)) return;
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/unban-user`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ User "${username}" has been unbanned!`, 'success');
+                                      loadLoginHistory(); // Reload to remove banned badge
+                                    } else {
+                                      showMessage(data.error || 'Failed to unban user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error unbanning user:', error);
+                                    showMessage('Error unbanning user: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== REMOVE PURCHASE HISTORY ======
+                                async function removePurchaseHistory(index) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('Are you sure you want to remove this purchase record?')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/remove-purchase-history`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, index })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage('✅ Purchase record removed successfully!', 'success');
+                                      loadLoginHistory(); // Reload the list
+                                    } else {
+                                      showMessage(data.error || 'Failed to remove purchase record', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error removing purchase record:', error);
+                                    showMessage('Error removing purchase record: ' + error.message, 'error');
                                   }
                                 }
 

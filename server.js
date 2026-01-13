@@ -1556,10 +1556,8 @@ app.post('/admin/get-code-usage', (req, res) => {
 app.get('/get-availability', (req, res) => {
   const availabilityStatus = checkAvailability();
   
-  res.json({
-    ...availabilityStatus,
-    schedule: availabilitySchedule
-  });
+  // availabilityStatus already includes the schedule string from checkAvailability()
+  res.json(availabilityStatus);
 });
 
 // ====== BAN/UNBAN SYSTEM ======

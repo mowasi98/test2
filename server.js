@@ -248,6 +248,14 @@ let availabilitySchedule = {
 };
 
 // Check if products are currently available based on schedule
+// Helper function to convert 24-hour time to 12-hour format
+function formatTime12Hour(time24) {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
 function checkAvailability() {
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -262,13 +270,16 @@ function checkAvailability() {
       return { 
         available: true,
         message: 'Products available 24/7 on weekends',
-        nextAvailableTime: null
+        nextAvailableTime: null,
+        schedule: 'Saturday-Sunday: Open 24/7'
       };
     } else {
+      const weekdayStart = formatTime12Hour(availabilitySchedule.weekday.startTime);
       return {
         available: false,
         message: 'Products not available on weekends',
-        nextAvailableTime: 'Monday at 3:30 PM'
+        nextAvailableTime: `Monday at ${weekdayStart}`,
+        schedule: `Monday-Friday: ${formatTime12Hour(availabilitySchedule.weekday.startTime)} - ${formatTime12Hour(availabilitySchedule.weekday.endTime)}`
       };
     }
   } else {
@@ -277,12 +288,15 @@ function checkAvailability() {
       return {
         available: false,
         message: 'Products not available on weekdays',
-        nextAvailableTime: 'Saturday (24/7)'
+        nextAvailableTime: availabilitySchedule.weekend.allDay ? 'Saturday (24/7)' : 'Not available',
+        schedule: availabilitySchedule.weekend.allDay ? 'Saturday-Sunday: Open 24/7' : 'Currently unavailable'
       };
     }
     
     const startTime = availabilitySchedule.weekday.startTime;
     const endTime = availabilitySchedule.weekday.endTime;
+    const startTime12 = formatTime12Hour(startTime);
+    const endTime12 = formatTime12Hour(endTime);
     
     // Handle midnight crossing (e.g., 15:30 to 00:00)
     if (endTime === '00:00' || endTime < startTime) {
@@ -291,13 +305,15 @@ function checkAvailability() {
         return {
           available: true,
           message: `Products available until midnight`,
-          nextAvailableTime: null
+          nextAvailableTime: null,
+          schedule: `Monday-Friday: ${startTime12} - Midnight`
         };
       } else {
         return {
           available: false,
-          message: `Products available from 3:30 PM to 12:00 AM`,
-          nextAvailableTime: '3:30 PM today'
+          message: `Products available from ${startTime12} to Midnight`,
+          nextAvailableTime: `${startTime12} today`,
+          schedule: `Monday-Friday: ${startTime12} - Midnight`
         };
       }
     } else {
@@ -305,20 +321,23 @@ function checkAvailability() {
       if (currentTime >= startTime && currentTime <= endTime) {
         return {
           available: true,
-          message: `Products available until ${endTime}`,
-          nextAvailableTime: null
+          message: `Products available until ${endTime12}`,
+          nextAvailableTime: null,
+          schedule: `Monday-Friday: ${startTime12} - ${endTime12}`
         };
       } else if (currentTime < startTime) {
         return {
           available: false,
-          message: `Products available from 3:30 PM to 12:00 AM`,
-          nextAvailableTime: '3:30 PM today'
+          message: `Products available from ${startTime12} to ${endTime12}`,
+          nextAvailableTime: `${startTime12} today`,
+          schedule: `Monday-Friday: ${startTime12} - ${endTime12}`
         };
       } else {
         return {
           available: false,
-          message: `Products available from 3:30 PM to 12:00 AM`,
-          nextAvailableTime: '3:30 PM tomorrow'
+          message: `Products available from ${startTime12} to ${endTime12}`,
+          nextAvailableTime: `${startTime12} tomorrow`,
+          schedule: `Monday-Friday: ${startTime12} - ${endTime12}`
         };
       }
     }

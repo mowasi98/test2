@@ -1500,8 +1500,8 @@
             // Check for extra slot overlay (Sparx Reader only)
             const extraSlotOverlay = document.getElementById(`extraSlotOverlay-${product}`);
             
-            if (data.manuallyDisabled) {
-              // Product manually disabled
+            if (data.timeRestricted) {
+              // Store is closed (outside operating hours)
               buyBtn.classList.add('disabled');
               buyBtn.style.pointerEvents = 'none';
               buyBtn.onclick = function(e) {
@@ -1509,6 +1509,16 @@
                 return false;
               };
               slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
+              if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
+            } else if (data.manuallyDisabled) {
+              // Product manually disabled
+              buyBtn.classList.add('disabled');
+              buyBtn.style.pointerEvents = 'none';
+              buyBtn.onclick = function(e) {
+                e.preventDefault();
+                return false;
+              };
+              slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product unavailable. Come back later</div>';
               if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else if (data.available) {
               // Regular product is available

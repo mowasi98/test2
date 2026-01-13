@@ -581,6 +581,7 @@ app.get('/check-product-availability', (req, res) => {
       count: product.count,
       max: MAX_PURCHASES_PER_DAY,
       manuallyDisabled: true,
+      timeRestricted: false,
       extraSlots: productName === 'Sparx Reader' ? product.extraSlots : null
     });
   }

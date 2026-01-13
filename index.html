@@ -511,21 +511,14 @@
     <div class="tagline">Your one-stop shop for learning tools</div>
   </header>
 
-  <div class="availability-banner" id="availabilityBanner">
-    <h3>⏰ Opening Hours</h3>
-    <div class="availability-schedule">
-      <div class="availability-item">
-        <strong>📅 Monday - Friday</strong>
-        <span>3:30 PM - 12:00 AM</span>
-      </div>
-      <div class="availability-item">
-        <strong>🎉 Saturday - Sunday</strong>
-        <span>24/7 (All Day)</span>
-      </div>
-    </div>
-    <div class="availability-status" id="availabilityStatus">
-      <span id="availabilityStatusText">Loading...</span>
-    </div>
+  <div class="availability-banner" id="availabilityBanner" style="display: none;">
+    <h3>⏰ Products Currently Unavailable</h3>
+    <div id="availabilityScheduleInfo" style="font-size: 1.1rem; color: #856404; margin-top: 0.5rem;"></div>
+    <div id="nextAvailableInfo" style="font-size: 0.95rem; color: #856404; margin-top: 0.8rem; font-weight: 600;"></div>
+  </div>
+  
+  <div class="availability-status" id="availabilityStatus" style="max-width: 900px; margin: 1rem auto; padding: 1rem; border-radius: 8px; text-align: center;">
+    <span id="availabilityStatusText">Loading...</span>
   </div>
 
   <div id="errorMessage" style="display: none; max-width: 900px; margin: 2rem auto 0 auto; padding: 1rem 1.5rem; background: #f8d7da; color: #721c24; border-radius: 8px; border-left: 4px solid #f5c6cb; font-weight: 600;"></div>
@@ -766,19 +759,33 @@
         
         const statusDiv = document.getElementById('availabilityStatus');
         const statusText = document.getElementById('availabilityStatusText');
+        const banner = document.getElementById('availabilityBanner');
+        const scheduleInfo = document.getElementById('availabilityScheduleInfo');
+        const nextAvailableInfo = document.getElementById('nextAvailableInfo');
         
         if (data.available) {
           statusDiv.className = 'availability-status available';
           statusText.textContent = '✅ Products are currently AVAILABLE';
+          // Hide banner when available
+          if (banner) banner.style.display = 'none';
         } else {
           statusDiv.className = 'availability-status unavailable';
-          statusText.innerHTML = `❌ Products are currently NOT AVAILABLE<br><span style="font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">Come back at ${data.nextAvailableTime}</span>`;
+          statusText.innerHTML = `❌ Products are currently NOT AVAILABLE<br><span style="font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">${data.message || 'Please check back later'}</span>`;
+          
+          // Show banner with schedule when unavailable
+          if (banner && scheduleInfo && nextAvailableInfo) {
+            banner.style.display = 'block';
+            scheduleInfo.textContent = data.schedule || 'Schedule not available';
+            nextAvailableInfo.textContent = data.nextAvailableTime ? `📅 Next available: ${data.nextAvailableTime}` : '';
+          }
         }
       } catch (error) {
         console.error('Error checking availability:', error);
         const statusDiv = document.getElementById('availabilityStatus');
+        const banner = document.getElementById('availabilityBanner');
         statusDiv.className = 'availability-status unavailable';
         document.getElementById('availabilityStatusText').textContent = 'Unable to check availability';
+        if (banner) banner.style.display = 'none';
       }
     }
 

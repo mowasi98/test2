@@ -763,7 +763,9 @@
           if (banner && bannerTitle && scheduleInfo) {
             banner.style.display = 'block';
             bannerTitle.textContent = '✅ Products are currently AVAILABLE';
-            scheduleInfo.textContent = data.schedule || '';
+            // Ensure schedule is a string
+            const scheduleText = typeof data.schedule === 'string' ? data.schedule : '';
+            scheduleInfo.textContent = scheduleText;
             if (nextAvailableInfo) nextAvailableInfo.textContent = '';
           }
         } else {
@@ -771,7 +773,9 @@
           if (banner && bannerTitle && scheduleInfo && nextAvailableInfo) {
             banner.style.display = 'block';
             bannerTitle.textContent = '❌ Products are currently NOT AVAILABLE';
-            scheduleInfo.textContent = data.schedule || 'Schedule not available';
+            // Ensure schedule is a string
+            const scheduleText = typeof data.schedule === 'string' ? data.schedule : 'Schedule not available';
+            scheduleInfo.textContent = scheduleText;
             nextAvailableInfo.textContent = data.nextAvailableTime ? `📅 Next available: ${data.nextAvailableTime}` : '';
           }
         }

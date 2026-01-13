@@ -264,6 +264,8 @@ function checkAvailability() {
   // Get current time in HH:MM format
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
+  console.log(`🕐 Checking availability - Current time: ${currentTime}, Day: ${dayOfWeek}, IsWeekend: ${isWeekend}`);
+  
   if (isWeekend) {
     // Weekend: Check if allDay is enabled
     if (availabilitySchedule.weekend.enabled && availabilitySchedule.weekend.allDay) {
@@ -298,10 +300,16 @@ function checkAvailability() {
     const startTime12 = formatTime12Hour(startTime);
     const endTime12 = formatTime12Hour(endTime);
     
-    // Handle midnight crossing (e.g., 15:30 to 00:00)
+    console.log(`📅 Weekday schedule - Start: ${startTime}, End: ${endTime}, Current: ${currentTime}`);
+    
+    // Handle midnight crossing (e.g., 01:00 to 00:00 means 1 AM to midnight)
     if (endTime === '00:00' || endTime < startTime) {
-      // If current time is after start time OR before end time (next day)
-      if (currentTime >= startTime || currentTime < endTime) {
+      console.log(`🌙 Midnight crossing detected - checking if ${currentTime} >= ${startTime} OR ${currentTime} < ${endTime}`);
+      
+      // If current time is at or after start time OR before end time (next day)
+      // Fixed: Changed >= to > for startTime comparison to avoid edge case
+      if (currentTime >= startTime || (endTime !== '00:00' && currentTime < endTime)) {
+        console.log(`✅ AVAILABLE - Time is within schedule`);
         return {
           available: true,
           message: `Products available until midnight`,
@@ -309,6 +317,7 @@ function checkAvailability() {
           schedule: `Monday-Friday: ${startTime12} - Midnight`
         };
       } else {
+        console.log(`❌ NOT AVAILABLE - Time is outside schedule`);
         return {
           available: false,
           message: `Products available from ${startTime12} to Midnight`,

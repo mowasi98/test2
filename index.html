@@ -1486,6 +1486,14 @@
           const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
           const data = await response.json();
           
+          // Debug logging
+          console.log(`📊 Product: ${product}`, {
+            timeRestricted: data.timeRestricted,
+            manuallyDisabled: data.manuallyDisabled,
+            available: data.available,
+            remaining: data.remaining
+          });
+          
           // Track if any product is available
           if (data.available || (data.extraSlots && data.extraSlots.available)) {
             anyProductAvailable = true;

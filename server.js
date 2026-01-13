@@ -558,6 +558,21 @@ app.get('/check-product-availability', (req, res) => {
   
   const product = dailyLimits[productName];
   
+  // Check if store is open based on availability schedule
+  const availabilityStatus = checkAvailability();
+  if (!availabilityStatus.available) {
+    return res.json({
+      available: false,
+      remaining: 0,
+      count: product.count,
+      max: MAX_PURCHASES_PER_DAY,
+      timeRestricted: true,
+      message: availabilityStatus.message,
+      nextAvailableTime: availabilityStatus.nextAvailableTime,
+      extraSlots: productName === 'Sparx Reader' ? product.extraSlots : null
+    });
+  }
+  
   // Check if product is manually set as unavailable
   if (!product.available) {
     return res.json({
@@ -592,6 +607,7 @@ app.get('/check-product-availability', (req, res) => {
     count: product.count,
     max: MAX_PURCHASES_PER_DAY,
     manuallyDisabled: false,
+    timeRestricted: false,
     extraSlots: extraSlotsInfo
   });
 });

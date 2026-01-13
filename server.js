@@ -467,15 +467,32 @@ setInterval(() => {
     const age = now - reservation.timestamp;
     if (age > RESERVATION_TIMEOUT) {
       // Release expired reservation
-      if (dailyLimits[reservation.productName] && dailyLimits[reservation.productName].count > 0) {
-        const oldCount = dailyLimits[reservation.productName].count;
-        dailyLimits[reservation.productName].count--;
-        const newCount = dailyLimits[reservation.productName].count;
-        console.log(`⏰ Expired reservation released for "${reservation.productName}": ${oldCount} → ${newCount} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
-        hasChanges = true;
+      const productName = reservation.productName;
+      
+      // Check if this is an extra slot reservation
+      if (reservation.isExtraSlot && dailyLimits[productName]?.extraSlots) {
+        if (dailyLimits[productName].extraSlots.count > 0) {
+          const oldCount = dailyLimits[productName].extraSlots.count;
+          dailyLimits[productName].extraSlots.count--;
+          const newCount = dailyLimits[productName].extraSlots.count;
+          console.log(`⏰ Expired EXTRA SLOT reservation released for "${productName}": ${oldCount} → ${newCount}/${dailyLimits[productName].extraSlots.max} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+          hasChanges = true;
+        } else {
+          console.log(`⏰ Expired EXTRA SLOT reservation for "${productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+        }
       } else {
-        console.log(`⏰ Expired reservation for "${reservation.productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+        // Regular slot reservation
+        if (dailyLimits[productName] && dailyLimits[productName].count > 0) {
+          const oldCount = dailyLimits[productName].count;
+          dailyLimits[productName].count--;
+          const newCount = dailyLimits[productName].count;
+          console.log(`⏰ Expired reservation released for "${productName}": ${oldCount} → ${newCount} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+          hasChanges = true;
+        } else {
+          console.log(`⏰ Expired reservation for "${productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+        }
       }
+      
       delete activeReservations[reservationId];
       hasChanges = true;
     }

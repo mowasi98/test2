@@ -266,6 +266,15 @@ function checkAvailability() {
   
   console.log(`🕐 Checking availability - Current time: ${currentTime}, Day: ${dayOfWeek}, IsWeekend: ${isWeekend}`);
   
+  // Format schedules for display
+  const weekdaySchedule = availabilitySchedule.weekday.enabled 
+    ? `Monday-Friday: ${formatTime12Hour(availabilitySchedule.weekday.startTime)} - ${availabilitySchedule.weekday.endTime === '00:00' ? 'Midnight' : formatTime12Hour(availabilitySchedule.weekday.endTime)}`
+    : 'Monday-Friday: Closed';
+  const weekendSchedule = (availabilitySchedule.weekend.enabled && availabilitySchedule.weekend.allDay)
+    ? 'Saturday-Sunday: Open 24/7'
+    : 'Saturday-Sunday: Closed';
+  const fullSchedule = `${weekdaySchedule} | ${weekendSchedule}`;
+  
   if (isWeekend) {
     // Weekend: Check if allDay is enabled
     if (availabilitySchedule.weekend.enabled && availabilitySchedule.weekend.allDay) {
@@ -273,7 +282,7 @@ function checkAvailability() {
         available: true,
         message: 'Products available 24/7 on weekends',
         nextAvailableTime: null,
-        schedule: 'Saturday-Sunday: Open 24/7'
+        schedule: fullSchedule
       };
     } else {
       const weekdayStart = formatTime12Hour(availabilitySchedule.weekday.startTime);
@@ -281,7 +290,7 @@ function checkAvailability() {
         available: false,
         message: 'Products not available on weekends',
         nextAvailableTime: `Monday at ${weekdayStart}`,
-        schedule: `Monday-Friday: ${formatTime12Hour(availabilitySchedule.weekday.startTime)} - ${formatTime12Hour(availabilitySchedule.weekday.endTime)}`
+        schedule: fullSchedule
       };
     }
   } else {
@@ -291,7 +300,7 @@ function checkAvailability() {
         available: false,
         message: 'Products not available on weekdays',
         nextAvailableTime: availabilitySchedule.weekend.allDay ? 'Saturday (24/7)' : 'Not available',
-        schedule: availabilitySchedule.weekend.allDay ? 'Saturday-Sunday: Open 24/7' : 'Currently unavailable'
+        schedule: fullSchedule
       };
     }
     
@@ -314,7 +323,7 @@ function checkAvailability() {
           available: true,
           message: `Products available until midnight`,
           nextAvailableTime: null,
-          schedule: `Monday-Friday: ${startTime12} - Midnight`
+          schedule: fullSchedule
         };
       } else {
         console.log(`❌ NOT AVAILABLE - Time is outside schedule`);
@@ -322,7 +331,7 @@ function checkAvailability() {
           available: false,
           message: `Products available from ${startTime12} to Midnight`,
           nextAvailableTime: `${startTime12} today`,
-          schedule: `Monday-Friday: ${startTime12} - Midnight`
+          schedule: fullSchedule
         };
       }
     } else {
@@ -332,21 +341,21 @@ function checkAvailability() {
           available: true,
           message: `Products available until ${endTime12}`,
           nextAvailableTime: null,
-          schedule: `Monday-Friday: ${startTime12} - ${endTime12}`
+          schedule: fullSchedule
         };
       } else if (currentTime < startTime) {
         return {
           available: false,
           message: `Products available from ${startTime12} to ${endTime12}`,
           nextAvailableTime: `${startTime12} today`,
-          schedule: `Monday-Friday: ${startTime12} - ${endTime12}`
+          schedule: fullSchedule
         };
       } else {
         return {
           available: false,
           message: `Products available from ${startTime12} to ${endTime12}`,
           nextAvailableTime: `${startTime12} tomorrow`,
-          schedule: `Monday-Friday: ${startTime12} - ${endTime12}`
+          schedule: fullSchedule
         };
       }
     }

@@ -514,6 +514,14 @@
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       
+      console.log('📝 LOGIN FORM DATA:', {
+        school,
+        schoolType: typeof school,
+        schoolLength: school ? school.length : 0,
+        username,
+        password: '***'
+      });
+      
       // Get product info from URL params
       const urlParams = new URLSearchParams(window.location.search);
       const productName = urlParams.get('product');

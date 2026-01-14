@@ -200,39 +200,49 @@ app.use(mongoSanitize({
 
 // Security: Rate limiting
 // General API rate limit - 100 requests per 15 minutes
+// General rate limiter - very lenient for legitimate users
+// Frontend checks availability every 5 seconds, so needs high limit
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please try again later.',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 2000, // Increased to 2000 requests per 15 min (plenty for normal use)
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'Too many requests, please try again later.' });
+  }
 });
 
-// Strict rate limit for admin endpoints - 20 requests per 15 minutes
+// Admin rate limiter - moderate (100 requests per 15 minutes)
 const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: 'Too many admin requests, please try again later.',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Increased from 20 to 100
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'Too many admin requests, please try again later.' });
+  }
 });
 
-// Very strict rate limit for login attempts - 10 per 15 minutes
+// Auth rate limiter - strict but fair (30 login attempts per 15 minutes)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Too many login attempts, please try again later.',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // Increased from 10 to 30
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'Too many login attempts, please try again later.' });
+  }
 });
 
-// Payment endpoints - 30 per 15 minutes
+// Payment rate limiter - moderate (50 payment attempts per 15 minutes)
 const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: 'Too many payment attempts, please try again later.',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Increased from 30 to 50
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'Too many payment attempts, please try again later.' });
+  }
 });
 
 // Apply general rate limiter to all routes (except webhook which was already handled)

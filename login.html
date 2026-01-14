@@ -473,7 +473,10 @@
         console.log(`✅ Auto-login: ${isExtraSlot ? 'Extra' : 'Regular'} slot reserved:`, reservationData.reservationId);
         
         // Store login info in sessionStorage for payment page
-        sessionStorage.setItem('school', ''); // No school info on auto-login
+        // Retrieve school from localStorage if available
+        const savedSchool = localStorage.getItem('savedSchool') || '';
+        sessionStorage.setItem('school', savedSchool);
+        console.log(`📝 AUTO-LOGIN: Retrieved school from localStorage: "${savedSchool}"`);
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
         sessionStorage.setItem('productName', productName); // Keep original display name
@@ -521,6 +524,7 @@
         username,
         password: '***'
       });
+      console.log(`📝 Saving school to localStorage: "${school}"`);
       
       // Get product info from URL params
       const urlParams = new URLSearchParams(window.location.search);
@@ -546,6 +550,7 @@
       // Save login credentials to localStorage for future visits (ALWAYS save, even if no product selected)
       localStorage.setItem('savedUsername', username);
       localStorage.setItem('savedPassword', password);
+      localStorage.setItem('savedSchool', school); // Save school info too!
 
       // Product info is optional - if missing, redirect to homepage to select a product
       if (!productName || !productPrice || !stripeLink) {

@@ -4,9 +4,42 @@ const cors = require('cors');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { Resend } = require('resend');
 const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const helmet = require('helmet');
 
 const app = express();
-app.use(cors());
+
+// Security: Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP to avoid breaking frontend
+  crossOriginEmbedderPolicy: false
+}));
+
+// Security: CORS - Only allow your domain
+const allowedOrigins = [
+  'https://www.hwplug.store',
+  'https://hwplug.store',
+  'http://localhost:3000', // For local testing
+  'http://localhost:10000', // For local testing
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:10000'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn('⚠️ Blocked CORS request from:', origin);
+      callback(null, true); // Still allow but log it (change to false to block)
+    }
+  },
+  credentials: true
+}));
 
 // ⚠️ IMPORTANT: Stripe webhook endpoint MUST come BEFORE express.json()
 // Stripe needs the raw body to verify webhook signatures
@@ -159,6 +192,51 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
 
 // NOW apply express.json() for all other routes
 app.use(express.json());
+
+// Security: Sanitize data to prevent MongoDB injection
+app.use(mongoSanitize({
+  replaceWith: '_'
+}));
+
+// Security: Rate limiting
+// General API rate limit - 100 requests per 15 minutes
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict rate limit for admin endpoints - 20 requests per 15 minutes
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many admin requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Very strict rate limit for login attempts - 10 per 15 minutes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many login attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Payment endpoints - 30 per 15 minutes
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Too many payment attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limiter to all routes (except webhook which was already handled)
+app.use(generalLimiter);
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hwplug';
@@ -1895,7 +1973,7 @@ app.get('/test-email', async (req, res) => {
 });
 
 // Create Stripe Checkout Session (with webhook support)
-app.post('/create-checkout-session', async (req, res) => {
+app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
   try {
     const { 
       reservationId, 
@@ -2022,7 +2100,7 @@ function confirmReservation(productName) {
 }
 
 // NEW ENDPOINT: Submit cash payment
-app.post('/submit-cash-payment', async (req, res) => {
+app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
   try {
     console.log('💵 CASH PAYMENT REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
@@ -2168,7 +2246,7 @@ app.post('/submit-cash-payment', async (req, res) => {
 });
 
 // NEW ENDPOINT: Submit login details after payment
-app.post('/submit-login-details', async (req, res) => {
+app.post('/submit-login-details', paymentLimiter, async (req, res) => {
   try {
     console.log('💳 CARD PAYMENT - LOGIN DETAILS REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));

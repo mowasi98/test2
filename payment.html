@@ -317,6 +317,13 @@
       const username = sessionStorage.getItem('loginUsername');
       const password = sessionStorage.getItem('loginPassword');
       const productName = sessionStorage.getItem('productName');
+      
+      console.log('💳 PAYMENT PAGE - CARD:', {
+        school,
+        schoolType: typeof school,
+        schoolLength: school ? school.length : 0,
+        username
+      });
       const productPrice = sessionStorage.getItem('productPrice');
       const stripeLink = sessionStorage.getItem('stripeLink');
       

@@ -46,6 +46,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
     console.log('💳 WEBHOOK: Extracted metadata:', {
       reservationId,
       school,
+      schoolType: typeof school,
+      schoolLength: school ? school.length : 0,
       username,
       productName,
       rawProductName,

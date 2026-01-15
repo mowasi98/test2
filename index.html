@@ -1703,21 +1703,42 @@
     // Run periodic test mode check every 10 seconds
     setInterval(periodicTestModeCheck, 10000);
 
-    // Intercept buy button clicks to check availability before redirecting
-    document.querySelectorAll('.buy-btn').forEach(btn => {
+    // Setup buy button handlers
+    function setupBuyButtonHandlers() {
+      console.log('🔧 Setting up buy button click handlers...');
+      
+      // Intercept buy button clicks to check availability before redirecting
+      const buyButtons = document.querySelectorAll('.buy-btn');
+      console.log('🔍 Found buy buttons:', buyButtons.length);
+      
+      if (buyButtons.length === 0) {
+        console.warn('⚠️ No buy buttons found! Retrying in 100ms...');
+        setTimeout(setupBuyButtonHandlers, 100);
+        return;
+      }
+      
+      buyButtons.forEach(btn => {
       btn.addEventListener('click', async function(e) {
-        console.log('🖱️ Buy button clicked:', this.getAttribute('data-product'));
+        console.log('═══════════════════════════════════════════════════');
+        console.log('🖱️ BUY BUTTON CLICKED');
+        console.log('═══════════════════════════════════════════════════');
+        console.log('📦 Product:', this.getAttribute('data-product'));
+        console.log('🔗 Button element:', this);
+        console.log('🎯 Event:', e);
+        console.log('⚙️ Event defaultPrevented:', e.defaultPrevented);
         
         const product = this.getAttribute('data-product');
         const btnElement = this;
         const originalHref = btnElement.getAttribute('href');
         
         console.log('📍 Original href:', originalHref);
+        console.log('🔍 Button classList:', btnElement.classList.toString());
         
         // Check if product is disabled (from availability check)
         if (btnElement.classList.contains('disabled')) {
-          e.preventDefault(); // Prevent navigation for disabled products
+          e.preventDefault();
           console.log('❌ Product is disabled, preventing navigation');
+          console.log('═══════════════════════════════════════════════════');
           return false;
         }
         
@@ -1725,14 +1746,24 @@
         const savedUsername = localStorage.getItem('savedUsername');
         const savedPassword = localStorage.getItem('savedPassword');
         
+        console.log('👤 Saved username:', savedUsername ? 'EXISTS' : 'NONE');
+        console.log('🔑 Saved password:', savedPassword ? 'EXISTS' : 'NONE');
+        
         if (!savedUsername || !savedPassword) {
           // ✅ User NOT logged in - Let the link work normally!
-          // DO NOT prevent default - just let the browser navigate naturally
-          console.log('ℹ️ User not logged in, allowing normal navigation to login page');
-          console.log('📍 Browser will navigate to:', originalHref);
+          console.log('✅ USER NOT LOGGED IN');
+          console.log('✅ NOT calling e.preventDefault()');
+          console.log('✅ Allowing browser to handle navigation naturally');
+          console.log('📍 Browser should navigate to:', originalHref);
+          console.log('⚙️ Event defaultPrevented (should be false):', e.defaultPrevented);
+          console.log('═══════════════════════════════════════════════════');
           // Don't call e.preventDefault() - let the link work as a normal link!
           return; // Let browser handle the navigation
         }
+        
+        console.log('✅ USER IS LOGGED IN');
+        console.log('⚠️ NOW calling e.preventDefault()');
+        console.log('═══════════════════════════════════════════════════');
         
         // ⚠️ User IS logged in - NOW we prevent default and do custom logic
         e.preventDefault();
@@ -1848,7 +1879,19 @@
           return false;
         }
       });
-    });
+      });
+      
+      console.log('✅ Buy button click handlers setup complete!');
+    }
+    
+    // Call setup function immediately (DOM should be ready since script is at bottom)
+    // Or wait for DOMContentLoaded if it hasn't fired yet
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupBuyButtonHandlers);
+    } else {
+      // DOM already loaded, call immediately
+      setupBuyButtonHandlers();
+    }
   </script>
 </body>
 </html>

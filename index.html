@@ -1706,8 +1706,6 @@
     // Intercept buy button clicks to check availability before redirecting
     document.querySelectorAll('.buy-btn').forEach(btn => {
       btn.addEventListener('click', async function(e) {
-        e.preventDefault(); // Prevent default to handle navigation ourselves
-        
         console.log('🖱️ Buy button clicked:', this.getAttribute('data-product'));
         
         const product = this.getAttribute('data-product');
@@ -1716,30 +1714,29 @@
         
         console.log('📍 Original href:', originalHref);
         
-        // Safety check: ensure we have a valid href
-        if (!originalHref || originalHref === '' || originalHref === '#') {
-          console.error('❌ Invalid href, cannot navigate');
-          return false;
-        }
-        
         // Check if product is disabled (from availability check)
         if (btnElement.classList.contains('disabled')) {
+          e.preventDefault(); // Prevent navigation for disabled products
           console.log('❌ Product is disabled, preventing navigation');
           return false;
         }
         
-        // ⚡ IMPORTANT: Check if user is logged in FIRST (synchronously)
-        // This prevents navigation issues caused by async operations
+        // ⚡ CRITICAL: Check if user is logged in FIRST (before preventing default!)
         const savedUsername = localStorage.getItem('savedUsername');
         const savedPassword = localStorage.getItem('savedPassword');
         
         if (!savedUsername || !savedPassword) {
-          // User NOT logged in - navigate to login page immediately (synchronously)
-          console.log('ℹ️ User not logged in, redirecting to login page immediately');
-          console.log('📍 Navigating to:', originalHref);
-          window.location.href = originalHref;
-          return; // Exit early
+          // ✅ User NOT logged in - Let the link work normally!
+          // DO NOT prevent default - just let the browser navigate naturally
+          console.log('ℹ️ User not logged in, allowing normal navigation to login page');
+          console.log('📍 Browser will navigate to:', originalHref);
+          // Don't call e.preventDefault() - let the link work as a normal link!
+          return; // Let browser handle the navigation
         }
+        
+        // ⚠️ User IS logged in - NOW we prevent default and do custom logic
+        e.preventDefault();
+        console.log('✅ User is logged in, handling custom navigation');
         
         // User IS logged in - proceed with async availability checks
         console.log('✅ User is logged in, checking availability...');

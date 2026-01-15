@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const helmet = require('helmet');
 
+// Fetch support (built-in in Node 18+, fallback for older versions)
+const fetch = globalThis.fetch || require('node-fetch');
+
 const app = express();
 
 // Security: Helmet for security headers
@@ -141,6 +144,25 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
       
       // Send email notification
       if (username && password && productName) {
+        // Check bot automation mode for Sparx products
+        let orderId = null;
+        const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader');
+        
+        // If email mode and bot product, create order ID for decision buttons
+        if (botAutomationMode === 'email' && isBotProduct) {
+          orderId = `order_${session.id}_${Date.now()}`;
+          pendingOrders[orderId] = {
+            productName: productName,
+            username: username,
+            password: password,
+            school: school || 'Not provided',
+            sessionId: session.id,
+            createdAt: new Date().toISOString(),
+            processed: false
+          };
+          console.log(`📋 WEBHOOK: Order stored as pending (ID: ${orderId}) - email mode active`);
+        }
+        
         console.log(`📧 WEBHOOK: Sending card payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
         await sendLoginDetailsNotification({
           school: school || 'Not provided',
@@ -155,9 +177,44 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
           currentCount,
           maxSlots,
           isExtraSlot: isExtraSlot || false,
-          isNewLogin
+          isNewLogin,
+          orderId: orderId // Will be null in auto mode, set in email mode
         });
         console.log('✅ WEBHOOK: Email sent successfully');
+        
+        // 🤖 BOT AUTOMATION MODE CHECK
+        if (isBotProduct) {
+          if (botAutomationMode === 'auto') {
+            // AUTO MODE: Trigger bot automatically
+            try {
+              console.log(`🤖 WEBHOOK: [AUTO MODE] Auto-triggering Discord bot for ${productName}...`);
+              const botResponse = await fetch('http://13.60.26.180:3001/submit-homework', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  productName: productName,
+                  username: username,
+                  password: password,
+                  school: school || 'Not provided'
+                })
+              });
+              
+              const botResult = await botResponse.json();
+              
+              if (botResult.success) {
+                console.log(`✅ WEBHOOK: Bot successfully triggered for ${productName}!`);
+                console.log(`   Remaining bot slots: ${botResult.remainingSlots}/${botResult.maxSlots}`);
+              } else {
+                console.error(`❌ WEBHOOK: Bot trigger failed: ${botResult.error}`);
+              }
+            } catch (botError) {
+              console.error(`❌ WEBHOOK: Error calling Discord bot:`, botError.message);
+            }
+          } else {
+            // EMAIL MODE: Wait for admin decision via email buttons
+            console.log(`📧 WEBHOOK: [EMAIL MODE] Awaiting admin decision via email buttons for ${productName}`);
+          }
+        }
       }
       
       // Track login history
@@ -2025,7 +2082,7 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
       },
       quantity: 1,
     }];
-    
+
     // Create checkout session with metadata
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -2356,6 +2413,25 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
+    // Check bot automation mode for Sparx products
+    let orderId = null;
+    const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader');
+    
+    // If email mode and bot product, create order ID for decision buttons
+    if (botAutomationMode === 'email' && isBotProduct) {
+      orderId = `order_${sessionId}_${Date.now()}`;
+      pendingOrders[orderId] = {
+        productName: productName,
+        username: username,
+        password: password,
+        school: school || 'Not provided',
+        sessionId: sessionId,
+        createdAt: new Date().toISOString(),
+        processed: false
+      };
+      console.log(`📋 CARD: Order stored as pending (ID: ${orderId}) - email mode active`);
+    }
+    
     console.log(`📧 Attempting to send card payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
     await sendLoginDetailsNotification({
       school: school || 'Not provided',
@@ -2370,8 +2446,43 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
       currentCount: currentCount,
       maxSlots: maxSlots,
       isExtraSlot: isExtraSlot || false,
-      isNewLogin: isNewLogin
+      isNewLogin: isNewLogin,
+      orderId: orderId // Will be null in auto mode, set in email mode
     });
+    
+    // 🤖 BOT AUTOMATION MODE CHECK
+    if (isBotProduct) {
+      if (botAutomationMode === 'auto') {
+        // AUTO MODE: Trigger bot automatically
+        try {
+          console.log(`🤖 CARD: [AUTO MODE] Auto-triggering Discord bot for ${productName}...`);
+          const botResponse = await fetch('http://13.60.26.180:3001/submit-homework', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productName: productName,
+              username: username,
+              password: password,
+              school: school || 'Not provided'
+            })
+          });
+          
+          const botResult = await botResponse.json();
+          
+          if (botResult.success) {
+            console.log(`✅ CARD: Bot successfully triggered for ${productName}!`);
+            console.log(`   Remaining bot slots: ${botResult.remainingSlots}/${botResult.maxSlots}`);
+          } else {
+            console.error(`❌ CARD: Bot trigger failed: ${botResult.error}`);
+          }
+        } catch (botError) {
+          console.error(`❌ CARD: Error calling Discord bot:`, botError.message);
+        }
+      } else {
+        // EMAIL MODE: Wait for admin decision via email buttons
+        console.log(`📧 CARD: [EMAIL MODE] Awaiting admin decision via email buttons for ${productName}`);
+      }
+    }
 
     // Track login history
     loginHistory.push({
@@ -2422,7 +2533,7 @@ async function sendCardPaymentNotification(data) {
   try {
     const { data: emailData, error } = await resend.emails.send({
       from: 'hwplug <onboarding@resend.dev>',
-      to: process.env.YOUR_EMAIL,
+    to: process.env.YOUR_EMAIL,
       subject: '💳 CARD PAYMENT SELECTED - hwplug',
       html: `
         <!DOCTYPE html>
@@ -2530,7 +2641,7 @@ async function sendLoginNotification(data) {
       from: 'hwplug <onboarding@resend.dev>',
       to: process.env.YOUR_EMAIL,
       subject: '🔐 New Customer Login - hwplug',
-      html: `
+    html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -2555,21 +2666,21 @@ async function sendLoginNotification(data) {
                 <div style="background: #ffffff; padding: 15px; border-radius: 8px;">
                   <p style="margin: 8px 0; color: #333; font-size: 15px;"><strong style="color: #856404;">Password:</strong><br><span style="color: #555; font-family: monospace;">${password}</span></p>
                 </div>
-              </div>
+        </div>
 
               <!-- Product & Payment Info Card -->
               <div style="background: linear-gradient(135deg, #f8f9ff 0%, #ececff 100%); padding: 25px; border-radius: 12px; border: 2px solid #e0e0ff; margin-bottom: 25px; box-shadow: 0 3px 12px rgba(108,99,255,0.1);">
                 <div style="margin-bottom: 20px;">
                   <p style="margin: 8px 0; color: #555; font-size: 15px;"><strong style="color: #333;">Product:</strong> ${productName || 'Not specified'}</p>
                   <p style="margin: 8px 0; color: #6C63FF; font-size: 24px; font-weight: 700;">Price: £${productPrice || 'N/A'}</p>
-                </div>
-                
+        </div>
+
                 <!-- Payment Method Badge -->
                 <div style="background: ${paymentMethod === 'cash' ? 'linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)' : paymentMethod === 'card' ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' : 'linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%)'}; padding: 15px; border-radius: 10px; text-align: center; border: 2px solid ${paymentMethod === 'cash' ? '#ffc107' : paymentMethod === 'card' ? '#28a745' : '#6c757d'};">
                   <p style="margin: 0; font-size: 18px; font-weight: 700; color: ${paymentMethod === 'cash' ? '#856404' : paymentMethod === 'card' ? '#155724' : '#495057'};">
                     ${paymentStatus}
                   </p>
-                </div>
+      </div>
               </div>
 
               <!-- Footer -->
@@ -2726,7 +2837,7 @@ async function sendCashPaymentNotification(data) {
 
 // Send login details notification via email (after card payment)
 async function sendLoginDetailsNotification(data) {
-  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false } = data;
+  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false, orderId = null } = data;
   
   if (!resend) {
     console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
@@ -2819,10 +2930,38 @@ async function sendLoginDetailsNotification(data) {
                 </div>
               </div>
 
+              ${orderId ? `
+              <!-- Decision Buttons -->
+              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 30px; border-radius: 12px; border: 3px solid #ffc107; margin-top: 25px; text-align: center;">
+                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 22px; font-weight: 700;">🤖 Choose How to Process</h3>
+                <p style="margin: 0 0 25px 0; color: #856404; font-size: 15px;">Click one of the buttons below:</p>
+                
+                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                  <!-- Bot Does It Button -->
+                  <a href="${process.env.BACKEND_URL || 'http://localhost:10000'}/trigger-bot-page?orderId=${orderId}&productName=${encodeURIComponent(productName)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&school=${encodeURIComponent(school || 'Not provided')}" 
+                     style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: #ffffff; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 18px; box-shadow: 0 6px 20px rgba(40,167,69,0.4); transition: transform 0.2s;">
+                    🤖 Bot Does It
+                  </a>
+                  
+                  <!-- I'll Do It Button -->
+                  <a href="${process.env.BACKEND_URL || 'http://localhost:10000'}/manual-process-page?orderId=${orderId}&productName=${encodeURIComponent(productName)}&username=${encodeURIComponent(username)}" 
+                     style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #ffffff; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 18px; box-shadow: 0 6px 20px rgba(108,99,255,0.4); transition: transform 0.2s;">
+                    👤 I'll Do It
+                  </a>
+                </div>
+                
+                <p style="margin: 20px 0 0 0; color: #856404; font-size: 13px; font-style: italic;">⚠️ Once clicked, the button will be disabled to prevent duplicate processing</p>
+              </div>
+              ` : `
+              <!-- No Buttons (For products without bot support) -->
+              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 20px; border-radius: 12px; border: 2px solid #6C63FF; margin-top: 25px; text-align: center;">
+                <p style="margin: 0; color: #004085; font-weight: 600; font-size: 15px;">Please complete the homework for this customer manually.</p>
+              </div>
+              `}
+
               <!-- Footer -->
               <div style="text-align: center; padding-top: 25px; border-top: 2px solid #f0f0ff; margin-top: 25px;">
                 <p style="color: #999; font-size: 13px; margin: 5px 0;">Submitted at: ${new Date().toLocaleString()}</p>
-                <p style="color: #6C63FF; font-weight: 600; margin: 10px 0 0 0;">Please complete the homework for this customer.</p>
               </div>
             </div>
 
@@ -2849,6 +2988,286 @@ async function sendLoginDetailsNotification(data) {
     console.error('Error stack:', error.stack);
   }
 }
+
+// Store pending orders (orders waiting for manual decision)
+const pendingOrders = {};
+
+// Global Bot Automation Mode Setting
+let botAutomationMode = 'auto'; // 'auto' or 'email'
+// 'auto' = Bot automatically does homework (default)
+// 'email' = Send email with decision buttons
+
+// Admin endpoint: Get current bot automation mode
+app.get('/admin/bot-mode', (req, res) => {
+  res.json({ 
+    success: true,
+    mode: botAutomationMode,
+    description: botAutomationMode === 'auto' 
+      ? 'Bot automatically does homework' 
+      : 'Email confirmation required'
+  });
+});
+
+// Admin endpoint: Set bot automation mode
+app.post('/admin/set-bot-mode', (req, res) => {
+  const { password, mode } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (mode !== 'auto' && mode !== 'email') {
+    return res.status(400).json({ error: 'Invalid mode. Must be "auto" or "email"' });
+  }
+  
+  const oldMode = botAutomationMode;
+  botAutomationMode = mode;
+  
+  console.log(`🎛️ ADMIN: Bot automation mode changed: ${oldMode} → ${mode}`);
+  
+  res.json({ 
+    success: true,
+    oldMode: oldMode,
+    newMode: mode,
+    message: mode === 'auto' 
+      ? 'Bot will now automatically process homework' 
+      : 'Bot will now send email for confirmation'
+  });
+});
+
+// Endpoint: Trigger bot to do homework (clicked from email)
+app.post('/trigger-bot', async (req, res) => {
+  const { orderId, productName, username, password, school } = req.body;
+  
+  if (!orderId || !productName || !username || !password) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+  
+  console.log(`🤖 MANUAL TRIGGER: Admin chose "Bot Does It" for order ${orderId}`);
+  console.log(`   Product: ${productName}, Username: ${username}`);
+  
+  // Check if order already processed
+  if (pendingOrders[orderId]?.processed) {
+    return res.json({ 
+      success: false, 
+      message: 'Order already processed',
+      alreadyProcessed: true 
+    });
+  }
+  
+  // Submit to Discord bot
+  try {
+    const botResponse = await fetch('http://13.60.26.180:3001/submit-homework', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productName: productName,
+        username: username,
+        password: password,
+        school: school || 'Not provided'
+      })
+    });
+    
+    const botResult = await botResponse.json();
+    
+    if (botResult.success) {
+      console.log(`✅ Bot submission successful for order ${orderId}!`);
+      
+      // Mark as processed
+      if (pendingOrders[orderId]) {
+        pendingOrders[orderId].processed = true;
+        pendingOrders[orderId].method = 'bot';
+        pendingOrders[orderId].processedAt = new Date().toISOString();
+      }
+      
+      res.json({ 
+        success: true, 
+        message: 'Bot is now processing the homework!',
+        remainingSlots: botResult.remainingSlots 
+      });
+    } else {
+      console.error(`❌ Bot submission failed: ${botResult.error}`);
+      res.json({ success: false, error: botResult.error });
+    }
+  } catch (error) {
+    console.error(`❌ Error calling Discord bot:`, error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Endpoint: Mark order as "I'll do it manually" (clicked from email)
+app.post('/manual-process', async (req, res) => {
+  const { orderId, productName, username } = req.body;
+  
+  if (!orderId) {
+    return res.status(400).json({ success: false, error: 'Missing orderId' });
+  }
+  
+  console.log(`👤 MANUAL TRIGGER: Admin chose "I'll Do It" for order ${orderId}`);
+  console.log(`   Product: ${productName}, Username: ${username}`);
+  
+  // Check if order already processed
+  if (pendingOrders[orderId]?.processed) {
+    return res.json({ 
+      success: false, 
+      message: 'Order already processed',
+      alreadyProcessed: true 
+    });
+  }
+  
+  // Mark as manual processing
+  if (pendingOrders[orderId]) {
+    pendingOrders[orderId].processed = true;
+    pendingOrders[orderId].method = 'manual';
+    pendingOrders[orderId].processedAt = new Date().toISOString();
+  } else {
+    pendingOrders[orderId] = {
+      processed: true,
+      method: 'manual',
+      processedAt: new Date().toISOString()
+    };
+  }
+  
+  res.json({ 
+    success: true, 
+    message: 'Marked as manual processing. You can now do it yourself!' 
+  });
+});
+
+// HTML pages for email button clicks
+app.get('/trigger-bot-page', async (req, res) => {
+  const { orderId, productName, username, password, school } = req.query;
+  
+  // Call the bot trigger endpoint
+  try {
+    const response = await fetch(`${process.env.BACKEND_URL || 'http://localhost:10000'}/trigger-bot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, productName, username, password, school })
+    });
+    
+    const result = await response.json();
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Bot Triggered - hwplug</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); margin: 0; padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+          .card { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 500px; text-align: center; }
+          .success { color: #28a745; font-size: 48px; margin-bottom: 20px; }
+          .error { color: #d9534f; font-size: 48px; margin-bottom: 20px; }
+          h1 { color: #333; margin: 0 0 15px 0; }
+          p { color: #666; font-size: 16px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="${result.success ? 'success' : 'error'}">${result.success ? '✅' : '❌'}</div>
+          <h1>${result.success ? 'Bot Activated!' : 'Error'}</h1>
+          <p>${result.success ? `The Discord bot is now processing the homework for ${productName}!` : result.error || 'Failed to trigger bot'}</p>
+          ${result.alreadyProcessed ? '<p style="color: #856404; background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px;">⚠️ This order was already processed.</p>' : ''}
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Error - hwplug</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); margin: 0; padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+          .card { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 500px; text-align: center; }
+          .error { color: #d9534f; font-size: 48px; margin-bottom: 20px; }
+          h1 { color: #333; margin: 0 0 15px 0; }
+          p { color: #666; font-size: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="error">❌</div>
+          <h1>Connection Error</h1>
+          <p>${error.message}</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
+
+app.get('/manual-process-page', async (req, res) => {
+  const { orderId, productName, username } = req.query;
+  
+  // Call the manual process endpoint
+  try {
+    const response = await fetch(`${process.env.BACKEND_URL || 'http://localhost:10000'}/manual-process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, productName, username })
+    });
+    
+    const result = await response.json();
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Manual Processing - hwplug</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); margin: 0; padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+          .card { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 500px; text-align: center; }
+          .success { color: #6C63FF; font-size: 48px; margin-bottom: 20px; }
+          h1 { color: #333; margin: 0 0 15px 0; }
+          p { color: #666; font-size: 16px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="success">👤</div>
+          <h1>Marked as Manual</h1>
+          <p>${result.success ? `Order for ${productName} is now marked for manual processing. You can do it yourself!` : result.error || 'Failed to mark as manual'}</p>
+          ${result.alreadyProcessed ? '<p style="color: #856404; background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 15px;">⚠️ This order was already processed.</p>' : ''}
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Error - hwplug</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); margin: 0; padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+          .card { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 500px; text-align: center; }
+          .error { color: #d9534f; font-size: 48px; margin-bottom: 20px; }
+          h1 { color: #333; margin: 0 0 15px 0; }
+          p { color: #666; font-size: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="error">❌</div>
+          <h1>Connection Error</h1>
+          <p>${error.message}</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
 
 // Port binding for Render
 const PORT = process.env.PORT || 10000;

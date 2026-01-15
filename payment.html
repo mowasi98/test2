@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Payment Method - hwplug</title>
+  <meta name="description" content="Secure payment for hwplug services">
+  
+  <!-- Favicon for all devices -->
+  <link rel="icon" type="image/png" href="plug-logo.png">
+  <link rel="apple-touch-icon" href="plug-logo.png">
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    /* Smooth scrolling for mobile and iPad only */
+    @media (max-width: 1024px) {
+      html {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+      }
+      body {
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+    .payment-box {
+      background: #fff;
+      padding: 3rem;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+    }
+    .logo {
+      font-size: 2.5rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      color: #333;
+      margin: 1rem 0 0.5rem 0;
+      font-size: 1.5rem;
+    }
+    .product-info {
+      background: #f8f9ff;
+      padding: 1.2rem;
+      border-radius: 10px;
+      margin: 1.5rem 0;
+      text-align: left;
+    }
+    .product-info p {
+      margin: 0.5rem 0;
+      color: #555;
+    }
+    .product-info strong {
+      color: #333;
+    }
+    .price {
+      color: #6C63FF;
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin: 1rem 0;
+    }
+    .payment-options {
+      margin: 2rem 0;
+    }
+    .payment-option {
+      background: #fff;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(108, 99, 255, 0.1);
+    }
+    .payment-option:hover {
+      border-color: #6C63FF;
+      box-shadow: 0 4px 12px rgba(108,99,255,0.15);
+    }
+    .payment-option.selected {
+      border-color: #6C63FF;
+      background: #f8f9ff;
+    }
+    .payment-option-title {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #333;
+      margin-bottom: 0.3rem;
+    }
+    .payment-option-desc {
+      color: #666;
+      font-size: 0.9rem;
+    }
+    .pay-btn {
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(108,99,255,0.25);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pay-btn:hover {
+      background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+      box-shadow: 0 4px 14px rgba(108,99,255,0.35);
+      transform: translateY(-2px);
+    }
+    .pay-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .success-message {
+      display: none;
+      background: #d4edda;
+      color: #155724;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .payment-box {
+        padding: 2rem 1.5rem;
+      }
+      .logo {
+        font-size: 2rem;
+      }
+      h2 {
+        font-size: 1.3rem;
+      }
+      .product-info {
+        padding: 1rem;
+      }
+      .price {
+        font-size: 1.5rem;
+      }
+      .payment-option {
+        padding: 1.2rem;
+      }
+      .payment-option-title {
+        font-size: 1rem;
+      }
+      .payment-option-desc {
+        font-size: 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="payment-box">
+    <div class="logo"><img src="plug-logo.png" alt="Plug Logo" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;">hwplug</div>
+    <h2>Select Payment Method</h2>
+    
+    <div id="errorMessage" style="display: none; background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #f5c6cb;"></div>
+    
+    <div class="product-info">
+      <p><strong>Product:</strong> <span id="productName">-</span></p>
+      <div class="price">&pound;<span id="productPrice">-</span></div>
+    </div>
+    
+    <div class="payment-options">
+      <div class="payment-option" data-method="card" onclick="selectPaymentMethod('card')">
+        <div class="payment-option-title">💳 Pay with Card</div>
+        <div class="payment-option-desc">Secure payment via Stripe</div>
+      </div>
+      
+      <div class="payment-option" data-method="cash" onclick="selectPaymentMethod('cash')">
+        <div class="payment-option-title">💵 Pay with Cash</div>
+        <div class="payment-option-desc">Pay in person or arrange cash payment</div>
+      </div>
+    </div>
+    
+    <div id="cashCodeInput" style="display: none; margin-top: 1rem;">
+      <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333;">Enter Cash Payment Code:</label>
+      <input type="text" id="cashCode" placeholder="Enter code from admin" style="width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; text-transform: uppercase;" />
+      <small style="color: #666; display: block; margin-top: 0.5rem;">Contact admin to get a valid payment code</small>
+    </div>
+    
+    <button id="payBtn" class="pay-btn" onclick="processPayment()" disabled>Continue</button>
+    
+    <div id="successMessage" class="success-message">
+      ✓ Cash payment request submitted! We'll contact you shortly.
+    </div>
+  </div>
+
+  <script>
+    // Auto-detect backend URL (use localhost for local testing, or set your production URL)
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
+    let selectedMethod = null;
+    let isProceedingToStripe = false; // Flag to track if user is going to Stripe (don't release slot)
+
+    // Load product info from sessionStorage
+    window.addEventListener('DOMContentLoaded', () => {
+      const productName = sessionStorage.getItem('productName');
+      const productPrice = sessionStorage.getItem('productPrice');
+      const slotReserved = sessionStorage.getItem('slotReserved');
+      const reservedProduct = sessionStorage.getItem('reservedProduct');
+      const isExtraSlot = sessionStorage.getItem('isExtraSlot') === 'true';
+      
+      // Clean product name for comparison (remove " - Extra Slot" suffix if present)
+      const cleanProductName = productName ? productName.replace(' - Extra Slot', '').trim() : '';
+      
+      // Verify slot was reserved for this product
+      if (!slotReserved || reservedProduct !== cleanProductName) {
+        document.getElementById('errorMessage').textContent = '⚠️ No slot reservation found. Redirecting to homepage...';
+        document.getElementById('errorMessage').style.display = 'block';
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 2000);
+        return;
+      }
+      
+      if (productName) {
+        const displayName = isExtraSlot ? `${productName} 💎` : productName;
+        document.getElementById('productName').textContent = displayName;
+      }
+      if (productPrice) {
+        document.getElementById('productPrice').textContent = productPrice;
+      }
+      
+      // Store reservation ID for release if needed
+      const reservationId = sessionStorage.getItem('reservationId');
+      
+      // Release reservation ONLY if user leaves/abandons the payment page (not going to Stripe)
+      window.addEventListener('beforeunload', function() {
+        // Don't release if user is proceeding to Stripe (card payment)
+        if (isProceedingToStripe) {
+          console.log('✅ Proceeding to Stripe - keeping slot reservation');
+          return;
+        }
+        
+        if (reservationId && reservedProduct) {
+          console.log('⚠️ User leaving payment page - releasing slot reservation');
+          // Try to release slot (use fetch with keepalive for reliability)
+          fetch(`${BACKEND_URL}/release-slot`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservationId: reservationId,
+              productName: reservedProduct
+            }),
+            keepalive: true // Keep request alive even if page unloads
+          }).catch(() => {
+            // Ignore errors - page is unloading
+          });
+        }
+      });
+    });
+
+    function selectPaymentMethod(method) {
+      selectedMethod = method;
+      
+      // Update UI
+      document.querySelectorAll('.payment-option').forEach(option => {
+        option.classList.remove('selected');
+      });
+      document.querySelector(`[data-method="${method}"]`).classList.add('selected');
+      
+      // Show/hide cash code input
+      const cashCodeInput = document.getElementById('cashCodeInput');
+      if (method === 'cash') {
+        cashCodeInput.style.display = 'block';
+      } else {
+        cashCodeInput.style.display = 'none';
+      }
+      
+      // Enable pay button
+      document.getElementById('payBtn').disabled = false;
+      document.getElementById('payBtn').textContent = method === 'card' ? 'Continue to Payment' : 'Submit Cash Payment';
+    }
+
+    async function processPayment() {
+      if (!selectedMethod) {
+        document.getElementById('errorMessage').textContent = 'Please select a payment method first.';
+        document.getElementById('errorMessage').style.display = 'block';
+        return;
+      }
+      
+      // Hide any previous error messages
+      document.getElementById('errorMessage').style.display = 'none';
+      
+      const payBtn = document.getElementById('payBtn');
+      payBtn.disabled = true;
+      payBtn.textContent = 'Processing...';
+      
+      const school = sessionStorage.getItem('school') || '';
+      const username = sessionStorage.getItem('loginUsername');
+      const password = sessionStorage.getItem('loginPassword');
+      const productName = sessionStorage.getItem('productName');
+      
+      console.log('💳 PAYMENT PAGE - CARD:', {
+        school,
+        schoolType: typeof school,
+        schoolLength: school ? school.length : 0,
+        username
+      });
+      const productPrice = sessionStorage.getItem('productPrice');
+      const stripeLink = sessionStorage.getItem('stripeLink');
+      
+      // Get previous username for new login detection
+      const previousUsername = sessionStorage.getItem('previousUsername') || localStorage.getItem('savedUsername');
+
+      console.log('Processing payment:', { selectedMethod, username, productName, productPrice, stripeLink });
+      
+      if (selectedMethod === 'card') {
+        // Get reservation ID (stored when slot was reserved)
+        const reservationId = sessionStorage.getItem('reservationId');
+        
+        // Set flag to prevent slot release when navigating to Stripe
+        isProceedingToStripe = true;
+        console.log('✅ Setting flag: proceeding to Stripe - slot will NOT be released');
+        
+        // Create Stripe checkout session with metadata (for webhook)
+        try {
+          console.log('💳 Creating Stripe checkout session with data:', {
+            reservationId,
+            school,
+            username,
+            productName,
+            productPrice,
+            previousUsername,
+            hasPassword: !!password
+          });
+          
+          const checkoutResponse = await fetch(`${BACKEND_URL}/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservationId: reservationId || '',
+              school: school || 'Not provided',
+              username: username,
+              password: password,
+              productName: productName,
+              productPrice: productPrice,
+              previousUsername: previousUsername || '',
+              successUrl: `${window.location.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+              cancelUrl: `${window.location.origin}/payment.html`
+            }),
+          });
+          
+          if (!checkoutResponse.ok) {
+            const errorData = await checkoutResponse.json();
+            console.error('💳 Checkout session creation failed:', errorData);
+            isProceedingToStripe = false;
+            document.getElementById('errorMessage').textContent = errorData.error || 'Failed to create checkout session. Please try again.';
+            document.getElementById('errorMessage').style.display = 'block';
+            payBtn.disabled = false;
+            payBtn.textContent = 'Continue to Payment';
+            return;
+          }
+          
+          const checkoutData = await checkoutResponse.json();
+          console.log('✅ Stripe checkout session created:', checkoutData.sessionId);
+          
+          // Store minimal data in localStorage for success page fallback
+          localStorage.setItem('cardPaymentProductName', productName);
+          localStorage.setItem('cardPaymentProductPrice', productPrice);
+          localStorage.setItem('cardPaymentSchool', school || '');
+          localStorage.setItem('cardPaymentUsername', username || '');
+          localStorage.setItem('cardPaymentPassword', password || '');
+          localStorage.setItem('cardPaymentPreviousUsername', previousUsername || '');
+          localStorage.setItem('cardPaymentReservationId', reservationId || '');
+          
+          // Redirect to Stripe checkout (webhook will handle purchase completion)
+          if (checkoutData.url) {
+            console.log('🔀 Redirecting to Stripe checkout...');
+            setTimeout(() => {
+              window.location.href = checkoutData.url;
+            }, 50);
+          } else {
+            throw new Error('No checkout URL received from server');
+          }
+        } catch (error) {
+          console.error('💳 Error creating checkout session:', error);
+          isProceedingToStripe = false;
+          document.getElementById('errorMessage').textContent = 'Something went wrong: ' + error.message;
+          document.getElementById('errorMessage').style.display = 'block';
+          payBtn.disabled = false;
+          payBtn.textContent = 'Continue to Payment';
+        }
+      } else if (selectedMethod === 'cash') {
+        // Get and validate cash code
+        const cashCode = document.getElementById('cashCode').value.trim();
+        if (!cashCode) {
+          document.getElementById('errorMessage').textContent = 'Please enter a cash payment code';
+          document.getElementById('errorMessage').style.display = 'block';
+          payBtn.disabled = false;
+          payBtn.textContent = 'Submit Cash Payment';
+          return;
+        }
+        
+        // Submit cash payment notification
+        try {
+          console.log('💵 Submitting cash payment with data:', {
+            school: school,
+            username: username,
+            productName: productName,
+            productPrice: productPrice,
+            previousUsername: previousUsername,
+            reservationId: sessionStorage.getItem('reservationId') || '',
+            cashCode: cashCode
+          });
+          
+          const response = await fetch(`${BACKEND_URL}/submit-cash-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              school: school,
+              username: username,
+              password: password,
+              productName: productName,
+              productPrice: productPrice,
+              previousUsername: previousUsername,
+              reservationId: sessionStorage.getItem('reservationId') || '', // Pass reservation ID
+              cashCode: cashCode // Include cash code
+            }),
+          });
+
+          console.log('💵 Response status:', response.status);
+          
+          if (!response.ok) {
+            try {
+              const errorData = await response.json();
+              console.error('💵 Error response:', errorData);
+              document.getElementById('errorMessage').textContent = errorData.error || 'Payment failed. Please try again.';
+              document.getElementById('errorMessage').style.display = 'block';
+            } catch (e) {
+              const errorText = await response.text();
+              console.error('💵 Error response:', errorText);
+              document.getElementById('errorMessage').textContent = 'Payment failed. Please check your code and try again.';
+              document.getElementById('errorMessage').style.display = 'block';
+            }
+            payBtn.disabled = false;
+            payBtn.textContent = 'Submit Cash Payment';
+            return;
+          }
+
+          const result = await response.json();
+          console.log('💵 Success response:', result);
+          
+          if (response.ok && result.success) {
+            // Show success message
+            document.querySelector('.payment-options').style.display = 'none';
+            document.getElementById('cashCodeInput').style.display = 'none';
+            payBtn.style.display = 'none';
+            document.getElementById('successMessage').style.display = 'block';
+            document.getElementById('successMessage').innerHTML = '✓ CASH PAYMENT REQUEST SUBMITTED! THANK YOU FOR YOUR PAYMENT. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.';
+            
+            // Clear session storage (don't release slot - payment completed)
+            sessionStorage.removeItem('productName');
+            sessionStorage.removeItem('productPrice');
+            sessionStorage.removeItem('loginUsername');
+            sessionStorage.removeItem('loginPassword');
+            sessionStorage.removeItem('stripeLink');
+            sessionStorage.removeItem('slotReserved');
+            sessionStorage.removeItem('reservedProduct');
+            sessionStorage.removeItem('reservationId'); // Don't release - payment completed
+            sessionStorage.removeItem('school'); // Clear school too
+            
+            console.log('✅ Cash payment successful - redirecting to homepage in 3 seconds');
+            
+            // Redirect to homepage after 3 seconds
+            setTimeout(function() {
+              window.location.href = 'index.html';
+            }, 3000);
+          } else {
+            document.getElementById('errorMessage').textContent = 'Error submitting payment: ' + (result.error || 'Unknown error');
+            document.getElementById('errorMessage').style.display = 'block';
+            payBtn.disabled = false;
+            payBtn.textContent = 'Submit Cash Payment';
+          }
+        } catch (error) {
+          console.error('💵 Catch error:', error);
+          document.getElementById('errorMessage').textContent = 'Something went wrong: ' + error.message;
+          document.getElementById('errorMessage').style.display = 'block';
+          payBtn.disabled = false;
+          payBtn.textContent = 'Submit Cash Payment';
+        }
+      }
+    }
+
+    // Send heartbeat to keep user active in admin panel
+    function sendHeartbeat() {
+      const username = localStorage.getItem('savedUsername');
+      const school = sessionStorage.getItem('selectedSchool');
+      if (username) {
+        fetch(`${BACKEND_URL}/user/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username,
+            school: school || 'Not provided'
+          })
+        }).catch(error => {
+          console.error('Heartbeat error:', error);
+        });
+      }
+    }
+
+    // Send heartbeat every 60 seconds
+    setInterval(sendHeartbeat, 60000);
+    // Send initial heartbeat
+    if (localStorage.getItem('savedUsername')) {
+      sendHeartbeat();
+    }
+  </script>
+</body>
+</html>

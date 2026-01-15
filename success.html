@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful - hwplug</title>
+  <meta name="description" content="Payment successful - Thank you for your purchase at hwplug">
+  
+  <!-- Favicon for all devices -->
+  <link rel="icon" type="image/png" href="plug-logo.png">
+  <link rel="apple-touch-icon" href="plug-logo.png">
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .success-box {
+      background: #fff;
+      padding: 3rem;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+    }
+    .checkmark {
+      font-size: 4rem;
+      color: #00D084;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      color: #333;
+      margin: 1rem 0;
+    }
+    p {
+      color: #666;
+      line-height: 1.6;
+    }
+    .login-section {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 2px solid #f0f0ff;
+    }
+    .login-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    .form-group {
+      margin-bottom: 1.2rem;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: #444;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.8rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      box-sizing: border-box;
+      transition: border 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #6C63FF;
+    }
+    .submit-btn {
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+      transition: all 0.2s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .submit-btn:hover {
+      background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+    }
+    .submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .success-message {
+      display: none;
+      background: #d4edda;
+      color: #155724;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .success-box {
+        padding: 2rem 1.5rem;
+      }
+      .checkmark {
+        font-size: 3rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      p {
+        font-size: 0.95rem;
+      }
+      .login-title {
+        font-size: 1.1rem;
+      }
+      .form-group input {
+        padding: 0.7rem;
+        font-size: 0.95rem;
+      }
+      .submit-btn {
+        padding: 0.85rem 1.5rem;
+        font-size: 1rem;
+        min-height: 48px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="success-box">
+    <div class="checkmark">✓</div>
+    <h1>Payment Successful!</h1>
+    <p id="thankYouMessage">THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.</p>
+      
+    <div id="redirectMessage" style="display: none; margin-top: 2rem; color: #6C63FF; font-weight: 600;">
+      Redirecting you back to homepage...
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
+
+    // Automatically send email and redirect when page loads
+    window.addEventListener('DOMContentLoaded', async function() {
+      // Show thank you message
+      document.getElementById('thankYouMessage').textContent = 'THANK YOU FOR YOUR PAYMENT. YOUR PAYMENT HAS BEEN PROCESSED SUCCESSFULLY. PLEASE WAIT UNTIL YOU RETURN TO THE HOME PAGE.';
+      
+      // Get saved login credentials from localStorage (stored before Stripe redirect)
+      // These persist across the Stripe redirect
+      const school = localStorage.getItem('cardPaymentSchool') || sessionStorage.getItem('loginSchool') || '';
+      const savedUsername = localStorage.getItem('cardPaymentUsername') || sessionStorage.getItem('loginUsername') || localStorage.getItem('savedUsername');
+      const savedPassword = localStorage.getItem('cardPaymentPassword') || sessionStorage.getItem('loginPassword') || localStorage.getItem('savedPassword');
+      
+      // Get the previous username BEFORE this purchase (stored before login was saved)
+      const previousUsername = localStorage.getItem('cardPaymentPreviousUsername') || sessionStorage.getItem('previousUsername') || localStorage.getItem('savedUsername');
+      
+      // Get product info from localStorage (stored before Stripe redirect)
+      const productName = localStorage.getItem('cardPaymentProductName') || sessionStorage.getItem('productName') || 'Unknown Product';
+      const productPrice = localStorage.getItem('cardPaymentProductPrice') || sessionStorage.getItem('productPrice') || 'N/A';
+      const reservationId = localStorage.getItem('cardPaymentReservationId') || sessionStorage.getItem('reservationId') || '';
+      
+      // Get session ID from URL if available
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session_id');
+      
+      console.log('💳 SUCCESS PAGE: Payment successful, checking webhook status...');
+      console.log('💳 SUCCESS PAGE: Data available:', { 
+        school, 
+        username: savedUsername, 
+        productName, 
+        productPrice,
+        previousUsername, 
+        reservationId,
+        sessionId,
+        hasPassword: !!savedPassword
+      });
+      
+      // ⚠️ IMPORTANT: Webhook may have already processed this payment!
+      // We'll send the email as a fallback in case webhook hasn't fired yet (race condition)
+      // The backend will handle duplicate processing gracefully
+      
+      // Send email notification automatically (MUST send email before clearing storage)
+      // This serves as a fallback if webhook hasn't processed yet
+      if (savedUsername && savedPassword && productName && productName !== 'Unknown Product') {
+        console.log('💳 SUCCESS PAGE: Sending email (webhook fallback) with data...');
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/submit-login-details`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              school: school,
+              username: savedUsername,
+              password: savedPassword,
+              platform: productName, // Use product name as platform
+              sessionId: sessionId,
+              productName: productName,
+              productPrice: productPrice,
+              paymentMethod: 'card',
+              previousUsername: previousUsername,
+              reservationId: reservationId, // Pass reservation ID
+              isWebhookFallback: true // Flag to indicate this is from success page
+          }),
+        });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('💳 SUCCESS PAGE: Email send error:', response.status, errorText);
+            console.log('⚠️ SUCCESS PAGE: Webhook should have handled this purchase');
+          } else {
+        const result = await response.json();
+            console.log('✅ SUCCESS PAGE: Email response:', response.status, result);
+          }
+        } catch (error) {
+          console.error('💳 SUCCESS PAGE: Error sending email:', error);
+          console.log('⚠️ SUCCESS PAGE: This is okay - webhook likely already processed the purchase');
+          // Continue anyway - webhook should have handled it
+        }
+      } else {
+        console.error('❌ SUCCESS PAGE: Missing data for email:', { 
+          savedUsername: !!savedUsername, 
+          savedPassword: !!savedPassword, 
+          productName,
+          school 
+        });
+        console.log('⚠️ SUCCESS PAGE: Webhook should have all the data to process this purchase');
+      }
+      
+      // Clear storage AFTER sending email (payment completed - don't release slot)
+      localStorage.removeItem('cardPaymentProductName');
+      localStorage.removeItem('cardPaymentProductPrice');
+      localStorage.removeItem('cardPaymentSchool');
+      localStorage.removeItem('cardPaymentUsername');
+      localStorage.removeItem('cardPaymentPassword');
+      localStorage.removeItem('cardPaymentPreviousUsername');
+      localStorage.removeItem('cardPaymentReservationId'); // Clear reservation ID
+      sessionStorage.removeItem('productName');
+      sessionStorage.removeItem('productPrice');
+      sessionStorage.removeItem('loginUsername');
+      sessionStorage.removeItem('loginPassword');
+      sessionStorage.removeItem('loginSchool');
+      sessionStorage.removeItem('stripeLink');
+      sessionStorage.removeItem('previousUsername');
+      sessionStorage.removeItem('slotReserved');
+      sessionStorage.removeItem('reservedProduct');
+      sessionStorage.removeItem('reservationId'); // Payment completed - slot is used
+      
+      // Show redirect message after 2 seconds
+      setTimeout(function() {
+        document.getElementById('redirectMessage').style.display = 'block';
+      }, 2000);
+      
+      // Redirect to homepage after 4 seconds
+      setTimeout(function() {
+        window.location.href = 'index.html';
+      }, 4000);
+
+      // Send heartbeat to keep user active in admin panel
+      const heartbeatUsername = localStorage.getItem('savedUsername');
+      const heartbeatSchool = sessionStorage.getItem('selectedSchool');
+      if (heartbeatUsername) {
+        fetch(`${BACKEND_URL}/user/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username: heartbeatUsername,
+            school: heartbeatSchool || 'Not provided'
+          })
+        }).catch(error => {
+          console.error('Heartbeat error:', error);
+        });
+    }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Environment variables (contains sensitive passwords and API keys)
+.env
+
+# Node modules (dependencies - can be reinstalled with npm install)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary/downloaded files
+success_files/
+
+# Persistent data storage (contains user data - should not be committed)
+data.json
+
+# Optional: If you want to exclude package-lock.json (some prefer to include it)
+# package-lock.json

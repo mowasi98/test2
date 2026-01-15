@@ -1,0 +1,2081 @@
+                            <!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                              <meta charset="UTF-8">
+                              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                              <title>Admin Panel - hwplug</title>
+                              <meta name="description" content="Admin control panel for hwplug">
+                              
+                              <!-- Favicon for all devices -->
+                              <link rel="icon" type="image/png" href="plug-logo.png">
+                              <link rel="apple-touch-icon" href="plug-logo.png">
+                              <style>
+                                body {
+                                  font-family: 'Segoe UI', Arial, sans-serif;
+                                  background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+                                  color: #222;
+                                  margin: 0;
+                                  padding: 2rem;
+                                  min-height: 100vh;
+                                }
+                                
+                                /* Smooth scrolling for mobile and iPad only */
+                                @media (max-width: 1024px) {
+                                  html {
+                                    scroll-behavior: smooth;
+                                    -webkit-overflow-scrolling: touch;
+                                  }
+                                  body {
+                                    -webkit-overflow-scrolling: touch;
+                                  }
+                                }
+                                .admin-container {
+                                  max-width: 800px;
+                                  margin: 0 auto;
+                                  background: #fff;
+                                  padding: 2rem;
+                                  border-radius: 16px;
+                                  box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+                                }
+                                h1 {
+                                  color: #6C63FF;
+                                  text-align: center;
+                                  margin-bottom: 2rem;
+                                }
+                                .password-section {
+                                  margin-bottom: 2rem;
+                                  padding: 1.5rem;
+                                  background: #f8f9ff;
+                                  border-radius: 12px;
+                                  border: 2px solid #6C63FF;
+                                }
+                                .form-group {
+                                  margin-bottom: 1rem;
+                                }
+                                .form-group label {
+                                  display: block;
+                                  font-weight: 600;
+                                  margin-bottom: 0.5rem;
+                                  color: #444;
+                                }
+                                .form-group input {
+                                  width: 100%;
+                                  padding: 0.8rem;
+                                  border: 2px solid #e0e0e0;
+                                  border-radius: 8px;
+                                  font-size: 1rem;
+                                  box-sizing: border-box;
+                                }
+                                .btn {
+                                  background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+                                  color: #fff;
+                                  padding: 0.75rem 2rem;
+                                  border: none;
+                                  border-radius: 10px;
+                                  font-size: 1rem;
+                                  font-weight: 600;
+                                  cursor: pointer;
+                                  transition: all 0.2s;
+                                  width: 100%;
+                                  margin-top: 1rem;
+                                  touch-action: manipulation;
+                                  user-select: none;
+                                  -webkit-tap-highlight-color: transparent;
+                                }
+                                .btn:hover {
+                                  background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+                                }
+                                .btn:active {
+                                  transform: scale(0.97);
+                                  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                                }
+                                .btn-danger {
+                                  background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%);
+                                }
+                                .btn-danger:hover {
+                                  background: linear-gradient(135deg, #c9302c 0%, #a02623 100%);
+                                }
+                                .status-section {
+                                  margin-top: 2rem;
+                                }
+                                .status-item {
+                                  display: flex;
+                                  justify-content: space-between;
+                                  align-items: center;
+                                  padding: 1rem;
+                                  margin-bottom: 1rem;
+                                  background: #f8f9ff;
+                                  border-radius: 8px;
+                                  border-left: 4px solid #6C63FF;
+                                }
+                                .status-item.full {
+                                  border-left-color: #d9534f;
+                                  background: #fff5f5;
+                                }
+                                .status-item .product-name {
+                                  font-weight: 700;
+                                  color: #333;
+                                }
+                                .status-item .count {
+                                  font-size: 1.2rem;
+                                  font-weight: 700;
+                                  color: #6C63FF;
+                                }
+                                .status-item.full .count {
+                                  color: #d9534f;
+                                }
+                                .status-item.unavailable {
+                                  border-left-color: #ff9800;
+                                  background: #fff8e1;
+                                  opacity: 0.7;
+                                }
+                                .product-controls {
+                                  display: flex;
+                                  gap: 0.5rem;
+                                  margin-top: 0.5rem;
+                                }
+                                .btn-small {
+                                  padding: 0.4rem 1rem;
+                                  font-size: 0.85rem;
+                                  margin: 0;
+                                  width: auto;
+                                }
+                                .btn-warning {
+                                  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+                                }
+                                .btn-warning:hover {
+                                  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+                                }
+                                .btn-success {
+                                  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                                }
+                                .btn-success:hover {
+                                  background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
+                                }
+                                .availability-section {
+                                  margin-top: 2rem;
+                                  padding: 1.5rem;
+                                  background: #fff3cd;
+                                  border-radius: 12px;
+                                  border: 2px solid #ffc107;
+                                }
+                                .slot-control {
+                                  display: flex;
+                                  align-items: center;
+                                  gap: 0.5rem;
+                                  margin-top: 0.8rem;
+                                  flex-wrap: wrap;
+                                }
+                                .slot-control input {
+                                  width: 80px;
+                                  padding: 0.5rem;
+                                  border: 2px solid #6C63FF;
+                                  border-radius: 8px;
+                                  font-size: 1rem;
+                                  font-weight: 700;
+                                  text-align: center;
+                                }
+                                .slot-control button {
+                                  padding: 0.5rem 1rem;
+                                  font-size: 1rem;
+                                  font-weight: 700;
+                                  min-width: 45px;
+                                }
+                                @media (max-width: 768px) {
+                                  body {
+                                    padding: 1rem;
+                                  }
+                                  .admin-container {
+                                    padding: 1.5rem;
+                                  }
+                                  h1 {
+                                    font-size: 1.5rem;
+                                  }
+                                  .status-item {
+                                    flex-direction: column;
+                                    align-items: flex-start;
+                                  }
+                                  .status-item .count {
+                                    margin-top: 0.5rem;
+                                  }
+                                  .product-controls {
+                                    flex-direction: column;
+                                    width: 100%;
+                                  }
+                                  .product-controls button {
+                                    width: 100%;
+                                  }
+                                  .slot-control {
+                                    width: 100%;
+                                  }
+                                  .slot-control input {
+                                    flex: 1;
+                                  }
+                                  .btn-small {
+                                    font-size: 0.8rem;
+                                    padding: 0.4rem 0.8rem;
+                                  }
+                                  .btn {
+                                    padding: 0.9rem 1.5rem;
+                                    font-size: 0.95rem;
+                                    min-height: 48px;
+                                  }
+                                }
+                                @media (max-width: 600px) {
+                                  /* Mobile styles - buttons use desktop size */
+                                }
+                                @keyframes pulse {
+                                  0%, 100% { opacity: 1; }
+                                  50% { opacity: 0.5; }
+                                }
+                                .message {
+                                  padding: 1rem;
+                                  border-radius: 8px;
+                                  margin-bottom: 1rem;
+                                  display: none;
+                                }
+                                .message.success {
+                                  background: #d4edda;
+                                  color: #155724;
+                                  border: 1px solid #c3e6cb;
+                                }
+                                .message.error {
+                                  background: #f8d7da;
+                                  color: #721c24;
+                                  border: 1px solid #f5c6cb;
+                                }
+                              </style>
+                            </head>
+                            <body>
+                              <div class="admin-container">
+                                <h1>🔐 Admin Panel - <img src="plug-logo.png" alt="Plug Logo" style="height: 1em; vertical-align: middle; margin: 0 0.3em;">hwplug</h1>
+                                
+                                <div id="message" class="message"></div>
+                                
+                                <div class="password-section">
+                                  <div class="form-group">
+                                    <label>Admin Password</label>
+                                    <input type="password" id="adminPassword" placeholder="Enter admin password">
+                                  </div>
+                                  <button class="btn" id="checkStatusBtn" style="touch-action: manipulation;">Check Counter Status</button>
+                                </div>
+                                
+                                <div class="status-section" id="statusSection" style="display: none;">
+                                  <h2>Current Status (3 slots per product per day)</h2>
+                                  <div id="statusItems"></div>
+                                  
+                                  <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                                    <button class="btn btn-danger" id="resetAllBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset All Counters</button>
+                                    <button class="btn btn-warning" id="resetTimerBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Reset Timer Only</button>
+                                  </div>
+                                  
+                                  <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 2px solid #dc3545;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #fff;">🧪 Test Mode (with Whitelist)</h4>
+                                    <p style="font-size: 0.85rem; color: #fff; margin-bottom: 0.8rem;">Enable test mode - only whitelisted users can access via login:</p>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+                                      <button class="btn" id="toggleTestModeBtn" style="background: #fff; color: #dc3545; font-weight: 700; touch-action: manipulation;">
+                                        <span id="testModeButtonText">Enable Test Mode</span>
+                                      </button>
+                                      <span id="testModeStatus" style="color: #fff; font-weight: 600; padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border-radius: 6px;">Status: Live</span>
+                                    </div>
+                                    <p style="font-size: 0.75rem; color: #fff; margin: 0 0 1rem 0;">⚠️ Non-whitelisted users see: "🧪 In Test Mode" with login form</p>
+                                    
+                                    <!-- Whitelist Management (integrated into test mode) -->
+                                    <div style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 6px; margin-bottom: 0.8rem;">
+                                      <p style="font-size: 0.85rem; color: #fff; margin: 0 0 0.5rem 0; font-weight: 600;">🔑 Add User to Whitelist:</p>
+                                      <p style="font-size: 0.75rem; color: rgba(255,255,255,0.9); margin: 0 0 0.8rem 0;">Whitelisted users can login on test mode screen to access the website</p>
+                                      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="text" id="whitelistUsernameInput" placeholder="Enter username" style="flex: 1; min-width: 200px; padding: 0.5rem; border: 2px solid #fff; border-radius: 4px; font-size: 1rem;">
+                                        <button class="btn" id="addToWhitelistBtn" style="background: #fff; color: #dc3545; font-weight: 700; touch-action: manipulation;">Add User</button>
+                                      </div>
+                                    </div>
+                                    <div id="whitelistedUsersContainer" style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 6px;">
+                                      <p style="font-size: 0.85rem; color: #fff; margin: 0 0 0.5rem 0; font-weight: 600;">Whitelisted Users (<span id="whitelistCount">0</span>):</p>
+                                      <div id="whitelistedUsersList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0;">No users whitelisted yet</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  <!-- Bot Automation Mode Section -->
+                                  <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 2px solid #28a745;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #fff;">🤖 Bot Automation Mode</h4>
+                                    <p style="font-size: 0.85rem; color: #fff; margin-bottom: 1rem;">Choose how homework is processed for Sparx Maths & Sparx Reader:</p>
+                                    
+                                    <div style="background: rgba(255,255,255,0.15); padding: 1.2rem; border-radius: 6px; margin-bottom: 1rem;">
+                                      <div style="margin-bottom: 1rem;">
+                                        <label style="display: flex; align-items: center; gap: 0.8rem; cursor: pointer; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 6px; margin-bottom: 0.8rem;">
+                                          <input type="radio" name="botMode" value="auto" id="botModeAuto" checked style="width: 24px; height: 24px; cursor: pointer;">
+                                          <div>
+                                            <div style="color: #fff; font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">🤖 Auto-Bot Mode (Default)</div>
+                                            <div style="color: rgba(255,255,255,0.9); font-size: 0.85rem;">Bot automatically does homework immediately after purchase</div>
+                                          </div>
+                                        </label>
+                                        
+                                        <label style="display: flex; align-items: center; gap: 0.8rem; cursor: pointer; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 6px;">
+                                          <input type="radio" name="botMode" value="email" id="botModeEmail" style="width: 24px; height: 24px; cursor: pointer;">
+                                          <div>
+                                            <div style="color: #fff; font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">📧 Email Confirmation Mode</div>
+                                            <div style="color: rgba(255,255,255,0.9); font-size: 0.85rem;">Send email with buttons - you decide: Bot or Manual</div>
+                                          </div>
+                                        </label>
+                                      </div>
+                                      
+                                      <button class="btn" id="saveBotModeBtn" style="background: #fff; color: #28a745; font-weight: 700; touch-action: manipulation;">
+                                        💾 Save Bot Mode Setting
+                                      </button>
+                                    </div>
+                                    
+                                    <div id="botModeStatus" style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 6px; text-align: center;">
+                                      <p style="color: #fff; font-weight: 600; margin: 0; font-size: 0.95rem;">
+                                        Current Mode: <span id="currentBotMode" style="font-weight: 700; font-size: 1.1rem;">Auto-Bot Mode</span>
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #856404;">🧪 Test Timer (For Testing Auto-Reset)</h4>
+                                    <p style="font-size: 0.85rem; color: #856404; margin-bottom: 0.8rem;">Set a short timer to test the automatic slot reset feature:</p>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                      <input type="number" id="testTimerMinutes" min="1" max="1440" value="1" placeholder="Minutes" style="width: 100px; padding: 0.5rem; border: 2px solid #ffc107; border-radius: 4px; font-size: 1rem;">
+                                      <span style="color: #856404; font-weight: 600;">minutes</span>
+                                      <button class="btn btn-primary" id="setTestTimerBtn" style="touch-action: manipulation;">Set Test Timer</button>
+                                    </div>
+                                    <small style="color: #856404; display: block; margin-top: 0.5rem;">⚠️ This will override the 24-hour timer. Use for testing only!</small>
+                                  </div>
+                                  
+                                  <p style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; margin-bottom: 1rem;">
+                                    <strong>Note:</strong> "Reset Timer Only" resets the 24-hour timer but keeps current slot counts. "Reset All Counters" resets both timer and slot counts to 0.
+                                  </p>
+                                  
+                                  <div class="availability-section">
+                                    <h3 style="margin-top: 0; color: #856404;">🌐 Global Availability Controls</h3>
+                                    <p style="color: #856404; margin-bottom: 1rem;">Mark all products as available or not available</p>
+                                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                                      <button class="btn btn-warning" id="markAllUnavailableBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Mark All as NOT Available</button>
+                                      <button class="btn btn-success" id="markAllAvailableBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Mark All as Available</button>
+                                    </div>
+                                  </div>
+
+                                  <div class="availability-schedule-section" style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-radius: 12px; border: 2px solid #ffc107;">
+                                    <h3 style="margin-top: 0; color: #856404;">⏰ Availability Schedule</h3>
+                                    <p style="color: #856404; margin-bottom: 1rem;">Control when products are available for purchase</p>
+                                    
+                                    <div style="background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                                      <h4 style="margin-top: 0; color: #6C63FF;">📅 Monday to Friday</h4>
+                                      
+                                      <div style="margin-bottom: 1rem;">
+                                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 1rem;">
+                                          <input type="checkbox" id="weekdayEnabled" checked style="width: 20px; height: 20px;">
+                                          <span style="font-weight: 600;">Enable weekday availability</span>
+                                        </label>
+                                        
+                                        <div id="weekdayTimings">
+                                          <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                                            <div style="flex: 1; min-width: 150px;">
+                                              <label style="display: block; margin-bottom: 0.5rem; color: #666;">Start Time:</label>
+                                              <input type="time" id="weekdayStart" value="15:30" style="width: 100%; padding: 0.8rem; border: 2px solid #ffc107; border-radius: 8px; font-size: 1rem;">
+                                            </div>
+                                            <div style="flex: 1; min-width: 150px;">
+                                              <label style="display: block; margin-bottom: 0.5rem; color: #666;">End Time:</label>
+                                              <input type="time" id="weekdayEnd" value="00:00" style="width: 100%; padding: 0.8rem; border: 2px solid #ffc107; border-radius: 8px; font-size: 1rem;">
+                                            </div>
+                                          </div>
+                                          <p style="color: #999; font-size: 0.9rem; margin: 0.5rem 0 0 0;">💡 Tip: 00:00 means midnight (12:00 AM)</p>
+                                        </div>
+                                      </div>
+                                      
+                                      <button class="btn" id="saveWeekdayBtn" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); touch-action: manipulation;">Save Weekday Schedule</button>
+                                    </div>
+                                    
+                                    <div style="background: #fff; padding: 1.5rem; border-radius: 8px;">
+                                      <h4 style="margin-top: 0; color: #6C63FF;">🎉 Saturday & Sunday</h4>
+                                      
+                                      <div style="margin-bottom: 1rem;">
+                                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 1rem;">
+                                          <input type="checkbox" id="weekendEnabled" checked style="width: 20px; height: 20px;">
+                                          <span style="font-weight: 600;">Enable weekend availability</span>
+                                        </label>
+                                        
+                                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                          <input type="checkbox" id="weekendAllDay" checked style="width: 20px; height: 20px;">
+                                          <span style="font-weight: 600;">Available 24/7 (All Day)</span>
+                                        </label>
+                                      </div>
+                                      
+                                      <button class="btn" id="saveWeekendBtn" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); touch-action: manipulation;">Save Weekend Schedule</button>
+                                    </div>
+                                    
+                                    <div style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #2196F3;">
+                                      <strong style="color: #1976d2;">Current Status:</strong>
+                                      <div id="availabilityStatus" style="margin-top: 0.5rem; color: #555;">Loading...</div>
+                                    </div>
+                                  </div>
+
+                                  <div class="cash-codes-section" style="margin-top: 2rem; padding: 1.5rem; background: #d1ecf1; border-radius: 12px; border: 2px solid #17a2b8;">
+                                    <h3 style="margin-top: 0; color: #0c5460;">💵 Cash Payment Codes</h3>
+                                    <p style="color: #0c5460; margin-bottom: 1rem;">Manage codes that users need to enter for cash payments</p>
+                                    
+                                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                                      <input type="text" id="newCashCode" placeholder="Enter new code (e.g., CASH123)" style="flex: 1; min-width: 200px; padding: 0.8rem; border: 2px solid #17a2b8; border-radius: 8px; font-size: 1rem; text-transform: uppercase;" />
+                                      <button class="btn btn-success" id="addCashCodeBtn" style="touch-action: manipulation;">Add Code</button>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                      <button class="btn" id="showCodesBtn" style="flex: 1; min-width: 200px; margin-bottom: 1rem; touch-action: manipulation;">Show All Codes</button>
+                                      <button class="btn btn-success" id="showCodeUsageBtn" style="flex: 1; min-width: 200px; margin-bottom: 1rem; touch-action: manipulation;">Show Who Used Codes</button>
+                                    </div>
+                                    
+                                    <div id="cashCodesContent" style="display: none;">
+                                      <div id="cashCodesStats" style="margin-bottom: 1rem; padding: 1rem; background: #bee5eb; border-radius: 8px; color: #0c5460;">
+                                        <strong>Total Active Codes:</strong> <span id="totalCodes">0</span>
+                                      </div>
+                                      <div id="cashCodesList"></div>
+                                    </div>
+                                    
+                                    <div id="codeUsageContent" style="display: none; margin-top: 1rem;">
+                                      <div id="codeUsageStats" style="margin-bottom: 1rem; padding: 1rem; background: #bee5eb; border-radius: 8px; color: #0c5460;">
+                                        <strong>Total Code Uses:</strong> <span id="totalUses">0</span>
+                                      </div>
+                                      <div id="codeUsageList" style="max-height: 500px; overflow-y: auto;"></div>
+                                    </div>
+                                  </div>
+
+                                  <div class="active-users-section" style="margin-top: 2rem;">
+                                    <h3 style="margin-top: 0; color: #28a745;">🟢 Active Users Browsing Now</h3>
+                                    <p style="color: #666; margin-bottom: 1rem;">See who is currently online browsing the website (updates every 15 seconds)</p>
+                                    <button class="btn btn-success" id="showOnlineBtn" style="margin-bottom: 1rem; touch-action: manipulation;">Show Who's Online</button>
+                                    <div id="activeUsersContent" style="display: none;">
+                                      <div id="activeUsersStats" style="margin-bottom: 1rem; padding: 1rem; background: #d4edda; border-radius: 8px; color: #155724; font-size: 1.1rem;">
+                                        <strong>👁️ Currently Browsing:</strong> <span id="totalActive" style="font-size: 1.5rem; font-weight: 700;">0</span> users online
+                                      </div>
+                                      <div id="activeUsersList"></div>
+                                    </div>
+                                  </div>
+
+                                  <div class="login-history-section" style="margin-top: 2rem;">
+                                    <h3 style="margin-top: 0; color: #6C63FF;">🛒 Purchase History</h3>
+                                    <p style="color: #666; margin-bottom: 1rem;">View all purchases and payments</p>
+                                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                                      <button class="btn" id="showHistoryBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Load Purchase History</button>
+                                      <button class="btn btn-danger" id="clearAllHistoryBtn" style="flex: 1; min-width: 200px; touch-action: manipulation;">Clear All History</button>
+                                    </div>
+                                    <div id="loginHistoryContent" style="display: none;">
+                                      <div id="loginHistoryStats" style="margin-bottom: 1rem; padding: 1rem; background: #e3f2fd; border-radius: 8px; color: #1976d2;">
+                                        <strong>Total Purchases:</strong> <span id="totalLogins">0</span>
+                                      </div>
+                                      <div id="loginHistoryList" style="max-height: 500px; overflow-y: auto;"></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <script>
+                                const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                                  ? 'http://localhost:10000' 
+                                  : 'https://test2-adsw.onrender.com';
+
+                                function showMessage(text, type) {
+                                  const messageDiv = document.getElementById('message');
+                                  messageDiv.textContent = text;
+                                  messageDiv.className = `message ${type}`;
+                                  messageDiv.style.display = 'block';
+                                  setTimeout(() => {
+                                    messageDiv.style.display = 'none';
+                                  }, 5000);
+                                }
+
+                                async function checkStatus() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  // ⚠️ VALIDATE PASSWORD FIRST - Don't show anything if wrong password!
+                                  if (!password) {
+                                    showMessage('Please enter admin password', 'error');
+                                    document.getElementById('statusSection').style.display = 'none';
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    // Test password by trying to access a protected endpoint
+                                    const testResponse = await fetch(`${BACKEND_URL}/admin/login-history`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+                                    
+                                    const testData = await testResponse.json();
+                                    
+                                    // If password is wrong, show error and hide everything
+                                    if (testResponse.status === 401 || testData.error === 'Invalid admin password') {
+                                      showMessage('❌ WRONG PASSWORD! Please try again.', 'error');
+                                      document.getElementById('statusSection').style.display = 'none';
+                                      return;
+                                    }
+                                    
+                                    // Password is correct! Now fetch status
+                                    const response = await fetch(`${BACKEND_URL}/admin/counters-status`);
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      document.getElementById('statusSection').style.display = 'block';
+                                      displayStatus(data.counters);
+                                      updateTestModeUI(data.testMode || false);
+                                      updateWhitelistUI(data.whitelistedUsers || []); // Whitelist is now part of test mode
+                                      showMessage('✅ Admin access granted!', 'success');
+                                    } else {
+                                      showMessage('Error fetching status', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                function displayStatus(counters) {
+                                  const statusItemsDiv = document.getElementById('statusItems');
+                                  statusItemsDiv.innerHTML = '';
+                                  
+                                  Object.keys(counters).forEach(product => {
+                                    const count = counters[product].count;
+                                    const isFull = count >= 3;
+                                    const isUnavailable = counters[product].available === false;
+                                    const safeProductId = product.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                    
+                                    const itemDiv = document.createElement('div');
+                                    itemDiv.className = `status-item ${isFull ? 'full' : ''} ${isUnavailable ? 'unavailable' : ''}`;
+                                    
+                                    // Check if this product has extra slots (Sparx Reader)
+                                    const hasExtraSlots = counters[product].extraSlots;
+                                    const extraSlotCount = hasExtraSlots ? counters[product].extraSlots.count : 0;
+                                    const extraSlotMax = hasExtraSlots ? counters[product].extraSlots.max : 0;
+                                    
+                                    itemDiv.innerHTML = `
+                                      <div style="flex: 1;">
+                                        <div class="product-name">${product} ${isUnavailable ? '⚠️ (Not Available)' : ''}</div>
+                                        <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">
+                                          ${counters[product].date ? 'Last reset: ' + counters[product].date : ''}
+                                        </div>
+                                        
+                                        <!-- Regular Slot Management Controls -->
+                                        <div class="slot-control">
+                                          <label style="font-size: 0.85rem; color: #666; margin-right: 0.5rem;">Regular:</label>
+                                          <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                          <input type="number" 
+                                                id="slot-${safeProductId}" 
+                                                value="${count}" 
+                                                min="0" 
+                                                max="20" 
+                                                onchange="setSlotCount('${product}', this.value)">
+                                          <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Set</button>
+                                        </div>
+                                        
+                                        ${hasExtraSlots ? `
+                                        <!-- Extra Slot Management Controls (Sparx Reader only) -->
+                                        <div class="slot-control" style="margin-top: 0.8rem; background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 0.8rem; border-radius: 8px; border: 2px solid #ffc107;">
+                                          <label style="font-size: 0.85rem; color: #856404; font-weight: 700; margin-right: 0.5rem;">💎 Extra Slots:</label>
+                                          <button class="btn btn-small btn-danger" onclick="adjustExtraSlotMax('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                          <input type="number" 
+                                                id="extraslot-${safeProductId}" 
+                                                value="${extraSlotMax}" 
+                                                min="0" 
+                                                max="50" 
+                                                onchange="setExtraSlotMax('${product}', this.value)"
+                                                style="width: 80px;">
+                                          <button class="btn btn-small btn-success" onclick="adjustExtraSlotMax('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          <button class="btn btn-small" onclick="setExtraSlotMax('${product}', document.getElementById('extraslot-${safeProductId}').value)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Set Max</button>
+                                          <span style="font-size: 0.85rem; color: #856404; margin-left: 0.5rem;">Used: ${extraSlotCount}/${extraSlotMax}</span>
+                                        </div>
+                                        ` : ''}
+                                        
+                                        <div class="product-controls">
+                                          <button class="btn btn-small btn-danger" onclick="resetProductCounter('${product}')" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Reset to 0</button>
+                                          <button class="btn btn-small ${isUnavailable ? 'btn-success' : 'btn-warning'}" 
+                                                  onclick="toggleProductAvailability('${product}', ${!isUnavailable})" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
+                                            ${isUnavailable ? 'Mark Available' : 'Mark Not Available'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div class="count">${count} / 3${hasExtraSlots ? `<br><span style="font-size: 0.8rem; color: #ffc107;">+${extraSlotCount}/${extraSlotMax} extra</span>` : ''}</div>
+                                    `;
+                                    statusItemsDiv.appendChild(itemDiv);
+                                  });
+                                }
+
+                                async function resetProductCounter(productName) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Are you sure you want to reset the counter for "${productName}"?`)) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/reset-product-counter`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ Counter reset for ${productName}!`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error resetting counter', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function setAllAvailable(available) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const action = available ? 'mark all products as available' : 'mark all products as NOT available';
+                                  if (!confirm(`Are you sure you want to ${action}?`)) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-product-availability`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        available: available
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${data.message}!`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error updating availability', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function toggleProductAvailability(productName, available) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const action = available ? 'mark as NOT available' : 'mark as available';
+                                  if (!confirm(`Are you sure you want to ${action} "${productName}"?`)) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/toggle-product-availability`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        available: !available // Toggle the availability
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${data.message}!`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error updating availability', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function resetTimer() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('Are you sure you want to reset the timer only? This will reset the 24-hour countdown but keep current slot counts.')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/reset-timer`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password }),
+                                    });
+                                    
+                                    // Check if response is ok
+                                    if (!response.ok) {
+                                      if (response.status === 404) {
+                                        showMessage('❌ Endpoint not found. Please make sure you have deployed the latest server.js to Render.', 'error');
+                                        return;
+                                      }
+                                      const errorText = await response.text();
+                                      showMessage(`❌ Server error (${response.status}): ${errorText}`, 'error');
+                                      return;
+                                    }
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage('✅ Timer reset successfully! Slot counts preserved.', 'success');
+                                      checkStatus(); // Refresh status
+                                      
+                                      // Trigger frontend timer refresh on all open pages by notifying
+                                      console.log('Timer reset at:', new Date(data.resetTime).toLocaleString());
+                                    } else {
+                                      showMessage(data.error || 'Error resetting timer', 'error');
+                                    }
+                                  } catch (error) {
+                                    if (error.message && error.message.includes('Unexpected token')) {
+                                      showMessage('❌ Server returned HTML instead of JSON. The endpoint may not exist on the deployed server. Please deploy the latest server.js to Render.', 'error');
+                                    } else {
+                                      showMessage('Error connecting to server: ' + error.message, 'error');
+                                    }
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function setTestTimer() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const minutes = parseInt(document.getElementById('testTimerMinutes').value);
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!minutes || minutes < 1 || minutes > 1440) {
+                                    showMessage('Please enter a valid number of minutes (1-1440)', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Set timer to ${minutes} minute(s)? This is for TESTING ONLY. The timer will auto-reset slots when it reaches 0.`)) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-test-timer`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password, minutes: minutes }),
+                                    });
+                                    
+                                    if (!response.ok) {
+                                      const errorText = await response.text();
+                                      showMessage(`❌ Server error (${response.status}): ${errorText}`, 'error');
+                                      return;
+                                    }
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ Test timer set to ${minutes} minute(s)! Timer will expire at ${new Date(data.expiresAt).toLocaleTimeString()}`, 'success');
+                                      checkStatus(); // Refresh status
+                                      console.log('Test timer set for:', minutes, 'minutes');
+                                    } else {
+                                      showMessage(data.error || 'Error setting test timer', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server: ' + error.message, 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function resetCounters() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('Are you sure you want to reset all counters? This will reset all products to 0.')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/reset-counters`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage('✅ All counters reset successfully!', 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error resetting counters', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function setSlotCount(productName, slotCount) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const count = parseInt(slotCount);
+                                  if (isNaN(count) || count < 0) {
+                                    showMessage('Invalid slot count. Must be 0 or greater.', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (count > 3) {
+                                    showMessage('Slot count cannot exceed 3. Please use a value between 0 and 3.', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-slot-count`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        slotCount: count
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${productName}: ${data.oldCount} → ${data.newCount} slots`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error setting slot count', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function adjustSlotCount(productName, delta) {
+                                  const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                  const input = document.getElementById(`slot-${safeProductId}`);
+                                  const currentValue = parseInt(input.value) || 0;
+                                  const newValue = Math.max(0, Math.min(3, currentValue + delta));
+                                  
+                                  if (newValue === currentValue) {
+                                    if (newValue === 0 && delta < 0) {
+                                      showMessage('Slot count is already at minimum (0)', 'error');
+                                    } else if (newValue === 3 && delta > 0) {
+                                      showMessage('Slot count is already at maximum (3)', 'error');
+                                    }
+                                    return;
+                                  }
+                                  
+                                  input.value = newValue;
+                                  await setSlotCount(productName, newValue);
+                                }
+
+                                // Extra Slot Management Functions (Sparx Reader)
+                                async function setExtraSlotMax(productName, maxSlots) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const max = parseInt(maxSlots);
+                                  if (isNaN(max) || max < 0) {
+                                    showMessage('Invalid extra slot count. Must be 0 or greater.', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (max > 50) {
+                                    showMessage('Extra slot max cannot exceed 50.', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-extra-slot-max`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        maxSlots: max
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${productName}: Extra slot max set to ${max}`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error setting extra slot max', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function adjustExtraSlotMax(productName, delta) {
+                                  const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                  const input = document.getElementById(`extraslot-${safeProductId}`);
+                                  const currentValue = parseInt(input.value) || 0;
+                                  const newValue = Math.max(0, Math.min(50, currentValue + delta));
+                                  
+                                  if (newValue === currentValue) {
+                                    if (newValue === 0 && delta < 0) {
+                                      showMessage('Extra slot max is already at minimum (0)', 'error');
+                                    } else if (newValue === 50 && delta > 0) {
+                                      showMessage('Extra slot max is already at maximum (50)', 'error');
+                                    }
+                                    return;
+                                  }
+                                  
+                                  input.value = newValue;
+                                  await setExtraSlotMax(productName, newValue);
+                                }
+
+                                // Load current bot mode
+                                async function loadBotMode() {
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/bot-mode`);
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      // Update radio buttons
+                                      document.getElementById('botModeAuto').checked = (data.mode === 'auto');
+                                      document.getElementById('botModeEmail').checked = (data.mode === 'email');
+                                      
+                                      // Update status text
+                                      const statusText = data.mode === 'auto' ? '🤖 Auto-Bot Mode' : '📧 Email Confirmation Mode';
+                                      document.getElementById('currentBotMode').textContent = statusText;
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading bot mode:', error);
+                                  }
+                                }
+                                
+                                // Save bot mode setting
+                                async function saveBotMode() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password', 'error');
+                                    return;
+                                  }
+                                  
+                                  const selectedMode = document.querySelector('input[name="botMode"]:checked').value;
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-bot-mode`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, mode: selectedMode })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${data.message}`, 'success');
+                                      
+                                      // Update status text
+                                      const statusText = data.newMode === 'auto' ? '🤖 Auto-Bot Mode' : '📧 Email Confirmation Mode';
+                                      document.getElementById('currentBotMode').textContent = statusText;
+                                    } else {
+                                      showMessage(`❌ ${data.error || 'Failed to save bot mode'}`, 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('❌ Error saving bot mode: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // Add mobile-friendly event listeners when page loads
+                                document.addEventListener('DOMContentLoaded', function() {
+                                  // Load bot mode on page load
+                                  loadBotMode();
+                                  // Reset All Counters button
+                                  const resetAllBtn = document.getElementById('resetAllBtn');
+                                  if (resetAllBtn) {
+                                    resetAllBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      resetCounters();
+                                    });
+                                    // Add touch event for better mobile response
+                                    resetAllBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      resetCounters();
+                                    });
+                                  }
+
+                                  // Reset Timer Only button
+                                  const resetTimerBtn = document.getElementById('resetTimerBtn');
+                                  if (resetTimerBtn) {
+                                    resetTimerBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      resetTimer();
+                                    });
+                                    resetTimerBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      resetTimer();
+                                    });
+                                  }
+
+                                  // Set Test Timer button
+                                  const setTestTimerBtn = document.getElementById('setTestTimerBtn');
+                                  if (setTestTimerBtn) {
+                                    setTestTimerBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      setTestTimer();
+                                    });
+                                    setTestTimerBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      setTestTimer();
+                                    });
+                                  }
+
+                                  // Toggle Test Mode button
+                                  const toggleTestModeBtn = document.getElementById('toggleTestModeBtn');
+                                  if (toggleTestModeBtn) {
+                                    toggleTestModeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      toggleTestMode();
+                                    });
+                                    toggleTestModeBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      toggleTestMode();
+                                    });
+                                  }
+
+                                  // Whitelist user management buttons (whitelist is now part of test mode)
+                                  const addToWhitelistBtn = document.getElementById('addToWhitelistBtn');
+                                  if (addToWhitelistBtn) {
+                                    addToWhitelistBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      addToWhitelist();
+                                    });
+                                    addToWhitelistBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      addToWhitelist();
+                                    });
+                                  }
+
+                                  // Allow Enter key to add to whitelist
+                                  const whitelistUsernameInput = document.getElementById('whitelistUsernameInput');
+                                  if (whitelistUsernameInput) {
+                                    whitelistUsernameInput.addEventListener('keypress', function(e) {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addToWhitelist();
+                                      }
+                                    });
+                                  }
+
+                                  // Mark All Unavailable button
+                                  const markAllUnavailableBtn = document.getElementById('markAllUnavailableBtn');
+                                  if (markAllUnavailableBtn) {
+                                    markAllUnavailableBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      setAllAvailable(false);
+                                    });
+                                    markAllUnavailableBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      setAllAvailable(false);
+                                    });
+                                  }
+
+                                  // Mark All Available button
+                                  const markAllAvailableBtn = document.getElementById('markAllAvailableBtn');
+                                  if (markAllAvailableBtn) {
+                                    markAllAvailableBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      setAllAvailable(true);
+                                    });
+                                    markAllAvailableBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      setAllAvailable(true);
+                                    });
+                                  }
+
+                                  // Check Status button
+                                  const checkStatusBtn = document.getElementById('checkStatusBtn');
+                                  if (checkStatusBtn) {
+                                    checkStatusBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      checkStatus();
+                                    });
+                                    checkStatusBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      checkStatus();
+                                    });
+                                  }
+                                  
+                                  // Save Bot Mode button
+                                  const saveBotModeBtn = document.getElementById('saveBotModeBtn');
+                                  if (saveBotModeBtn) {
+                                    saveBotModeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      saveBotMode();
+                                    });
+                                    saveBotModeBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      saveBotMode();
+                                    });
+                                  }
+
+                                  // Save Weekday Schedule button
+                                  const saveWeekdayBtn = document.getElementById('saveWeekdayBtn');
+                                  if (saveWeekdayBtn) {
+                                    saveWeekdayBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      updateWeekdaySchedule();
+                                    });
+                                    saveWeekdayBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      updateWeekdaySchedule();
+                                    });
+                                  }
+
+                                  // Save Weekend Schedule button
+                                  const saveWeekendBtn = document.getElementById('saveWeekendBtn');
+                                  if (saveWeekendBtn) {
+                                    saveWeekendBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      updateWeekendSchedule();
+                                    });
+                                    saveWeekendBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      updateWeekendSchedule();
+                                    });
+                                  }
+
+                                  // Add Cash Code button
+                                  const addCashCodeBtn = document.getElementById('addCashCodeBtn');
+                                  if (addCashCodeBtn) {
+                                    addCashCodeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      addCashCode();
+                                    });
+                                    addCashCodeBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      addCashCode();
+                                    });
+                                  }
+
+                                  // Show Codes button
+                                  const showCodesBtn = document.getElementById('showCodesBtn');
+                                  if (showCodesBtn) {
+                                    showCodesBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadCashCodes();
+                                    });
+                                    showCodesBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      loadCashCodes();
+                                    });
+                                  }
+
+                                  // Show Code Usage button
+                                  const showCodeUsageBtn = document.getElementById('showCodeUsageBtn');
+                                  if (showCodeUsageBtn) {
+                                    showCodeUsageBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadCodeUsage();
+                                    });
+                                    showCodeUsageBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      loadCodeUsage();
+                                    });
+                                  }
+
+                                  // Show Who's Online button
+                                  const showOnlineBtn = document.getElementById('showOnlineBtn');
+                                  if (showOnlineBtn) {
+                                    showOnlineBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadActiveUsers();
+                                    });
+                                    showOnlineBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      loadActiveUsers();
+                                    });
+                                  }
+
+                                  // Show Purchase History button
+                                  const showHistoryBtn = document.getElementById('showHistoryBtn');
+                                  if (showHistoryBtn) {
+                                    showHistoryBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      loadLoginHistory();
+                                    });
+                                    showHistoryBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      loadLoginHistory();
+                                    });
+                                  }
+
+                                  // Clear All History button
+                                  const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
+                                  if (clearAllHistoryBtn) {
+                                    clearAllHistoryBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      clearAllPurchaseHistory();
+                                    });
+                                    clearAllHistoryBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      clearAllPurchaseHistory();
+                                    });
+                                  }
+                                });
+
+                                let activeUsersInterval = null;
+
+                                async function loadActiveUsers() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/active-users`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      document.getElementById('activeUsersContent').style.display = 'block';
+                                      document.getElementById('totalActive').textContent = data.totalActive;
+                                      
+                                      const usersList = document.getElementById('activeUsersList');
+                                      usersList.innerHTML = '';
+                                      
+                                      if (data.activeUsers.length === 0) {
+                                        usersList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No users currently browsing</p>';
+                                      } else {
+                                        data.activeUsers.forEach((user) => {
+                                          const userItem = document.createElement('div');
+                                          userItem.style.cssText = 'background: #f8f9fa; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 4px solid #28a745; position: relative;';
+                                          
+                                          const timeText = user.secondsSinceActive < 10 ? 'Active now' : 
+                                                          user.secondsSinceActive < 60 ? `Active ${user.secondsSinceActive}s ago` :
+                                                          `Active ${Math.floor(user.secondsSinceActive / 60)}m ago`;
+                                          
+                                          userItem.innerHTML = `
+                                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                                              <div style="flex: 1; min-width: 200px;">
+                                                <div style="font-weight: 600; color: #333; font-size: 1.1rem;">
+                                                  <span style="display: inline-block; width: 10px; height: 10px; background: #28a745; border-radius: 50%; margin-right: 0.5rem; animation: pulse 2s infinite;"></span>
+                                                  ${user.username}
+                                                  <span style="background: #28a745; color: #fff; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">ONLINE</span>
+                                                </div>
+                                                <div style="color: #666; font-size: 0.9rem; margin-top: 0.3rem; margin-left: 1.5rem;">
+                                                  <strong>School:</strong> ${user.school}
+                                                </div>
+                                              </div>
+                                              <div style="text-align: right; color: #28a745; font-size: 0.9rem; font-weight: 600; white-space: nowrap;">
+                                                ${timeText}
+                                              </div>
+                                            </div>
+                                          `;
+                                          
+                                          usersList.appendChild(userItem);
+                                        });
+                                      }
+                                      
+                                      // Set up auto-refresh every 15 seconds
+                                      if (!activeUsersInterval) {
+                                        activeUsersInterval = setInterval(() => {
+                                          loadActiveUsers();
+                                        }, 15000);
+                                      }
+                                      
+                                      showMessage('Active users loaded! Auto-refreshing every 15 seconds.', 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to load active users', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading active users:', error);
+                                    showMessage('Error loading active users: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function loadLoginHistory() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    // Fetch login history AND banned users list together
+                                    const [historyResponse, bannedResponse] = await Promise.all([
+                                      fetch(`${BACKEND_URL}/admin/login-history`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ password })
+                                      }),
+                                      fetch(`${BACKEND_URL}/admin/get-banned-users`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ password })
+                                      })
+                                    ]);
+
+                                    const data = await historyResponse.json();
+                                    const bannedData = await bannedResponse.json();
+                                    
+                                    // Create set of banned usernames for fast lookup
+                                    const bannedUsernames = new Set(
+                                      (bannedData.bannedUsers || []).map(u => u.username.toLowerCase())
+                                    );
+
+                                    if (data.success) {
+                                      document.getElementById('loginHistoryContent').style.display = 'block';
+                                      document.getElementById('totalLogins').textContent = data.totalLogins;
+                                      
+                                      const historyList = document.getElementById('loginHistoryList');
+                                      historyList.innerHTML = '';
+                                      
+                                      if (data.loginHistory.length === 0) {
+                                        historyList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No login history yet</p>';
+                                      } else {
+                                        data.loginHistory.forEach((login, index) => {
+                                          const loginItem = document.createElement('div');
+                                          loginItem.style.cssText = 'background: #f8f9fa; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 4px solid ' + (login.paymentMethod === 'Card' ? '#6C63FF' : '#28a745');
+                                          
+                                          const date = new Date(login.timestamp);
+                                          const formattedDate = date.toLocaleString('en-GB', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: false
+                                          });
+                                          
+                                          // Check if this user is banned (from the set we fetched)
+                                          const isBanned = bannedUsernames.has(login.username.toLowerCase());
+                                          
+                                          loginItem.innerHTML = `
+                                              <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap;">
+                                                <div style="flex: 1; min-width: 200px;">
+                                                  <div style="font-weight: 600; color: #333; margin-bottom: 0.3rem;">
+                                                    ${login.username}
+                                                    ${login.isNewLogin ? '<span style="background: #ffc107; color: #000; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">NEW</span>' : ''}
+                                                    ${isBanned ? '<span style="background: #d9534f; color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">🚫 BANNED</span>' : ''}
+                                                  </div>
+                                                  <div style="color: #666; font-size: 0.9rem;">
+                                                    <strong>School:</strong> ${login.school}<br>
+                                                    <strong>Product:</strong> ${login.productName} (£${login.productPrice})<br>
+                                                    <strong>Payment:</strong> <span style="color: ${login.paymentMethod === 'Card' ? '#6C63FF' : '#28a745'}; font-weight: 600;">${login.paymentMethod}</span>
+                                                  </div>
+                                                </div>
+                                                <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
+                                                  <div style="color: #999; font-size: 0.85rem; white-space: nowrap;">
+                                                    ${formattedDate}
+                                                  </div>
+                                                  <div style="display: flex; gap: 0.5rem;">
+                                                    ${!isBanned ? `
+                                                      <button class="btn btn-small btn-warning" onclick="banUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
+                                                        🚫 Ban
+                                                      </button>
+                                                    ` : `
+                                                      <button class="btn btn-small btn-success" onclick="unbanUser('${login.username}')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
+                                                        ✅ Unban
+                                                      </button>
+                                                    `}
+                                                    <button class="btn btn-small btn-danger" onclick="removePurchaseHistory(${index})" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
+                                                      🗑️ Remove
+                                                    </button>
+                                                  </div>
+                                              </div>
+                                            </div>
+                                          `;
+                                          
+                                          historyList.appendChild(loginItem);
+                                        });
+                                      }
+                                      
+                                      showMessage('Login history loaded successfully!', 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to load login history', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading login history:', error);
+                                    showMessage('Error loading login history: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== BAN/UNBAN SYSTEM ======
+                                async function checkIfUserBanned(username) {
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/check-ban-status`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ username })
+                                    });
+                                    const data = await response.json();
+                                    return data.banned || false;
+                                  } catch (error) {
+                                    console.error('Error checking ban status:', error);
+                                    return false;
+                                  }
+                                }
+
+                                async function banUser(username) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const reason = prompt(`Ban user "${username}"?\n\nReason (optional):`, 'Spamming / Abuse');
+                                  if (reason === null) return; // Cancelled
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/ban-user`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username, reason })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ User "${username}" has been banned!`, 'success');
+                                      loadLoginHistory(); // Reload to show banned badge
+                                    } else {
+                                      showMessage(data.error || 'Failed to ban user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error banning user:', error);
+                                    showMessage('Error banning user: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function unbanUser(username) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Unban user "${username}"?`)) return;
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/unban-user`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ User "${username}" has been unbanned!`, 'success');
+                                      loadLoginHistory(); // Reload to remove banned badge
+                                    } else {
+                                      showMessage(data.error || 'Failed to unban user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error unbanning user:', error);
+                                    showMessage('Error unbanning user: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== REMOVE PURCHASE HISTORY ======
+                                async function removePurchaseHistory(index) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('Are you sure you want to remove this purchase record?')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/remove-purchase-history`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, index })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage('✅ Purchase record removed successfully!', 'success');
+                                      loadLoginHistory(); // Reload the list
+                                    } else {
+                                      showMessage(data.error || 'Failed to remove purchase record', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error removing purchase record:', error);
+                                    showMessage('Error removing purchase record: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function clearAllPurchaseHistory() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('⚠️ Are you sure you want to CLEAR ALL purchase history? This cannot be undone!')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/clear-all-purchase-history`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ All purchase history cleared! (${data.count} records removed)`, 'success');
+                                      // Hide the history content and reset
+                                      document.getElementById('loginHistoryContent').style.display = 'none';
+                                      document.getElementById('totalLogins').textContent = '0';
+                                      document.getElementById('loginHistoryList').innerHTML = '';
+                                    } else {
+                                      showMessage(data.error || 'Failed to clear purchase history', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error clearing purchase history:', error);
+                                    showMessage('Error clearing purchase history: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== CASH PAYMENT CODES MANAGEMENT ======
+                                async function loadCashCodes() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/get-cash-codes`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      document.getElementById('cashCodesContent').style.display = 'block';
+                                      document.getElementById('totalCodes').textContent = data.totalCodes;
+                                      
+                                      const codesList = document.getElementById('cashCodesList');
+                                      codesList.innerHTML = '';
+                                      
+                                      if (data.codes.length === 0) {
+                                        codesList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No codes created yet. Add a code above to get started.</p>';
+                                      } else {
+                                        data.codes.forEach((code, index) => {
+                                          const codeItem = document.createElement('div');
+                                          codeItem.style.cssText = 'background: #fff; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 4px solid #17a2b8; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;';
+                                          
+                                          codeItem.innerHTML = `
+                                            <div style="font-family: monospace; font-size: 1.2rem; font-weight: 700; color: #0c5460;">
+                                              ${code}
+                                            </div>
+                                            <button class="btn btn-danger btn-small" onclick="removeCashCode('${code}')" style="touch-action: manipulation;">Remove</button>
+                                          `;
+                                          
+                                          codesList.appendChild(codeItem);
+                                        });
+                                      }
+                                    } else {
+                                      showMessage(data.error || 'Failed to load codes', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading cash codes:', error);
+                                    showMessage('Error loading cash codes: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function addCashCode() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const codeInput = document.getElementById('newCashCode');
+                                  const code = codeInput.value.trim();
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  if (!code) {
+                                    showMessage('Please enter a code', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/add-cash-code`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, code })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      showMessage(`Code "${data.codes[data.codes.length - 1]}" added successfully!`, 'success');
+                                      codeInput.value = ''; // Clear input
+                                      loadCashCodes(); // Reload list
+                                    } else {
+                                      showMessage(data.error || 'Failed to add code', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error adding cash code:', error);
+                                    showMessage('Error adding cash code: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function removeCashCode(code) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!confirm(`Remove code "${code}"?`)) {
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/remove-cash-code`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, code })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      showMessage(`Code "${code}" removed successfully!`, 'success');
+                                      loadCashCodes(); // Reload list
+                                    } else {
+                                      showMessage(data.error || 'Failed to remove code', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error removing cash code:', error);
+                                    showMessage('Error removing cash code: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function loadCodeUsage() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/get-code-usage`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      document.getElementById('codeUsageContent').style.display = 'block';
+                                      document.getElementById('totalUses').textContent = data.totalUses;
+                                      
+                                      const usageList = document.getElementById('codeUsageList');
+                                      usageList.innerHTML = '';
+                                      
+                                      if (data.usageHistory.length === 0) {
+                                        usageList.innerHTML = '<p style="text-align: center; color: #999; padding: 2rem;">No codes have been used yet.</p>';
+                                      } else {
+                                        // Sort by most recent first
+                                        const sortedHistory = data.usageHistory.slice().reverse();
+                                        
+                                        sortedHistory.forEach((usage) => {
+                                          const usageItem = document.createElement('div');
+                                          usageItem.style.cssText = 'background: #fff; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 4px solid #28a745;';
+                                          
+                                          const usageDate = new Date(usage.timestamp);
+                                          const formattedDate = usageDate.toLocaleString('en-GB', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          });
+                                          
+                                          usageItem.innerHTML = `
+                                            <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap;">
+                                              <div style="flex: 1; min-width: 200px;">
+                                                <div style="font-family: monospace; font-size: 1.2rem; font-weight: 700; color: #28a745; margin-bottom: 0.5rem;">
+                                                  💵 ${usage.code}
+                                                </div>
+                                                <div style="color: #666; font-size: 0.9rem;">
+                                                  <strong>User:</strong> ${usage.username}<br>
+                                                  <strong>School:</strong> ${usage.school}<br>
+                                                  <strong>Product:</strong> ${usage.productName} (£${usage.productPrice})
+                                                </div>
+                                              </div>
+                                              <div style="text-align: right; color: #999; font-size: 0.85rem; white-space: nowrap;">
+                                                ${formattedDate}
+                                              </div>
+                                            </div>
+                                          `;
+                                          
+                                          usageList.appendChild(usageItem);
+                                        });
+                                      }
+                                    } else {
+                                      showMessage(data.error || 'Failed to load code usage', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading code usage:', error);
+                                    showMessage('Error loading code usage: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // Load and display availability status
+                                async function loadAvailabilityStatus() {
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/get-availability`);
+                                    const data = await response.json();
+                                    
+                                    const statusDiv = document.getElementById('availabilityStatus');
+                                    
+                                    if (data.available) {
+                                      statusDiv.innerHTML = `
+                                        <div style="color: #28a745; font-weight: 600;">
+                                          ✅ Products are currently AVAILABLE
+                                        </div>
+                                        <div style="color: #666; margin-top: 0.5rem; font-size: 0.9rem;">
+                                          ${data.message}
+                                        </div>
+                                      `;
+                                    } else {
+                                      statusDiv.innerHTML = `
+                                        <div style="color: #d9534f; font-weight: 600;">
+                                          ❌ Products are currently NOT AVAILABLE
+                                        </div>
+                                        <div style="color: #666; margin-top: 0.5rem; font-size: 0.9rem;">
+                                          ${data.message}
+                                        </div>
+                                        <div style="color: #ff9800; margin-top: 0.5rem; font-size: 0.9rem; font-weight: 600;">
+                                          📅 Next available: ${data.nextAvailableTime}
+                                        </div>
+                                      `;
+                                    }
+                                    
+                                    // Update form fields with current schedule (only if not being edited)
+                                    if (data.schedule) {
+                                      document.getElementById('weekdayEnabled').checked = data.schedule.weekday.enabled;
+                                      
+                                      // Only update time inputs if they're not currently focused (being edited)
+                                      const weekdayStart = document.getElementById('weekdayStart');
+                                      const weekdayEnd = document.getElementById('weekdayEnd');
+                                      
+                                      if (document.activeElement !== weekdayStart) {
+                                        weekdayStart.value = data.schedule.weekday.startTime;
+                                      }
+                                      if (document.activeElement !== weekdayEnd) {
+                                        weekdayEnd.value = data.schedule.weekday.endTime;
+                                      }
+                                      
+                                      document.getElementById('weekendEnabled').checked = data.schedule.weekend.enabled;
+                                      document.getElementById('weekendAllDay').checked = data.schedule.weekend.allDay;
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading availability status:', error);
+                                    document.getElementById('availabilityStatus').innerHTML = '<span style="color: #d9534f;">Error loading status</span>';
+                                  }
+                                }
+
+                                // Update weekday schedule
+                                async function updateWeekdaySchedule() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  const enabled = document.getElementById('weekdayEnabled').checked;
+                                  const startTime = document.getElementById('weekdayStart').value;
+                                  const endTime = document.getElementById('weekdayEnd').value;
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/update-schedule`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        password,
+                                        scheduleType: 'weekday',
+                                        settings: { enabled, startTime, endTime }
+                                      })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      showMessage('Weekday schedule updated successfully!', 'success');
+                                      loadAvailabilityStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Failed to update schedule', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error updating weekday schedule:', error);
+                                    showMessage('Error updating schedule: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // Update weekend schedule
+                                async function updateWeekendSchedule() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  const enabled = document.getElementById('weekendEnabled').checked;
+                                  const allDay = document.getElementById('weekendAllDay').checked;
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/update-schedule`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        password,
+                                        scheduleType: 'weekend',
+                                        settings: { enabled, allDay }
+                                      })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      showMessage('Weekend schedule updated successfully!', 'success');
+                                      loadAvailabilityStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Failed to update schedule', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error updating weekend schedule:', error);
+                                    showMessage('Error updating schedule: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // Load availability status on page load and refresh every 30 seconds
+                                loadAvailabilityStatus();
+                                setInterval(loadAvailabilityStatus, 30000);
+
+                                // ====== TEST MODE FUNCTIONS ======
+                                function updateTestModeUI(isTestMode) {
+                                  const buttonText = document.getElementById('testModeButtonText');
+                                  const status = document.getElementById('testModeStatus');
+                                  
+                                  if (isTestMode) {
+                                    buttonText.textContent = 'Disable Test Mode';
+                                    status.textContent = 'Status: 🧪 Test Mode Active';
+                                    status.style.background = '#fff';
+                                    status.style.color = '#dc3545';
+                                  } else {
+                                    buttonText.textContent = 'Enable Test Mode';
+                                    status.textContent = 'Status: ✅ Live';
+                                    status.style.background = 'rgba(255,255,255,0.2)';
+                                    status.style.color = '#fff';
+                                  }
+                                }
+
+                                async function toggleTestMode() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+
+                                  // Get current status first
+                                  try {
+                                    const statusResponse = await fetch(`${BACKEND_URL}/admin/counters-status`);
+                                    const statusData = await statusResponse.json();
+                                    const currentTestMode = statusData.testMode || false;
+                                    const newTestMode = !currentTestMode;
+
+                                    // Toggle test mode
+                                    const response = await fetch(`${BACKEND_URL}/admin/toggle-test-mode`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, enabled: newTestMode })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      updateTestModeUI(data.testMode);
+                                      showMessage(data.testMode ? '🧪 Test mode ENABLED - Users see "Come back later"' : '✅ Test mode DISABLED - Website is live!', 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to toggle test mode', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error toggling test mode:', error);
+                                    showMessage('Error toggling test mode: ' + error.message, 'error');
+                                  }
+                                }
+
+                                // ====== WHITELIST MANAGEMENT FUNCTIONS (Part of Test Mode) ======
+                                function updateWhitelistUI(users) {
+                                  const count = document.getElementById('whitelistCount');
+                                  const usersList = document.getElementById('whitelistedUsersList');
+                                  
+                                  // Update users list
+                                  count.textContent = users.length;
+                                  
+                                  if (users.length === 0) {
+                                    usersList.innerHTML = '<p style="font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 0;">No users whitelisted yet</p>';
+                                  } else {
+                                    usersList.innerHTML = users.map(user => `
+                                      <div style="background: rgba(255,255,255,0.2); padding: 0.5rem 0.8rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="color: #fff; font-weight: 600;">${user}</span>
+                                        <button onclick="removeFromWhitelist('${user}')" style="background: #dc3545; color: #fff; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; touch-action: manipulation;">Remove</button>
+                                      </div>
+                                    `).join('');
+                                  }
+                                }
+
+                                async function addToWhitelist() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const username = document.getElementById('whitelistUsernameInput').value.trim();
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!username) {
+                                    showMessage('Please enter a username', 'error');
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/add-to-whitelist`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      updateWhitelistUI(data.whitelistedUsers);
+                                      document.getElementById('whitelistUsernameInput').value = ''; // Clear input
+                                      showMessage(`✅ User "${username}" added to whitelist`, 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to add user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error adding to whitelist:', error);
+                                    showMessage('Error adding to whitelist: ' + error.message, 'error');
+                                  }
+                                }
+
+                                async function removeFromWhitelist(username) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm(`Remove "${username}" from whitelist?`)) {
+                                    return;
+                                  }
+
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/remove-from-whitelist`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, username })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      updateWhitelistUI(data.whitelistedUsers);
+                                      showMessage(`✅ User "${username}" removed from whitelist`, 'success');
+                                    } else {
+                                      showMessage(data.error || 'Failed to remove user', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error removing from whitelist:', error);
+                                    showMessage('Error removing from whitelist: ' + error.message, 'error');
+                                  }
+                                }
+                              </script>
+                            </body>
+                            </html>

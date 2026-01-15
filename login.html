@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - hwplug</title>
+  <meta name="description" content="Login to hwplug - Your Learning Marketplace">
+  
+  <!-- Favicon for all devices -->
+  <link rel="icon" type="image/png" href="plug-logo.png">
+  <link rel="apple-touch-icon" href="plug-logo.png">
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    /* Smooth scrolling for mobile and iPad only */
+    @media (max-width: 1024px) {
+      html {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+      }
+      body {
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+    .login-box {
+      background: #fff;
+      padding: 3rem;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 450px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+    }
+    .logo {
+      font-size: 2.5rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      color: #333;
+      margin: 1rem 0 2rem 0;
+      font-size: 1.5rem;
+    }
+    .form-group {
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #444;
+      font-size: 0.95rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.9rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      box-sizing: border-box;
+      transition: border 0.2s;
+      touch-action: manipulation;
+      min-height: 44px;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #6C63FF;
+    }
+    .password-wrapper {
+      position: relative;
+    }
+    .password-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #6C63FF;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      transition: color 0.2s;
+    }
+    .password-toggle:hover {
+      color: #5548d9;
+    }
+    .school-wrapper {
+      position: relative;
+    }
+    .school-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 2px solid #6C63FF;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 12px rgba(100,100,250,0.2);
+    }
+    .school-dropdown.show {
+      display: block;
+    }
+    .school-option {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      border-bottom: 1px solid #f0f0f0;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(108, 99, 255, 0.1);
+    }
+    .school-option:hover {
+      background: #f8f9ff;
+    }
+    .school-option:last-child {
+      border-bottom: none;
+    }
+    .submit-btn {
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 0.5rem;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(108,99,255,0.25);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .submit-btn:hover {
+      background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+      box-shadow: 0 4px 14px rgba(108,99,255,0.35);
+      transform: translateY(-2px);
+    }
+    .submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .error-message {
+      display: none;
+      background: #f8d7da;
+      color: #721c24;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      .login-box {
+        padding: 2rem 1.5rem;
+      }
+      .logo {
+        font-size: 2rem;
+      }
+      h2 {
+        font-size: 1.3rem;
+        margin: 0.8rem 0 1.5rem 0;
+      }
+      .form-group {
+        margin-bottom: 1.2rem;
+      }
+      .form-group input {
+        padding: 0.75rem;
+        font-size: 0.95rem;
+      }
+      .password-toggle {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.4rem;
+      }
+      .school-option {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="logo"><img src="plug-logo.png" alt="Plug Logo" style="height: 1.2em; vertical-align: middle; margin-right: 0.3em;">hwplug</div>
+    <h2 id="loginTitle">Login to Continue</h2>
+    
+    <div id="errorMessage" class="error-message"></div>
+    
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>What school does your homework need for? *</label>
+        <div class="school-wrapper">
+          <input type="text" id="school" required placeholder="Type to search for your school..." autocomplete="off">
+          <div id="schoolDropdown" class="school-dropdown"></div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>School Email / Username *</label>
+        <input type="text" id="username" required placeholder="Your SCHOOL email (e.g., for Sparx, Educate, etc.)" autocomplete="username">
+        <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
+          ⚠️ Use your <strong>SCHOOL EMAIL</strong>, not your personal email!<br>
+          (The email you use for Sparx / Educate / Seneca / etc.)
+        </small>
+      </div>
+      
+      <div class="form-group">
+        <label>School Password *</label>
+        <div class="password-wrapper">
+          <input type="password" id="password" required placeholder="Your SCHOOL password" autocomplete="current-password" style="padding-right: 100px;">
+          <button type="button" class="password-toggle" onclick="togglePassword()">Show Password</button>
+        </div>
+        <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
+          ⚠️ Use your <strong>SCHOOL PASSWORD</strong>, not your personal one!<br>
+          (The password for your school homework accounts)
+        </small>
+      </div>
+      
+      <div style="text-align: center; margin: 1.5rem 0; padding: 1.5rem; background: #f0f0ff; border-radius: 8px; border-left: 4px solid #6C63FF;">
+        <div style="color: #444; font-size: 1.1rem; margin-bottom: 0.8rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+          <img src="plug-logo.png" alt="Plug Logo" style="width: 28px; height: 28px; vertical-align: middle;">
+          <span>Homework Plug</span>
+        </div>
+        <div style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem; font-weight: 600;">📱 Add the Snapchat for updates on your homework</div>
+        <a href="https://snapchat.com/add/homework5003" target="_blank" rel="noopener noreferrer" style="display: inline-block; color: #6C63FF; font-size: 1.2rem; font-weight: 700; text-decoration: none; padding: 0.5rem 1rem; background: white; border-radius: 8px; transition: all 0.2s; margin-bottom: 1rem; touch-action: manipulation; -webkit-tap-highlight-color: transparent; min-height: 44px;">
+          👻 hwplug
+        </a>
+        
+        <label style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; font-size: 1rem; background: white; padding: 0.8rem; border-radius: 8px; transition: all 0.2s; touch-action: manipulation; -webkit-tap-highlight-color: rgba(108, 99, 255, 0.1); min-height: 48px;">
+          <input type="checkbox" id="snapchatConfirm" required style="width: 22px; height: 22px; cursor: pointer; min-width: 22px; min-height: 22px;">
+          <span style="font-weight: 600; color: #333;">✓ I have added this Snapchat</span>
+        </label>
+        <div style="color: #d9534f; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600;">⚠️ Required to continue</div>
+      </div>
+      
+      <button type="submit" id="submitBtn" class="submit-btn">Continue to Login</button>
+    </form>
+  </div>
+
+  <script>
+    // Auto-detect backend URL (use localhost for local testing, or set your production URL)
+    const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:10000' 
+      : 'https://test2-adsw.onrender.com';
+
+    // Comprehensive list of UK schools (including all Chingford schools)
+    const schools = [
+      // Chingford Schools
+      'Chingford Foundation School', 'Chingford CofE Primary School', 'Chingford Hall Primary School',
+      'Highams Park School', 'Rush Croft Sports College', 'Chingford Mount Primary School',
+      'Larkswood Primary Academy', 'Whitehall Primary School', 'Normandy Primary School',
+      'Handsworth Primary School', 'Yardley Primary School', 'Chingford St Mary\'s CofE Primary School',
+      'Newton\'s Primary School', 'Chingford Green Primary School', 'Ainslie Wood Primary School',
+      'Woodford Green Primary School', 'Oakhill Primary School', 'Coppermill Primary School',
+      'Chingford All Saints CofE Primary School', 'Chingford St John\'s CofE Primary School',
+      'South Chingford Foundation School', 'Chingford Endowed Foundation School',
+      'Heathcote School & Science College',
+      // Rest of UK Schools
+      'Abbey College', 'Abbots Bromley School', 'Abingdon School', 'Academy of St Francis of Assisi',
+      'Adams Grammar School', 'Aldenham School', 'Alleyn\'s School', 'Altrincham Grammar School for Girls',
+      'Ampleforth College', 'Ashford School', 'Bablake School', 'Badminton School', 'Bancroft\'s School',
+      'Barnard Castle School', 'Bedales School', 'Bedford School', 'Berkhamsted School',
+      'Birkdale School', 'Birmingham King Edward VI High School', 'Bishop\'s Stortford College',
+      'Bishop\'s Wordsworth\'s School', 'Blackpool Sixth Form College', 'Blundell\'s School',
+      'Bolton School', 'Bradfield College', 'Bradford Grammar School', 'Brighton College',
+      'Bristol Grammar School', 'Bromsgrove School', 'Bryanston School', 'Canford School',
+      'Cardiff High School', 'Caterham School', 'Charterhouse', 'Cheltenham College',
+      'Cheltenham Ladies\' College', 'Chigwell School', 'Chislehurst and Sidcup Grammar School',
+      'Christ\'s Hospital', 'City of London School', 'City of London School for Girls',
+      'Clifton College', 'Clifton High School', 'Coopers\' Company and Coborn School',
+      'Cranbrook School', 'Cranleigh School', 'Dame Alice Owen\'s School', 'Dauntsey\'s School',
+      'Dartford Grammar School', 'Dartmouth Academy', 'Dean Close School', 'Dulwich College',
+      'Durham School', 'Eastbourne College', 'Eaton Square School', 'Edgbaston High School',
+      'Emanuel School', 'Epsom College', 'Eton College', 'Exeter School', 'Fettes College',
+      'Forest School', 'Framlingham College', 'Francis Holland School', 'Garden House School',
+      'Giggleswick School', 'Godolphin and Latymer School', 'Guildford High School',
+      'Haberdashers\' Aske\'s Boys\' School', 'Haberdashers\' Aske\'s School for Girls',
+      'Hampton School', 'Harrow School', 'Haileybury', 'Harrogate Ladies\' College',
+      'Hereford Cathedral School', 'Highgate School', 'Hills Road Sixth Form College',
+      'Hulme Grammar School', 'Hurstpierpoint College', 'Hymers College', 'Immanuel College',
+      'James Allen\'s Girls\' School', 'Judd School', 'Kelly College', 'Kent College',
+      'King Edward\'s School Birmingham', 'King Edward VI Camp Hill School for Boys',
+      'King Edward VI Camp Hill School for Girls', 'King\'s College School', 'King\'s School Canterbury',
+      'King\'s School Chester', 'King\'s School Ely', 'King\'s School Rochester',
+      'Kingswood School', 'Lady Eleanor Holles School', 'Latymer School', 'Leeds Grammar School',
+      'Leighton Park School', 'Lewes Old Grammar School', 'Loretto School', 'Lord Wandsworth College',
+      'Loughborough Grammar School', 'Magdalen College School', 'Malvern College',
+      'Manchester Grammar School', 'Marlborough College', 'Merchant Taylors\' School',
+      'Mill Hill School', 'Millfield School', 'Monkton Combe School', 'Moreton Hall',
+      'New College School', 'New Hall School', 'Newcastle School for Boys',
+      'Newcastle-under-Lyme School', 'Nottingham High School', 'Oakham School',
+      'Oundle School', 'Pangbourne College', 'Pate\'s Grammar School', 'Pembroke School',
+      'Perse School', 'Peter Symonds College', 'Plymouth College', 'Portsmouth Grammar School',
+      'Purcell School', 'Putney High School', 'Queen Elizabeth\'s Grammar School',
+      'Queen Elizabeth\'s School', 'Queen Mary\'s Grammar School', 'Queen\'s College',
+      'Radley College', 'Ratcliffe College', 'Reed\'s School', 'Reigate Grammar School',
+      'Rendcomb College', 'Ripon Grammar School', 'Roedean School', 'Royal Grammar School Guildford',
+      'Royal Grammar School Newcastle', 'Royal Hospital School', 'Royal Masonic School',
+      'Rugby School', 'Ruthin School', 'Saint Olave\'s Grammar School', 'Salesian College',
+      'Sevenoaks School', 'Shebbear College', 'Sherborne School', 'Sherborne School for Girls',
+      'Shrewsbury School', 'Sir John Deane\'s College', 'Sir Roger Manwood\'s School',
+      'Solihull School', 'St Albans School', 'St Bede\'s College', 'St Catherine\'s School',
+      'St Dunstan\'s College', 'St Edward\'s School', 'St George\'s School', 'St Helen\'s School',
+      'St Joseph\'s College', 'St Margaret\'s School', 'St Mary\'s School Ascot',
+      'St Paul\'s School', 'St Peter\'s School', 'St Swithun\'s School', 'Stockport Grammar School',
+      'Sutton Grammar School', 'Sutton Valence School', 'Tettenhall College',
+      'The King\'s School Grantham', 'The Manchester Grammar School', 'The Perse School',
+      'Tonbridge School', 'Trent College', 'Trinity School', 'Truro School',
+      'Uppingham School', 'Wallington County Grammar School', 'Warwick School',
+      'Watford Grammar School for Boys', 'Watford Grammar School for Girls',
+      'Wellington College', 'Wellington School', 'Westminster School', 'Whitgift School',
+      'Wilmington Grammar School', 'Wilson\'s School', 'Winchester College',
+      'Wolverhampton Grammar School', 'Worth School', 'Wycombe Abbey', 'Wymondham College',
+      'York College', 'Other School'
+    ].sort();
+
+    function togglePassword() {
+      const passwordInput = document.getElementById('password');
+      const toggleBtn = document.querySelector('.password-toggle');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleBtn.textContent = 'Hide Password';
+      } else {
+        passwordInput.type = 'password';
+        toggleBtn.textContent = 'Show Password';
+      }
+    }
+
+    // School autocomplete functionality
+    function setupSchoolAutocomplete() {
+      const schoolInput = document.getElementById('school');
+      const schoolDropdown = document.getElementById('schoolDropdown');
+
+      schoolInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm.length === 0) {
+          schoolDropdown.classList.remove('show');
+          return;
+        }
+
+        const filteredSchools = schools.filter(school => 
+          school.toLowerCase().includes(searchTerm)
+        );
+
+        if (filteredSchools.length > 0) {
+          schoolDropdown.innerHTML = filteredSchools.slice(0, 10).map(school => 
+            `<div class="school-option" onclick="selectSchool('${school.replace(/'/g, "\\'")}')">${school}</div>`
+          ).join('');
+          schoolDropdown.classList.add('show');
+        } else {
+          schoolDropdown.classList.remove('show');
+        }
+      });
+
+      schoolInput.addEventListener('focus', function() {
+        if (this.value.length > 0) {
+          const searchTerm = this.value.toLowerCase().trim();
+          const filteredSchools = schools.filter(school => 
+            school.toLowerCase().includes(searchTerm)
+          );
+          if (filteredSchools.length > 0) {
+            schoolDropdown.innerHTML = filteredSchools.slice(0, 10).map(school => 
+              `<div class="school-option" onclick="selectSchool('${school.replace(/'/g, "\\'")}')">${school}</div>`
+            ).join('');
+            schoolDropdown.classList.add('show');
+          }
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.school-wrapper')) {
+          schoolDropdown.classList.remove('show');
+        }
+      });
+    }
+
+    function selectSchool(school) {
+      document.getElementById('school').value = school;
+      document.getElementById('schoolDropdown').classList.remove('show');
+    }
+
+    // Check for saved login credentials on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('═══════════════════════════════════════════════════');
+      console.log('📄 LOGIN.HTML PAGE LOADED - VERSION 2.0');
+      console.log('═══════════════════════════════════════════════════');
+      console.log('🌐 Current URL:', window.location.href);
+      console.log('📍 Current pathname:', window.location.pathname);
+      console.log('🔍 URL search params:', window.location.search);
+      
+      // CRITICAL: Add a visible alert to confirm this code is running
+      console.log('⚠️ ⚠️ ⚠️ IF YOU SEE THIS, NEW CODE IS LOADED! ⚠️ ⚠️ ⚠️');
+      
+      // Setup school autocomplete
+      setupSchoolAutocomplete();
+      
+      const savedUsername = localStorage.getItem('savedUsername');
+      const savedPassword = localStorage.getItem('savedPassword');
+      
+      console.log('👤 Saved username:', savedUsername ? 'EXISTS (' + savedUsername + ')' : 'NONE');
+      console.log('🔑 Saved password:', savedPassword ? 'EXISTS' : 'NONE');
+      
+      if (savedUsername && savedPassword) {
+        console.log('✅ User has saved credentials');
+        
+        // Get product info from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const productName = urlParams.get('product');
+        const productPrice = urlParams.get('price');
+        const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
+        
+        console.log('📦 Product from URL:', productName);
+        console.log('💰 Price from URL:', productPrice);
+        console.log('🔗 Stripe link from URL:', stripeLink ? 'EXISTS' : 'NONE');
+        
+        // If product info exists, auto-submit immediately (skip login page entirely)
+        if (productName && productPrice && stripeLink) {
+          console.log('⚡ All product info present - auto-submitting to payment');
+          // Just auto-fill quietly and redirect immediately (don't change title/button text)
+          document.getElementById('username').value = savedUsername;
+          document.getElementById('password').value = savedPassword;
+          // Auto-login and redirect directly to payment (instant)
+          handleAutoLogin(savedUsername, savedPassword, productName, productPrice, stripeLink);
+        } else {
+          console.log('ℹ️ Missing product info - showing account switch UI');
+          // No product selected, show "Switch Account" UI for account switching
+          document.getElementById('loginTitle').textContent = 'Switch Account';
+          document.getElementById('submitBtn').textContent = 'Switch Account';
+          // Auto-fill the form
+          document.getElementById('username').value = savedUsername;
+          document.getElementById('password').value = savedPassword;
+        }
+      } else {
+        console.log('ℹ️ No saved credentials - showing normal login form');
+        console.log('═══════════════════════════════════════════════════');
+      }
+    });
+
+    async function handleAutoLogin(username, password, productName, productPrice, stripeLink) {
+      try {
+        // Check if this is an extra slot purchase
+        const urlParams = new URLSearchParams(window.location.search);
+        const isExtraSlot = urlParams.get('isExtraSlot') === 'true';
+        
+        // Clean product name (remove " - Extra Slot" suffix if present)
+        let cleanProductName = productName.replace(' - Extra Slot', '').trim();
+        
+        // First, reserve a slot for the product (prevents race condition)
+        console.log(`🔒 Auto-login: Reserving ${isExtraSlot ? 'EXTRA' : 'regular'} slot for:`, cleanProductName);
+        const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            productName: cleanProductName,
+            isExtraSlot: isExtraSlot,
+            username: username // Pass username for whitelist check in test mode
+          })
+        });
+        
+        const reservationData = await reservationResponse.json();
+        
+        if (!reservationData.success || !reservationData.reserved) {
+          console.error('❌ Slot reservation failed:', reservationData);
+          // If slot reservation fails, let user use the form normally
+          return;
+        }
+        
+        // Slot reserved successfully! Store reservation details
+        console.log(`✅ Auto-login: ${isExtraSlot ? 'Extra' : 'Regular'} slot reserved:`, reservationData.reservationId);
+        
+        // Store login info in sessionStorage for payment page
+        // Retrieve school from localStorage if available
+        const savedSchool = localStorage.getItem('savedSchool') || '';
+        sessionStorage.setItem('school', savedSchool);
+        console.log(`📝 AUTO-LOGIN: Retrieved school from localStorage: "${savedSchool}"`);
+        sessionStorage.setItem('loginUsername', username);
+        sessionStorage.setItem('loginPassword', password);
+        sessionStorage.setItem('productName', productName); // Keep original display name
+        sessionStorage.setItem('productPrice', productPrice);
+        sessionStorage.setItem('stripeLink', stripeLink);
+        sessionStorage.setItem('slotReserved', 'true');
+        sessionStorage.setItem('reservedProduct', cleanProductName); // Use clean name for backend
+        sessionStorage.setItem('reservationId', reservationData.reservationId);
+        sessionStorage.setItem('isExtraSlot', isExtraSlot ? 'true' : 'false');
+        
+        // Redirect to payment selection page
+        window.location.href = 'payment.html';
+      } catch (error) {
+        console.error('Auto-login error:', error);
+        // If auto-login fails, just let them use the form
+      }
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      const submitBtn = document.getElementById('submitBtn');
+      const errorDiv = document.getElementById('errorMessage');
+      const snapchatCheckbox = document.getElementById('snapchatConfirm');
+      
+      // Validate Snapchat confirmation
+      if (!snapchatCheckbox.checked) {
+        errorDiv.textContent = '⚠️ You must add the Snapchat above and check the box before continuing!';
+        errorDiv.style.display = 'block';
+        return;
+      }
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing...';
+      errorDiv.style.display = 'none';
+      
+      const school = document.getElementById('school').value;
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      console.log('📝 LOGIN FORM DATA:', {
+        school,
+        schoolType: typeof school,
+        schoolLength: school ? school.length : 0,
+        username,
+        password: '***'
+      });
+      console.log(`📝 Saving school to localStorage: "${school}"`);
+      
+      // Get product info from URL params
+      const urlParams = new URLSearchParams(window.location.search);
+      const productName = urlParams.get('product');
+      const productPrice = urlParams.get('price');
+      const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
+      
+      // Validate inputs
+      if (!school || !username || !password) {
+        errorDiv.textContent = 'Please fill in all required fields (School, Username, and Password).';
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continue to Login';
+        return;
+      }
+
+      // Store previous username BEFORE saving new one (for new login detection)
+      const previousUsername = localStorage.getItem('savedUsername');
+      if (previousUsername) {
+        sessionStorage.setItem('previousUsername', previousUsername);
+      }
+      
+      // Save login credentials to localStorage for future visits (ALWAYS save, even if no product selected)
+      localStorage.setItem('savedUsername', username);
+      localStorage.setItem('savedPassword', password);
+      localStorage.setItem('savedSchool', school); // Save school info too!
+
+      // Product info is optional - if missing, redirect to homepage to select a product
+      if (!productName || !productPrice || !stripeLink) {
+        // If no product selected, silently redirect to homepage (credentials already saved)
+        window.location.href = 'index.html';
+        return;
+      }
+
+      try {
+        // Check if this is an extra slot purchase
+        const isExtraSlot = urlParams.get('isExtraSlot') === 'true';
+        
+        // Clean product name (remove " - Extra Slot" suffix if present)
+        let cleanProductName = productName.replace(' - Extra Slot', '').trim();
+        
+        // First, reserve a slot for the product (prevents race condition)
+        console.log(`🔒 Reserving ${isExtraSlot ? 'EXTRA' : 'regular'} slot for:`, cleanProductName);
+        const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            productName: cleanProductName,
+            isExtraSlot: isExtraSlot,
+            username: username // Pass username for whitelist check in test mode
+          })
+        });
+        
+        const reservationData = await reservationResponse.json();
+        
+        if (!reservationData.success || !reservationData.reserved) {
+          // Slot reservation failed - slots are full or product unavailable
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Continue to Login';
+          
+          if (reservationData.manuallyDisabled) {
+            errorDiv.textContent = '⚠️ This product is not available right now. Please try again later.';
+          } else if (isExtraSlot) {
+            errorDiv.textContent = '⚠️ Extra slots are finished for today. Please try again tomorrow.';
+          } else {
+            errorDiv.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
+          }
+          errorDiv.style.display = 'block';
+          return;
+        }
+        
+        // Slot reserved successfully! Store reservation details
+        console.log(`✅ ${isExtraSlot ? 'Extra' : 'Regular'} slot reserved:`, reservationData.reservationId);
+        
+        // Store login info in sessionStorage for payment page (email sent after payment)
+        sessionStorage.setItem('school', school);
+        sessionStorage.setItem('loginUsername', username);
+        sessionStorage.setItem('loginPassword', password);
+        sessionStorage.setItem('productName', productName); // Keep original display name
+        sessionStorage.setItem('productPrice', productPrice);
+        sessionStorage.setItem('stripeLink', stripeLink);
+        sessionStorage.setItem('slotReserved', 'true');
+        sessionStorage.setItem('reservedProduct', cleanProductName); // Use clean name for backend
+        sessionStorage.setItem('reservationId', reservationData.reservationId);
+        sessionStorage.setItem('isExtraSlot', isExtraSlot ? 'true' : 'false');
+        
+        console.log('Stored data:', { productName, productPrice, stripeLink, reservationId: reservationData.reservationId });
+        
+        // Redirect to payment selection page
+        window.location.href = 'payment.html';
+      } catch (error) {
+        console.error('Error:', error);
+        errorDiv.textContent = 'Something went wrong. Please try again.';
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continue to Login';
+      }
+    }
+
+    // Send heartbeat to keep user active in admin panel
+    function sendHeartbeat() {
+      const username = localStorage.getItem('savedUsername');
+      const school = sessionStorage.getItem('selectedSchool');
+      if (username) {
+        fetch(`${BACKEND_URL}/user/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            username,
+            school: school || 'Not provided'
+          })
+        }).catch(error => {
+          console.error('Heartbeat error:', error);
+        });
+      }
+    }
+
+    // Send heartbeat every 60 seconds
+    setInterval(sendHeartbeat, 60000);
+    // Send initial heartbeat if user is already logged in
+    if (localStorage.getItem('savedUsername')) {
+      sendHeartbeat();
+    }
+  </script>
+</body>
+</html>

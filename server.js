@@ -11,6 +11,10 @@ const helmet = require('helmet');
 // Fetch support (built-in in Node 18+, fallback for older versions)
 const fetch = globalThis.fetch || require('node-fetch');
 
+// Discord Bot API URL Configuration
+const DISCORD_BOT_API_URL = process.env.DISCORD_BOT_API_URL || 'http://13.60.26.180:3001';
+console.log(`🤖 Discord Bot API configured: ${DISCORD_BOT_API_URL}`);
+
 const app = express();
 
 // Security: Helmet for security headers
@@ -183,12 +187,18 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
         console.log('✅ WEBHOOK: Email sent successfully');
         
         // 🤖 BOT AUTOMATION MODE CHECK
+        console.log(`🎛️ WEBHOOK: Bot automation mode is: ${botAutomationMode}`);
+        console.log(`🎯 WEBHOOK: Is bot product: ${isBotProduct} (${productName})`);
+        
         if (isBotProduct) {
           if (botAutomationMode === 'auto') {
             // AUTO MODE: Trigger bot automatically
             try {
               console.log(`🤖 WEBHOOK: [AUTO MODE] Auto-triggering Discord bot for ${productName}...`);
-              const botResponse = await fetch('http://13.60.26.180:3001/submit-homework', {
+              console.log(`📡 WEBHOOK: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+              console.log(`📝 WEBHOOK: Bot payload:`, { productName, username, school: school || 'Not provided' });
+              
+              const botResponse = await fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -199,7 +209,9 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
                 })
               });
               
+              console.log(`📥 WEBHOOK: Bot API response status: ${botResponse.status}`);
               const botResult = await botResponse.json();
+              console.log(`📥 WEBHOOK: Bot API response:`, botResult);
               
               if (botResult.success) {
                 console.log(`✅ WEBHOOK: Bot successfully triggered for ${productName}!`);
@@ -208,12 +220,16 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
                 console.error(`❌ WEBHOOK: Bot trigger failed: ${botResult.error}`);
               }
             } catch (botError) {
-              console.error(`❌ WEBHOOK: Error calling Discord bot:`, botError.message);
+              console.error(`❌ WEBHOOK: Error calling Discord bot:`, botError);
+              console.error(`   Error message: ${botError.message}`);
+              console.error(`   Error stack:`, botError.stack);
             }
           } else {
             // EMAIL MODE: Wait for admin decision via email buttons
             console.log(`📧 WEBHOOK: [EMAIL MODE] Awaiting admin decision via email buttons for ${productName}`);
           }
+        } else {
+          console.log(`ℹ️ WEBHOOK: Not a bot product, skipping bot automation`);
         }
       }
       
@@ -2261,6 +2277,26 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
     
     // Send email notification for cash payment (non-blocking)
     console.log(`📧 Attempting to send cash payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
+    
+    // Check bot automation mode for Sparx products
+    let orderId = null;
+    const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader');
+    
+    // If email mode and bot product, create order ID for decision buttons
+    if (botAutomationMode === 'email' && isBotProduct) {
+      orderId = `order_cash_${Date.now()}`;
+      pendingOrders[orderId] = {
+        productName: productName,
+        username: username,
+        password: password,
+        school: school || 'Not provided',
+        createdAt: new Date().toISOString(),
+        processed: false,
+        paymentMethod: 'cash'
+      };
+      console.log(`📋 CASH: Order stored as pending (ID: ${orderId}) - email mode active`);
+    }
+    
     sendCashPaymentNotification({
       school: school || 'Not provided',
       username,
@@ -2271,9 +2307,49 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
       currentCount: currentCount,
       maxSlots: maxSlots,
       isExtraSlot: isExtraSlot || false,
-      isNewLogin: isNewLogin
+      isNewLogin: isNewLogin,
+      orderId: orderId // Will be null in auto mode, set in email mode
     }).then(() => {
       console.log('✅ Cash payment email sent successfully');
+      
+      // 🤖 BOT AUTOMATION MODE CHECK (after email is sent)
+      if (isBotProduct) {
+        if (botAutomationMode === 'auto') {
+          // AUTO MODE: Trigger bot automatically
+          console.log(`🤖 CASH: [AUTO MODE] Auto-triggering Discord bot for ${productName}...`);
+          console.log(`📡 CASH: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+          fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productName: productName,
+              username: username,
+              password: password,
+              school: school || 'Not provided'
+            })
+          })
+          .then(res => {
+            console.log(`📥 CASH: Bot API response status: ${res.status}`);
+            return res.json();
+          })
+          .then(botResult => {
+            console.log(`📥 CASH: Bot API response:`, botResult);
+            if (botResult.success) {
+              console.log(`✅ CASH: Bot successfully triggered for ${productName}!`);
+              console.log(`   Remaining bot slots: ${botResult.remainingSlots}/${botResult.maxSlots}`);
+            } else {
+              console.error(`❌ CASH: Bot trigger failed: ${botResult.error}`);
+            }
+          })
+          .catch(botError => {
+            console.error(`❌ CASH: Error calling Discord bot:`, botError);
+            console.error(`   Error message: ${botError.message}`);
+          });
+        } else {
+          // EMAIL MODE: Wait for admin decision via email buttons
+          console.log(`📧 CASH: [EMAIL MODE] Awaiting admin decision via email buttons for ${productName}`);
+        }
+      }
     }).catch(err => {
       console.error('❌ Error sending cash payment notification email:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
@@ -2451,12 +2527,18 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
     });
     
     // 🤖 BOT AUTOMATION MODE CHECK
+    console.log(`🎛️ CARD: Bot automation mode is: ${botAutomationMode}`);
+    console.log(`🎯 CARD: Is bot product: ${isBotProduct} (${productName})`);
+    
     if (isBotProduct) {
       if (botAutomationMode === 'auto') {
         // AUTO MODE: Trigger bot automatically
         try {
           console.log(`🤖 CARD: [AUTO MODE] Auto-triggering Discord bot for ${productName}...`);
-          const botResponse = await fetch('http://13.60.26.180:3001/submit-homework', {
+          console.log(`📡 CARD: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+          console.log(`📝 CARD: Bot payload:`, { productName, username, school: school || 'Not provided' });
+          
+          const botResponse = await fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2467,7 +2549,9 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
             })
           });
           
+          console.log(`📥 CARD: Bot API response status: ${botResponse.status}`);
           const botResult = await botResponse.json();
+          console.log(`📥 CARD: Bot API response:`, botResult);
           
           if (botResult.success) {
             console.log(`✅ CARD: Bot successfully triggered for ${productName}!`);
@@ -2476,12 +2560,16 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
             console.error(`❌ CARD: Bot trigger failed: ${botResult.error}`);
           }
         } catch (botError) {
-          console.error(`❌ CARD: Error calling Discord bot:`, botError.message);
+          console.error(`❌ CARD: Error calling Discord bot:`, botError);
+          console.error(`   Error message: ${botError.message}`);
+          console.error(`   Error stack:`, botError.stack);
         }
       } else {
         // EMAIL MODE: Wait for admin decision via email buttons
         console.log(`📧 CARD: [EMAIL MODE] Awaiting admin decision via email buttons for ${productName}`);
       }
+    } else {
+      console.log(`ℹ️ CARD: Not a bot product, skipping bot automation`);
     }
 
     // Track login history
@@ -2713,7 +2801,7 @@ async function sendLoginNotification(data) {
 
 // Send cash payment notification via email
 async function sendCashPaymentNotification(data) {
-  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false } = data;
+  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false, orderId = null } = data;
   
   if (!resend) {
     console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
@@ -2799,10 +2887,22 @@ async function sendCashPaymentNotification(data) {
                 <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">(${currentCount} / ${maxSlots} used)</p>
               </div>
 
+              ${orderId ? `
+              <!-- Bot Decision Buttons (Email Confirmation Mode) -->
+              <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
+                <p style="margin: 0 0 15px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Choose How to Process:</p>
+                <div style="display: inline-block;">
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-bot?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">🤖 Bot Does It</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
+                </div>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">Click one to choose how to handle this homework</p>
+              </div>
+              ` : ''}
+
               <!-- Action Required -->
               <div style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); padding: 20px; border-radius: 12px; border: 2px solid #d9534f; text-align: center;">
                 <p style="margin: 0; color: #721c24; font-weight: 700; font-size: 16px;">⚠️ ACTION REQUIRED</p>
-                <p style="margin: 10px 0 0 0; color: #721c24; font-size: 14px;">Please arrange cash payment and complete the homework for this customer.</p>
+                <p style="margin: 10px 0 0 0; color: #721c24; font-size: 14px;">${orderId ? 'Click a button above to decide how to process this homework.' : 'Please arrange cash payment and complete the homework for this customer.'}</p>
               </div>
 
               <!-- Footer -->
@@ -2931,31 +3031,19 @@ async function sendLoginDetailsNotification(data) {
               </div>
 
               ${orderId ? `
-              <!-- Decision Buttons -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 30px; border-radius: 12px; border: 3px solid #ffc107; margin-top: 25px; text-align: center;">
-                <h3 style="margin: 0 0 15px 0; color: #856404; font-size: 22px; font-weight: 700;">🤖 Choose How to Process</h3>
-                <p style="margin: 0 0 25px 0; color: #856404; font-size: 15px;">Click one of the buttons below:</p>
-                
-                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                  <!-- Bot Does It Button -->
-                  <a href="${process.env.BACKEND_URL || 'http://localhost:10000'}/trigger-bot-page?orderId=${orderId}&productName=${encodeURIComponent(productName)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&school=${encodeURIComponent(school || 'Not provided')}" 
-                     style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: #ffffff; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 18px; box-shadow: 0 6px 20px rgba(40,167,69,0.4); transition: transform 0.2s;">
-                    🤖 Bot Does It
-                  </a>
-                  
-                  <!-- I'll Do It Button -->
-                  <a href="${process.env.BACKEND_URL || 'http://localhost:10000'}/manual-process-page?orderId=${orderId}&productName=${encodeURIComponent(productName)}&username=${encodeURIComponent(username)}" 
-                     style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #ffffff; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 18px; box-shadow: 0 6px 20px rgba(108,99,255,0.4); transition: transform 0.2s;">
-                    👤 I'll Do It
-                  </a>
+              <!-- Bot Decision Buttons (Email Confirmation Mode) -->
+              <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
+                <p style="margin: 0 0 15px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Choose How to Process:</p>
+                <div style="display: inline-block;">
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-bot?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">🤖 Bot Does It</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                
-                <p style="margin: 20px 0 0 0; color: #856404; font-size: 13px; font-style: italic;">⚠️ Once clicked, the button will be disabled to prevent duplicate processing</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">Click one to choose how to handle this homework</p>
               </div>
               ` : `
-              <!-- No Buttons (For products without bot support) -->
-              <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 20px; border-radius: 12px; border: 2px solid #6C63FF; margin-top: 25px; text-align: center;">
-                <p style="margin: 0; color: #004085; font-weight: 600; font-size: 15px;">Please complete the homework for this customer manually.</p>
+              <!-- No Buttons (Auto Mode) -->
+              <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 20px; border-radius: 12px; border: 2px solid #28a745; margin-top: 25px; text-align: center;">
+                <p style="margin: 0; color: #fff; font-weight: 600; font-size: 15px;">🤖 Bot is automatically processing this homework!</p>
               </div>
               `}
 
@@ -3036,6 +3124,313 @@ app.post('/admin/set-bot-mode', (req, res) => {
   });
 });
 
+// Email Button Endpoint: Bot Does It (clicked from email)
+app.get('/process-order-bot', async (req, res) => {
+  const { orderId } = req.query;
+  
+  console.log(`📧 EMAIL BUTTON: Bot Does It clicked - Order ID: ${orderId}`);
+  
+  if (!orderId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Error</h1>
+          <p>Missing order ID</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if order exists
+  if (!pendingOrders[orderId]) {
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Order Not Found - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Order Not Found</h1>
+          <p>This order has already been processed or doesn't exist.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if already processed
+  if (pendingOrders[orderId].processed) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Already Processed - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #ffc107; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Already Processed</h1>
+          <p>This order has already been handled.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  const order = pendingOrders[orderId];
+  
+  // Mark as processed
+  pendingOrders[orderId].processed = true;
+  pendingOrders[orderId].processedAt = new Date().toISOString();
+  pendingOrders[orderId].processedBy = 'bot';
+  
+  console.log(`🤖 EMAIL BUTTON: Triggering bot for order: ${orderId}`);
+  console.log(`   Product: ${order.productName}`);
+  console.log(`   Username: ${order.username}`);
+  
+  // Trigger the bot
+  try {
+    console.log(`📡 EMAIL BUTTON: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+    const botResponse = await fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productName: order.productName,
+        username: order.username,
+        password: order.password,
+        school: order.school
+      })
+    });
+    
+    console.log(`📥 EMAIL BUTTON: Bot API response status: ${botResponse.status}`);
+    const botResult = await botResponse.json();
+    console.log(`📥 EMAIL BUTTON: Bot API response:`, botResult);
+    
+    if (botResult.success) {
+      console.log(`✅ EMAIL BUTTON: Bot successfully triggered!`);
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Bot Started - hwplug</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+            .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            h1 { color: #28a745; }
+            .info { background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✅ Bot Started!</h1>
+            <div style="font-size: 64px; margin: 20px 0;">🤖</div>
+            <p><strong>The bot is now doing the homework!</strong></p>
+            <div class="info">
+              <p><strong>Product:</strong> ${order.productName}</p>
+              <p><strong>Username:</strong> ${order.username}</p>
+              <p><strong>School:</strong> ${order.school}</p>
+            </div>
+            <p style="color: #666; font-size: 14px;">Bot slots remaining: ${botResult.remainingSlots}/${botResult.maxSlots}</p>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">You can close this page now.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      console.error(`❌ EMAIL BUTTON: Bot trigger failed: ${botResult.error}`);
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Bot Error - hwplug</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+            .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            h1 { color: #d9534f; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>❌ Bot Error</h1>
+            <p>${botResult.error || 'Failed to trigger bot'}</p>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">Please do this homework manually.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  } catch (botError) {
+    console.error(`❌ EMAIL BUTTON: Error calling bot:`, botError);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Connection Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Connection Error</h1>
+          <p>Could not connect to the bot server.</p>
+          <p style="color: #666; font-size: 14px;">${botError.message}</p>
+          <p style="color: #666; font-size: 14px; margin-top: 20px;">Please do this homework manually.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
+
+// Email Button Endpoint: I'll Do It (clicked from email)
+app.get('/process-order-manual', (req, res) => {
+  const { orderId } = req.query;
+  
+  console.log(`👤 EMAIL BUTTON: I'll Do It clicked - Order ID: ${orderId}`);
+  
+  if (!orderId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Error</h1>
+          <p>Missing order ID</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if order exists
+  if (!pendingOrders[orderId]) {
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Order Not Found - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Order Not Found</h1>
+          <p>This order has already been processed or doesn't exist.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if already processed
+  if (pendingOrders[orderId].processed) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Already Processed - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #ffc107; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Already Processed</h1>
+          <p>This order has already been handled.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  const order = pendingOrders[orderId];
+  
+  // Mark as processed manually
+  pendingOrders[orderId].processed = true;
+  pendingOrders[orderId].processedAt = new Date().toISOString();
+  pendingOrders[orderId].processedBy = 'manual';
+  
+  console.log(`👤 EMAIL BUTTON: Order marked as manual: ${orderId}`);
+  console.log(`   Product: ${order.productName}`);
+  console.log(`   Username: ${order.username}`);
+  
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Manual Processing - hwplug</title>
+      <style>
+        body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+        .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: #6C63FF; }
+        .info { background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>✅ Marked as Manual</h1>
+        <div style="font-size: 64px; margin: 20px 0;">👤</div>
+        <p><strong>You'll do this homework manually.</strong></p>
+        <div class="info">
+          <p><strong>Product:</strong> ${order.productName}</p>
+          <p><strong>Username:</strong> ${order.username}</p>
+          <p><strong>Password:</strong> ${order.password}</p>
+          <p><strong>School:</strong> ${order.school}</p>
+        </div>
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">You can close this page now.</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // Endpoint: Trigger bot to do homework (clicked from email)
 app.post('/trigger-bot', async (req, res) => {
   const { orderId, productName, username, password, school } = req.body;
@@ -3058,7 +3453,8 @@ app.post('/trigger-bot', async (req, res) => {
   
   // Submit to Discord bot
   try {
-    const botResponse = await fetch('http://13.60.26.180:3001/submit-homework', {
+    console.log(`📡 TRIGGER: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+    const botResponse = await fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3272,5 +3668,15 @@ app.get('/manual-process-page', async (req, res) => {
 // Port binding for Render
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🚀 SERVER STARTED SUCCESSFULLY`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`📡 Port: ${PORT}`);
+  console.log(`🌐 Backend URL: ${process.env.BACKEND_URL || 'Not set'}`);
+  console.log(`📧 Email configured: ${process.env.YOUR_EMAIL ? 'Yes ✅' : 'No ❌'}`);
+  console.log(`💳 Stripe configured: ${process.env.STRIPE_SECRET_KEY ? 'Yes ✅' : 'No ❌'}`);
+  console.log(`🤖 Discord Bot API: ${DISCORD_BOT_API_URL}`);
+  console.log(`🎛️ Bot Automation Mode: ${botAutomationMode.toUpperCase()}`);
+  console.log(`   └─ ${botAutomationMode === 'auto' ? '🤖 Auto-trigger bot on purchase' : '📧 Email confirmation required'}`);
+  console.log(`${'='.repeat(60)}\n`);
 });

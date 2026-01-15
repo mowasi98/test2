@@ -297,6 +297,42 @@
                                     </div>
                                   </div>
                                   
+                                  <!-- Bot Automation Mode Section -->
+                                  <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 2px solid #28a745;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #fff;">🤖 Bot Automation Mode</h4>
+                                    <p style="font-size: 0.85rem; color: #fff; margin-bottom: 1rem;">Choose how homework is processed for Sparx Maths & Sparx Reader:</p>
+                                    
+                                    <div style="background: rgba(255,255,255,0.15); padding: 1.2rem; border-radius: 6px; margin-bottom: 1rem;">
+                                      <div style="margin-bottom: 1rem;">
+                                        <label style="display: flex; align-items: center; gap: 0.8rem; cursor: pointer; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 6px; margin-bottom: 0.8rem;">
+                                          <input type="radio" name="botMode" value="auto" id="botModeAuto" checked style="width: 24px; height: 24px; cursor: pointer;">
+                                          <div>
+                                            <div style="color: #fff; font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">🤖 Auto-Bot Mode (Default)</div>
+                                            <div style="color: rgba(255,255,255,0.9); font-size: 0.85rem;">Bot automatically does homework immediately after purchase</div>
+                                          </div>
+                                        </label>
+                                        
+                                        <label style="display: flex; align-items: center; gap: 0.8rem; cursor: pointer; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 6px;">
+                                          <input type="radio" name="botMode" value="email" id="botModeEmail" style="width: 24px; height: 24px; cursor: pointer;">
+                                          <div>
+                                            <div style="color: #fff; font-weight: 700; font-size: 1.1rem; margin-bottom: 0.3rem;">📧 Email Confirmation Mode</div>
+                                            <div style="color: rgba(255,255,255,0.9); font-size: 0.85rem;">Send email with buttons - you decide: Bot or Manual</div>
+                                          </div>
+                                        </label>
+                                      </div>
+                                      
+                                      <button class="btn" id="saveBotModeBtn" style="background: #fff; color: #28a745; font-weight: 700; touch-action: manipulation;">
+                                        💾 Save Bot Mode Setting
+                                      </button>
+                                    </div>
+                                    
+                                    <div id="botModeStatus" style="background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 6px; text-align: center;">
+                                      <p style="color: #fff; font-weight: 600; margin: 0; font-size: 0.95rem;">
+                                        Current Mode: <span id="currentBotMode" style="font-weight: 700; font-size: 1.1rem;">Auto-Bot Mode</span>
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
                                   <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
                                     <h4 style="margin: 0 0 0.5rem 0; color: #856404;">🧪 Test Timer (For Testing Auto-Reset)</h4>
                                     <p style="font-size: 0.85rem; color: #856404; margin-bottom: 0.8rem;">Set a short timer to test the automatic slot reset feature:</p>
@@ -950,8 +986,64 @@
                                   await setExtraSlotMax(productName, newValue);
                                 }
 
+                                // Load current bot mode
+                                async function loadBotMode() {
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/bot-mode`);
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      // Update radio buttons
+                                      document.getElementById('botModeAuto').checked = (data.mode === 'auto');
+                                      document.getElementById('botModeEmail').checked = (data.mode === 'email');
+                                      
+                                      // Update status text
+                                      const statusText = data.mode === 'auto' ? '🤖 Auto-Bot Mode' : '📧 Email Confirmation Mode';
+                                      document.getElementById('currentBotMode').textContent = statusText;
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading bot mode:', error);
+                                  }
+                                }
+                                
+                                // Save bot mode setting
+                                async function saveBotMode() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password', 'error');
+                                    return;
+                                  }
+                                  
+                                  const selectedMode = document.querySelector('input[name="botMode"]:checked').value;
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-bot-mode`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ password, mode: selectedMode })
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${data.message}`, 'success');
+                                      
+                                      // Update status text
+                                      const statusText = data.newMode === 'auto' ? '🤖 Auto-Bot Mode' : '📧 Email Confirmation Mode';
+                                      document.getElementById('currentBotMode').textContent = statusText;
+                                    } else {
+                                      showMessage(`❌ ${data.error || 'Failed to save bot mode'}`, 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('❌ Error saving bot mode: ' + error.message, 'error');
+                                  }
+                                }
+
                                 // Add mobile-friendly event listeners when page loads
                                 document.addEventListener('DOMContentLoaded', function() {
+                                  // Load bot mode on page load
+                                  loadBotMode();
                                   // Reset All Counters button
                                   const resetAllBtn = document.getElementById('resetAllBtn');
                                   if (resetAllBtn) {
@@ -1065,6 +1157,19 @@
                                     checkStatusBtn.addEventListener('touchstart', function(e) {
                                       e.preventDefault();
                                       checkStatus();
+                                    });
+                                  }
+                                  
+                                  // Save Bot Mode button
+                                  const saveBotModeBtn = document.getElementById('saveBotModeBtn');
+                                  if (saveBotModeBtn) {
+                                    saveBotModeBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      saveBotMode();
+                                    });
+                                    saveBotModeBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      saveBotMode();
                                     });
                                   }
 

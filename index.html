@@ -377,6 +377,11 @@
       font-size: 0.85rem;
       margin-top: 0.3rem;
       font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    .slots-remaining.updating {
+      opacity: 0.6;
+      transform: scale(0.98);
     }
     footer {
       text-align: center;
@@ -1476,8 +1481,23 @@
       }
     });
 
+    // Prevent duplicate availability checks
+    let isCheckingAvailability = false;
+    let lastCheckTime = 0;
+    const CHECK_DEBOUNCE_MS = 500; // Minimum time between checks
+    
     // Check availability for all products on page load
     async function checkAvailability() {
+      // Prevent overlapping checks
+      const now = Date.now();
+      if (isCheckingAvailability || (now - lastCheckTime) < CHECK_DEBOUNCE_MS) {
+        console.log('⏭️ Skipping availability check (already in progress or too soon)');
+        return;
+      }
+      
+      isCheckingAvailability = true;
+      lastCheckTime = now;
+      
       let allProductsFull = true;
       let anyProductAvailable = false;
       
@@ -1532,12 +1552,23 @@
               // Regular product is available
               buyBtn.classList.remove('disabled');
               buyBtn.style.pointerEvents = 'auto';
+              
+              // Add smooth transition when updating slot numbers
+              const oldContent = slotsDiv.innerHTML;
+              let newContent = '';
+              
               // Highlight if only 1 slot remaining
               if (data.remaining === 1) {
-                slotsDiv.innerHTML = `<div class="slots-remaining" style="color: #ff6b6b; font-weight: 700; animation: pulse 2s infinite;">⚠️ Only 1 slot remaining today!</div>`;
+                newContent = `<div class="slots-remaining" style="color: #ff6b6b; font-weight: 700; animation: pulse 2s infinite;">⚠️ Only 1 slot remaining today!</div>`;
               } else {
-                slotsDiv.innerHTML = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
+                newContent = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
               }
+              
+              // Only update if content actually changed (prevents flickering)
+              if (oldContent.trim() !== newContent.trim()) {
+                slotsDiv.innerHTML = newContent;
+              }
+              
               if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else {
               // Regular slots finished - check for extra slots (Sparx Reader only)
@@ -1581,6 +1612,10 @@
           console.error('Backend URL:', BACKEND_URL);
           console.error('Full error:', error);
           console.error('Try checking if backend is running at:', BACKEND_URL);
+          
+          // Reset flag if error occurred early
+          isCheckingAvailability = false;
+          return; // Exit function to prevent further errors
         }
       }
       
@@ -1614,14 +1649,18 @@
         // If NOT available (time-wise), the checkAvailabilityStatus() function already handles the banner
       } catch (error) {
         console.error('Error checking if slots full:', error);
+      } finally {
+        // Always reset flag even if there was an error
+        isCheckingAvailability = false;
       }
     }
 
     // Check availability when page loads
     window.addEventListener('DOMContentLoaded', checkAvailability);
     
-    // Auto-refresh slot availability every 5 seconds (no page reload needed)
-    setInterval(checkAvailability, 5000);
+    // Auto-refresh slot availability every 3 seconds (no page reload needed)
+    // Reduced from 5 seconds for faster updates, but with debouncing to prevent overlap
+    setInterval(checkAvailability, 3000);
 
     // Periodic test mode check (every 10 seconds) - catches when admin enables test mode
     async function periodicTestModeCheck() {
@@ -1667,7 +1706,7 @@
     // Intercept buy button clicks to check availability before redirecting
     document.querySelectorAll('.buy-btn').forEach(btn => {
       btn.addEventListener('click', async function(e) {
-        e.preventDefault(); // Always prevent default to handle navigation ourselves
+        e.preventDefault(); // Prevent default to handle navigation ourselves
         
         console.log('🖱️ Buy button clicked:', this.getAttribute('data-product'));
         
@@ -1675,11 +1714,35 @@
         const btnElement = this;
         const originalHref = btnElement.getAttribute('href');
         
+        console.log('📍 Original href:', originalHref);
+        
+        // Safety check: ensure we have a valid href
+        if (!originalHref || originalHref === '' || originalHref === '#') {
+          console.error('❌ Invalid href, cannot navigate');
+          return false;
+        }
+        
         // Check if product is disabled (from availability check)
         if (btnElement.classList.contains('disabled')) {
           console.log('❌ Product is disabled, preventing navigation');
           return false;
         }
+        
+        // ⚡ IMPORTANT: Check if user is logged in FIRST (synchronously)
+        // This prevents navigation issues caused by async operations
+        const savedUsername = localStorage.getItem('savedUsername');
+        const savedPassword = localStorage.getItem('savedPassword');
+        
+        if (!savedUsername || !savedPassword) {
+          // User NOT logged in - navigate to login page immediately (synchronously)
+          console.log('ℹ️ User not logged in, redirecting to login page immediately');
+          console.log('📍 Navigating to:', originalHref);
+          window.location.href = originalHref;
+          return; // Exit early
+        }
+        
+        // User IS logged in - proceed with async availability checks
+        console.log('✅ User is logged in, checking availability...');
         
         // Check if test mode is blocking purchases
         const purchaseAllowed = await checkPurchaseAllowed();
@@ -1688,7 +1751,7 @@
           return false;
         }
         
-        // Check availability first
+        // Check availability
         try {
           console.log('🔍 Checking availability for:', product);
           const response = await fetch(`${BACKEND_URL}/check-product-availability?product=${encodeURIComponent(product)}`);
@@ -1709,84 +1772,83 @@
             return false;
           }
           
-          // Check if user is already logged in
-          const savedUsername = localStorage.getItem('savedUsername');
-          const savedPassword = localStorage.getItem('savedPassword');
+          // User is logged in - get saved credentials
           const savedSchool = localStorage.getItem('savedSchool') || '';
           
-          if (savedUsername && savedPassword) {
-            // User is already logged in - skip login page and go directly to payment
-            console.log('✅ User already logged in, skipping login page');
+          // User is already logged in - skip login page and go directly to payment
+          console.log('✅ User logged in, preparing for direct payment');
+          
+          // Extract product info from URL
+          const urlParams = new URLSearchParams(originalHref.split('?')[1] || '');
+          const productName = urlParams.get('product') || product;
+          const productPrice = urlParams.get('price') || '';
+          const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
+          
+          // Reserve slot first
+          try {
+            console.log('🔒 Reserving slot for:', productName);
+            const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                productName: productName,
+                username: savedUsername // Pass username for whitelist check in test mode
+              })
+            });
             
-            // Extract product info from URL
-            const urlParams = new URLSearchParams(originalHref.split('?')[1] || '');
-            const productName = urlParams.get('product') || product;
-            const productPrice = urlParams.get('price') || '';
-            const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
+            const reservationData = await reservationResponse.json();
             
-            // Reserve slot first
-            try {
-              console.log('🔒 Reserving slot for:', productName);
-              const reservationResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                  productName: productName,
-                  username: savedUsername // Pass username for whitelist check in test mode
-                })
-              });
-              
-              const reservationData = await reservationResponse.json();
-              
-              if (!reservationData.success || !reservationData.reserved) {
-                const errorMsg = document.getElementById('errorMessage');
-                if (reservationData.timeRestricted) {
-                  errorMsg.textContent = `⏰ ${reservationData.error || 'Products are not available at this time'}. ${reservationData.nextAvailableTime ? 'Come back at ' + reservationData.nextAvailableTime + '.' : ''}`;
-                } else if (reservationData.manuallyDisabled) {
-                  errorMsg.textContent = '⚠️ This product is not available right now. Please try again later.';
-                } else {
-                  errorMsg.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
-                }
-                errorMsg.style.display = 'block';
-                setTimeout(() => { errorMsg.style.display = 'none'; }, 8000);
-                return false;
-              }
-              
-              // Slot reserved! Store everything and go to payment
-              sessionStorage.setItem('school', savedSchool);
-              sessionStorage.setItem('loginUsername', savedUsername);
-              sessionStorage.setItem('loginPassword', savedPassword);
-              sessionStorage.setItem('productName', productName);
-              sessionStorage.setItem('productPrice', productPrice);
-              sessionStorage.setItem('stripeLink', stripeLink);
-              sessionStorage.setItem('slotReserved', 'true');
-              sessionStorage.setItem('reservedProduct', productName);
-              sessionStorage.setItem('reservationId', reservationData.reservationId);
-              
-              // Store previous username for new login detection
-              sessionStorage.setItem('previousUsername', savedUsername);
-              
-              console.log('✅ Redirecting directly to payment page');
-              window.location.href = 'payment.html';
-            } catch (error) {
-              console.error('❌ Error reserving slot:', error);
+            if (!reservationData.success || !reservationData.reserved) {
               const errorMsg = document.getElementById('errorMessage');
-              errorMsg.textContent = '⚠️ Error reserving slot. Please try again.';
+              if (reservationData.timeRestricted) {
+                errorMsg.textContent = `⏰ ${reservationData.error || 'Products are not available at this time'}. ${reservationData.nextAvailableTime ? 'Come back at ' + reservationData.nextAvailableTime + '.' : ''}`;
+              } else if (reservationData.manuallyDisabled) {
+                errorMsg.textContent = '⚠️ This product is not available right now. Please try again later.';
+              } else {
+                errorMsg.textContent = '⚠️ Slots are finished for today for this product. Please try again tomorrow.';
+              }
               errorMsg.style.display = 'block';
-              setTimeout(() => { errorMsg.style.display = 'none'; }, 5000);
+              setTimeout(() => { errorMsg.style.display = 'none'; }, 8000);
               return false;
             }
-          } else {
-            // User not logged in - go to login page as usual
-            console.log('ℹ️ User not logged in, going to login page');
-            window.location.href = originalHref;
+            
+            // Slot reserved! Store everything and go to payment
+            sessionStorage.setItem('school', savedSchool);
+            sessionStorage.setItem('loginUsername', savedUsername);
+            sessionStorage.setItem('loginPassword', savedPassword);
+            sessionStorage.setItem('productName', productName);
+            sessionStorage.setItem('productPrice', productPrice);
+            sessionStorage.setItem('stripeLink', stripeLink);
+            sessionStorage.setItem('slotReserved', 'true');
+            sessionStorage.setItem('reservedProduct', productName);
+            sessionStorage.setItem('reservationId', reservationData.reservationId);
+            
+            // Store previous username for new login detection
+            sessionStorage.setItem('previousUsername', savedUsername);
+            
+            // Immediately update availability display before redirecting
+            await checkAvailability();
+            
+            console.log('✅ Redirecting directly to payment page');
+            window.location.href = 'payment.html';
+          } catch (error) {
+            console.error('❌ Error reserving slot:', error);
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = '⚠️ Error reserving slot. Please try again.';
+            errorMsg.style.display = 'block';
+            setTimeout(() => { errorMsg.style.display = 'none'; }, 5000);
+            return false;
           }
         } catch (error) {
           console.error('❌ Error checking availability:', error);
-          // On error, go to login page anyway (fail open)
-          window.location.href = originalHref;
+          // For logged-in users, show error message
+          const errorMsg = document.getElementById('errorMessage');
+          errorMsg.textContent = '⚠️ Error connecting to server. Please try again.';
+          errorMsg.style.display = 'block';
+          setTimeout(() => { errorMsg.style.display = 'none'; }, 5000);
+          return false;
         }
       });
     });

@@ -1252,13 +1252,6 @@
     window.addEventListener('DOMContentLoaded', async function() {
       console.log('✅ Homepage loaded - index.html');
       
-      // Make absolutely sure we're staying on the homepage - no redirects
-      if (window.location.pathname.includes('login.html')) {
-        console.warn('⚠️ Somehow ended up on login.html - redirecting back to homepage');
-        window.location.href = 'index.html';
-        return;
-      }
-      
       // Check test mode FIRST
       const testModeActive = await checkTestMode();
       if (testModeActive) {

@@ -1525,20 +1525,16 @@
               // Store is closed (outside operating hours)
               buyBtn.classList.add('disabled');
               buyBtn.style.pointerEvents = 'none';
-              buyBtn.onclick = function(e) {
-                e.preventDefault();
-                return false;
-              };
+              // DON'T set onclick - it overwrites addEventListener!
+              // The click handler checks for 'disabled' class
               slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product not available right now</div>';
               if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else if (data.manuallyDisabled) {
               // Product manually disabled
               buyBtn.classList.add('disabled');
               buyBtn.style.pointerEvents = 'none';
-              buyBtn.onclick = function(e) {
-                e.preventDefault();
-                return false;
-              };
+              // DON'T set onclick - it overwrites addEventListener!
+              // The click handler checks for 'disabled' class
               slotsDiv.innerHTML = '<div class="slots-message">⚠️ Product unavailable. Come back later</div>';
               if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else if (data.available) {
@@ -1580,10 +1576,8 @@
                 console.log(`❌ No extra slots available. Product: ${product}, extraSlots:`, data.extraSlots);
                 buyBtn.classList.add('disabled');
                 buyBtn.style.pointerEvents = 'none';
-                buyBtn.onclick = function(e) {
-                  e.preventDefault();
-                  return false;
-                };
+                // DON'T set onclick - it overwrites addEventListener!
+                // The click handler checks for 'disabled' class
                 slotsDiv.innerHTML = '<div class="slots-message">⚠️ Slots are finished for today</div>';
                 if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
               }

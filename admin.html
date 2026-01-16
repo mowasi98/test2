@@ -869,8 +869,8 @@
                                     return;
                                   }
                                   
-                                  if (count > 3) {
-                                    showMessage('Slot count cannot exceed 3. Please use a value between 0 and 3.', 'error');
+                                  if (count > 20) {
+                                    showMessage('Slot count cannot exceed 20. Please use a value between 0 and 20.', 'error');
                                     return;
                                   }
                                   
@@ -905,13 +905,13 @@
                                   const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
                                   const input = document.getElementById(`slot-${safeProductId}`);
                                   const currentValue = parseInt(input.value) || 0;
-                                  const newValue = Math.max(0, Math.min(3, currentValue + delta));
+                                  const newValue = Math.max(0, Math.min(20, currentValue + delta));
                                   
                                   if (newValue === currentValue) {
                                     if (newValue === 0 && delta < 0) {
                                       showMessage('Slot count is already at minimum (0)', 'error');
-                                    } else if (newValue === 3 && delta > 0) {
-                                      showMessage('Slot count is already at maximum (3)', 'error');
+                                    } else if (newValue === 20 && delta > 0) {
+                                      showMessage('Slot count is already at maximum (20)', 'error');
                                     }
                                     return;
                                   }

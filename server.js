@@ -131,8 +131,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
         // Confirm the reservation
         if (reservationId && activeReservations[reservationId]) {
           if (activeReservations[reservationId].productName === productName) {
-            delete activeReservations[reservationId];
             const slotType = activeReservations[reservationId].isExtraSlot ? 'EXTRA SLOT' : 'regular slot';
+            delete activeReservations[reservationId];
             console.log(`✅ WEBHOOK: Reservation CONFIRMED (${slotType}) for "${productName}" - ID: ${reservationId}`);
           } else {
             console.warn(`⚠️ WEBHOOK: Reservation ID mismatch, confirming all for ${productName}`);
@@ -373,7 +373,7 @@ let testMode = false;
 let whitelistMode = false;
 let whitelistedUsers = []; // Array of approved usernames
 
-const MAX_PURCHASES_PER_DAY = 3; // Default starting slots per product per day
+const MAX_PURCHASES_PER_DAY = 15; // Default starting slots per product per day
 const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
 const EXTRA_SLOT_PRICE = 3; // £3 total for extra slots (when regular slots are full)
 const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots for Sparx Reader
@@ -1029,7 +1029,7 @@ app.post('/increment-product-count', (req, res) => {
 });
 
 // Admin endpoint to reset all counters
-app.post('/admin/reset-counters', (req, res) => {
+app.post('/admin/reset-counters', async (req, res) => {
   const { password } = req.body;
   // Simple password protection (you can change this password)
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
@@ -1060,16 +1060,39 @@ app.post('/admin/reset-counters', (req, res) => {
   // Save to disk
   saveData();
   
+  // 🤖 ALSO RESET THE BOT'S DAILY COUNTER
+  let botResetStatus = null;
+  try {
+    console.log(`🤖 ADMIN: Also resetting bot's daily counter at ${DISCORD_BOT_API_URL}...`);
+    const botResetResponse = await fetch(`${DISCORD_BOT_API_URL}/admin/reset-counter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: ADMIN_PASSWORD })
+    });
+    
+    if (botResetResponse.ok) {
+      botResetStatus = await botResetResponse.json();
+      console.log(`✅ ADMIN: Bot counter also reset successfully! Old: ${botResetStatus.oldCount}, New: ${botResetStatus.newCount}`);
+    } else {
+      console.error(`❌ ADMIN: Bot counter reset failed with status ${botResetResponse.status}`);
+      botResetStatus = { error: `Bot API returned status ${botResetResponse.status}` };
+    }
+  } catch (botError) {
+    console.error(`❌ ADMIN: Error resetting bot counter:`, botError.message);
+    botResetStatus = { error: botError.message };
+  }
+  
   res.json({
     success: true,
     message: 'All counters reset successfully',
     counters: dailyLimits,
-    clearedReservations: clearedReservations
+    clearedReservations: clearedReservations,
+    botReset: botResetStatus
   });
 });
 
 // Admin endpoint to reset individual product counter
-app.post('/admin/reset-product-counter', (req, res) => {
+app.post('/admin/reset-product-counter', async (req, res) => {
   const { password, productName } = req.body;
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
   
@@ -1104,10 +1127,37 @@ app.post('/admin/reset-product-counter', (req, res) => {
   // Save to disk
   saveData();
   
+  // 🤖 ALSO RESET THE BOT'S DAILY COUNTER (for bot-enabled products)
+  const botProducts = ['Sparx Maths', 'Sparx Reader'];
+  let botResetStatus = null;
+  
+  if (botProducts.includes(productName)) {
+    try {
+      console.log(`🤖 ADMIN: Also resetting bot's daily counter at ${DISCORD_BOT_API_URL}...`);
+      const botResetResponse = await fetch(`${DISCORD_BOT_API_URL}/admin/reset-counter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: ADMIN_PASSWORD })
+      });
+      
+      if (botResetResponse.ok) {
+        botResetStatus = await botResetResponse.json();
+        console.log(`✅ ADMIN: Bot counter also reset successfully! Old: ${botResetStatus.oldCount}, New: ${botResetStatus.newCount}`);
+      } else {
+        console.error(`❌ ADMIN: Bot counter reset failed with status ${botResetResponse.status}`);
+        botResetStatus = { error: `Bot API returned status ${botResetResponse.status}` };
+      }
+    } catch (botError) {
+      console.error(`❌ ADMIN: Error resetting bot counter:`, botError.message);
+      botResetStatus = { error: botError.message };
+    }
+  }
+  
   res.json({
     success: true,
     message: `Counter reset for ${productName}`,
     product: productName,
+    botReset: botResetStatus,
     counter: dailyLimits[productName],
     clearedReservations: clearedReservations
   });

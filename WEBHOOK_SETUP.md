@@ -99,7 +99,7 @@ After creating the webhook:
 3. Click **"Reveal"** to show the secret
 4. Copy the secret (it starts with `whsec_...`)
 
-Example: `whsec_1234567890abcdefghijklmnop`
+Example format: `whsec_[YOUR_SECRET_HERE]`
 
 ---
 
@@ -115,7 +115,7 @@ Example: `whsec_1234567890abcdefghijklmnop`
 2. Click **"Add Environment Variable"**
 3. Add the following:
    - **Key:** `STRIPE_WEBHOOK_SECRET`
-   - **Value:** `whsec_1234567890abcdefghijklmnop` (paste your secret)
+   - **Value:** (paste your actual webhook secret that starts with `whsec_`)
 4. Click **"Save Changes"**
 
 Your service will automatically redeploy with the new environment variable.

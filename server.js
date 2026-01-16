@@ -373,7 +373,7 @@ let testMode = false;
 let whitelistMode = false;
 let whitelistedUsers = []; // Array of approved usernames
 
-const MAX_PURCHASES_PER_DAY = 15; // Default starting slots per product per day
+const MAX_PURCHASES_PER_DAY = 3; // Default starting slots per product per day
 const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
 const EXTRA_SLOT_PRICE = 3; // £3 total for extra slots (when regular slots are full)
 const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots for Sparx Reader

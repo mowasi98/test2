@@ -241,12 +241,23 @@
       const slotReserved = sessionStorage.getItem('slotReserved');
       const reservedProduct = sessionStorage.getItem('reservedProduct');
       const isExtraSlot = sessionStorage.getItem('isExtraSlot') === 'true';
+      const reservationId = sessionStorage.getItem('reservationId');
+      
+      console.log('💳 Payment page loaded - Session data:', {
+        productName,
+        productPrice,
+        slotReserved,
+        reservedProduct,
+        isExtraSlot,
+        reservationId
+      });
       
       // Clean product name for comparison (remove " - Extra Slot" suffix if present)
       const cleanProductName = productName ? productName.replace(' - Extra Slot', '').trim() : '';
       
       // Verify slot was reserved for this product
-      if (!slotReserved || reservedProduct !== cleanProductName) {
+      if (!slotReserved || !reservedProduct || !productName) {
+        console.error('❌ Missing session data:', { slotReserved, reservedProduct, productName });
         document.getElementById('errorMessage').textContent = '⚠️ No slot reservation found. Redirecting to homepage...';
         document.getElementById('errorMessage').style.display = 'block';
         setTimeout(() => {
@@ -255,6 +266,19 @@
         return;
       }
       
+      // Verify product names match (both should be cleaned)
+      if (reservedProduct !== cleanProductName) {
+        console.error('❌ Product mismatch:', { reservedProduct, cleanProductName });
+        document.getElementById('errorMessage').textContent = '⚠️ Product mismatch. Redirecting to homepage...';
+        document.getElementById('errorMessage').style.display = 'block';
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 2000);
+        return;
+      }
+      
+      console.log('✅ Reservation verified for:', cleanProductName, isExtraSlot ? '(Extra Slot)' : '');
+      
       if (productName) {
         const displayName = isExtraSlot ? `${productName} 💎` : productName;
         document.getElementById('productName').textContent = displayName;
@@ -262,9 +286,6 @@
       if (productPrice) {
         document.getElementById('productPrice').textContent = productPrice;
       }
-      
-      // Store reservation ID for release if needed
-      const reservationId = sessionStorage.getItem('reservationId');
       
       // Release reservation ONLY if user leaves/abandons the payment page (not going to Stripe)
       window.addEventListener('beforeunload', function() {

@@ -870,24 +870,6 @@ app.post('/reserve-slot', (req, res) => {
     }
   }
   
-  // **PREVENT DUPLICATE PURCHASES:** Check if user has already purchased this product today
-  if (username) {
-    if (!purchaseHistory[username]) {
-      purchaseHistory[username] = {};
-    }
-    
-    // Check if user already purchased this product today
-    const purchaseKey = isExtraSlot ? `${productName}-extra` : productName;
-    if (purchaseHistory[username][purchaseKey]) {
-      console.log(`🚫 User "${username}" already purchased "${productName}" ${isExtraSlot ? '(extra slot)' : ''} today - blocking duplicate purchase`);
-      return res.json({
-        success: false,
-        error: `You've already purchased ${productName}${isExtraSlot ? ' (extra slot)' : ''} today. Each product can only be purchased once per day.`,
-        alreadyPurchased: true
-      });
-    }
-  }
-  
   const product = dailyLimits[productName];
   
   // Check if product is manually disabled

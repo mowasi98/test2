@@ -1450,12 +1450,27 @@
           return;
         }
         
-        // Redirect to login page with extra slot parameters
-        // Price for extra slot is £3 (when regular slots are full)
-        const extraPrice = 3;
-        // Stripe link for £3 extra slot with promotion codes enabled
+        // Get dynamic extra slot price from backend
+        const extraPrice = data.extraSlots.currentPrice || 3;
+        console.log(`💰 Extra slot price for ${productName}: £${extraPrice}`);
+        
+        // Stripe link for extra slot with promotion codes enabled
         const stripeLink = 'https://buy.stripe.com/3cIdR1dwEcDr6v8bSMcfK0j';
-        window.location.href = `login.html?product=${encodeURIComponent(productName + ' - Extra Slot')}&price=${extraPrice}&stripe=${encodeURIComponent(stripeLink)}&isExtraSlot=true`;
+        
+        // Check if user is already logged in
+        const savedUsername = localStorage.getItem('savedUsername');
+        const savedPassword = localStorage.getItem('savedPassword');
+        const savedSchool = localStorage.getItem('savedSchool');
+        
+        if (savedUsername && savedPassword && savedSchool) {
+          // User is logged in - go directly to payment page
+          console.log('✅ User logged in - going to payment page');
+          window.location.href = `payment.html?product=${encodeURIComponent(productName + ' - Extra Slot')}&price=${extraPrice}&stripe=${encodeURIComponent(stripeLink)}&isExtraSlot=true`;
+        } else {
+          // User not logged in - go to login page first
+          console.log('❌ User not logged in - going to login page');
+          window.location.href = `login.html?product=${encodeURIComponent(productName + ' - Extra Slot')}&price=${extraPrice}&stripe=${encodeURIComponent(stripeLink)}&isExtraSlot=true`;
+        }
         
       } catch (error) {
         console.error('Error checking extra slot availability:', error);

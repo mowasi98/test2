@@ -358,12 +358,12 @@ const DataSchema = new mongoose.Schema({
 
 const DataModel = mongoose.model('Data', DataSchema);
 
-// Daily purchase limit tracking (3 per product per day)
+// Daily purchase limit tracking (5 per product per day)
 let dailyLimits = {
-  'Sparx Reader': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
-  'Sparx Maths': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
-  'Educate': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
-  'Seneca': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } }
+  'Sparx Reader': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
+  'Sparx Maths': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
+  'Educate': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
+  'Seneca': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } }
 };
 
 // Test mode flag - when enabled, shows "Come back later" screen to all users
@@ -584,22 +584,42 @@ async function loadData() {
         'Sparx Reader': {
           ...dailyLimits['Sparx Reader'],
           ...loadedLimits['Sparx Reader'],
-          extraSlots: loadedLimits['Sparx Reader']?.extraSlots || { count: 0, max: 2 }
+          extraSlots: {
+            count: loadedLimits['Sparx Reader']?.extraSlots?.count || 0,
+            max: loadedLimits['Sparx Reader']?.extraSlots?.max || 2,
+            basePrice: loadedLimits['Sparx Reader']?.extraSlots?.basePrice || 3,
+            currentPrice: loadedLimits['Sparx Reader']?.extraSlots?.currentPrice || 3
+          }
         },
         'Sparx Maths': {
           ...dailyLimits['Sparx Maths'],
           ...loadedLimits['Sparx Maths'],
-          extraSlots: loadedLimits['Sparx Maths']?.extraSlots || { count: 0, max: 2 }
+          extraSlots: {
+            count: loadedLimits['Sparx Maths']?.extraSlots?.count || 0,
+            max: loadedLimits['Sparx Maths']?.extraSlots?.max || 2,
+            basePrice: loadedLimits['Sparx Maths']?.extraSlots?.basePrice || 3,
+            currentPrice: loadedLimits['Sparx Maths']?.extraSlots?.currentPrice || 3
+          }
         },
         'Educate': {
           ...dailyLimits['Educate'],
           ...loadedLimits['Educate'],
-          extraSlots: loadedLimits['Educate']?.extraSlots || { count: 0, max: 2 }
+          extraSlots: {
+            count: loadedLimits['Educate']?.extraSlots?.count || 0,
+            max: loadedLimits['Educate']?.extraSlots?.max || 2,
+            basePrice: loadedLimits['Educate']?.extraSlots?.basePrice || 3,
+            currentPrice: loadedLimits['Educate']?.extraSlots?.currentPrice || 3
+          }
         },
         'Seneca': {
           ...dailyLimits['Seneca'],
           ...loadedLimits['Seneca'],
-          extraSlots: loadedLimits['Seneca']?.extraSlots || { count: 0, max: 2 }
+          extraSlots: {
+            count: loadedLimits['Seneca']?.extraSlots?.count || 0,
+            max: loadedLimits['Seneca']?.extraSlots?.max || 2,
+            basePrice: loadedLimits['Seneca']?.extraSlots?.basePrice || 3,
+            currentPrice: loadedLimits['Seneca']?.extraSlots?.currentPrice || 3
+          }
         }
       };
       
@@ -653,8 +673,14 @@ setInterval(() => {
         if (dailyLimits[productName].extraSlots.count > 0) {
           const oldCount = dailyLimits[productName].extraSlots.count;
           dailyLimits[productName].extraSlots.count--;
+          
+          // Decrement price back (since expired slot is released)
+          if (dailyLimits[productName].extraSlots.currentPrice > dailyLimits[productName].extraSlots.basePrice) {
+            dailyLimits[productName].extraSlots.currentPrice--;
+          }
+          
           const newCount = dailyLimits[productName].extraSlots.count;
-          console.log(`⏰ Expired EXTRA SLOT reservation released for "${productName}": ${oldCount} → ${newCount}/${dailyLimits[productName].extraSlots.max} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
+          console.log(`⏰ Expired EXTRA SLOT reservation released for "${productName}": ${oldCount} → ${newCount}/${dailyLimits[productName].extraSlots.max} - Price reset to £${dailyLimits[productName].extraSlots.currentPrice} (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
           hasChanges = true;
         } else {
           console.log(`⏰ Expired EXTRA SLOT reservation for "${productName}" but count already at 0 (ID: ${reservationId}, age: ${Math.round(age / 60000)} min)`);
@@ -708,7 +734,8 @@ function resetDailyCountersIfNeeded() {
         // Reset extra slots for all products
         if (dailyLimits[product].extraSlots) {
           dailyLimits[product].extraSlots.count = 0;
-          console.log(`✅ Extra slots also reset for "${product}"`);
+          dailyLimits[product].extraSlots.currentPrice = dailyLimits[product].extraSlots.basePrice; // Reset price
+          console.log(`✅ Extra slots also reset for "${product}" (price reset to £${dailyLimits[product].extraSlots.basePrice})`);
         }
         
         hasChanges = true;
@@ -777,7 +804,9 @@ app.get('/check-product-availability', (req, res) => {
       available: extraSlotsAvailable,
       count: product.extraSlots.count,
       max: product.extraSlots.max,
-      price: EXTRA_SLOT_PRICE
+      price: product.extraSlots.currentPrice, // Dynamic price (increases by £1 per purchase)
+      basePrice: product.extraSlots.basePrice, // Starting price
+      nextPrice: product.extraSlots.currentPrice + 1 // What next person will pay (if they reserve)
     };
   }
   
@@ -859,17 +888,23 @@ app.post('/reserve-slot', (req, res) => {
     
     // Reserve extra slot
     const oldExtraCount = product.extraSlots.count;
+    const currentPrice = product.extraSlots.currentPrice; // Capture current price for THIS purchase
+    
     product.extraSlots.count++;
     const extraRemaining = product.extraSlots.max - product.extraSlots.count;
+    
+    // Increment price for NEXT person (dynamic pricing: £3, £4, £5, etc.)
+    product.extraSlots.currentPrice++;
     
     const reservationId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     activeReservations[reservationId] = {
       productName: productName,
       timestamp: Date.now(),
-      isExtraSlot: true
+      isExtraSlot: true,
+      extraSlotPrice: currentPrice // Store the price THIS user will pay
     };
     
-    console.log(`💎 EXTRA SLOT RESERVED for "${productName}": ${oldExtraCount} → ${product.extraSlots.count}/${product.extraSlots.max} (${extraRemaining} remaining) - Reservation ID: ${reservationId}`);
+    console.log(`💎 EXTRA SLOT RESERVED for "${productName}": ${oldExtraCount} → ${product.extraSlots.count}/${product.extraSlots.max} (${extraRemaining} remaining) - Price: £${currentPrice} (next: £${product.extraSlots.currentPrice}) - Reservation ID: ${reservationId}`);
     
     saveData();
     
@@ -880,7 +915,8 @@ app.post('/reserve-slot', (req, res) => {
       isExtraSlot: true,
       extraSlotCount: product.extraSlots.count,
       extraSlotMax: product.extraSlots.max,
-      extraSlotPrice: EXTRA_SLOT_PRICE,
+      extraSlotPrice: currentPrice, // Return the price for THIS purchase
+      nextExtraSlotPrice: product.extraSlots.currentPrice, // Next person will pay this
       wasLastExtraSlot: extraRemaining === 0
     });
   }
@@ -969,10 +1005,16 @@ app.post('/release-slot', (req, res) => {
     // Release extra slot
     if (dailyLimits[productName].extraSlots && dailyLimits[productName].extraSlots.count > 0) {
       dailyLimits[productName].extraSlots.count--;
+      
+      // Decrement price back (since slot was released)
+      if (dailyLimits[productName].extraSlots.currentPrice > dailyLimits[productName].extraSlots.basePrice) {
+        dailyLimits[productName].extraSlots.currentPrice--;
+      }
+      
       const extraRemaining = dailyLimits[productName].extraSlots.max - dailyLimits[productName].extraSlots.count;
       
       delete activeReservations[reservationId];
-      console.log(`🔓 EXTRA SLOT RELEASED for "${productName}": ${dailyLimits[productName].extraSlots.count}/${dailyLimits[productName].extraSlots.max} - Reservation ID: ${reservationId}`);
+      console.log(`🔓 EXTRA SLOT RELEASED for "${productName}": ${dailyLimits[productName].extraSlots.count}/${dailyLimits[productName].extraSlots.max} - Price reset to £${dailyLimits[productName].extraSlots.currentPrice} - Reservation ID: ${reservationId}`);
       
       saveData();
       
@@ -981,7 +1023,8 @@ app.post('/release-slot', (req, res) => {
         released: true,
         isExtraSlot: true,
         extraSlotCount: dailyLimits[productName].extraSlots.count,
-        extraSlotMax: dailyLimits[productName].extraSlots.max
+        extraSlotMax: dailyLimits[productName].extraSlots.max,
+        currentExtraSlotPrice: dailyLimits[productName].extraSlots.currentPrice
       });
     }
   }
@@ -2013,10 +2056,11 @@ app.post('/admin/auto-reset-slots', async (req, res) => {
           dailyLimits[product].count = 0;
           dailyLimits[product].date = today;
           
-          // Also reset extra slots for Sparx Reader
-          if (product === 'Sparx Reader' && dailyLimits[product].extraSlots) {
+          // Also reset extra slots for all products
+          if (dailyLimits[product].extraSlots) {
             dailyLimits[product].extraSlots.count = 0;
-            console.log(`✅ Extra slots also reset for "${product}"`);
+            dailyLimits[product].extraSlots.currentPrice = dailyLimits[product].extraSlots.basePrice; // Reset price
+            console.log(`✅ Extra slots also reset for "${product}" (price reset to £${dailyLimits[product].extraSlots.basePrice})`);
           }
           
           hasReset = true;

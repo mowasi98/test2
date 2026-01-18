@@ -373,10 +373,10 @@ let testMode = false;
 let whitelistMode = false;
 let whitelistedUsers = []; // Array of approved usernames
 
-const MAX_PURCHASES_PER_DAY = 3; // Default starting slots per product per day
+const MAX_PURCHASES_PER_DAY = 5; // Default starting slots per product per day (changed from 3 to 5)
 const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
-const EXTRA_SLOT_PRICE = 3; // £3 total for extra slots (when regular slots are full)
-const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots for Sparx Reader
+const EXTRA_SLOT_PRICE = 3; // £3 starting price for extra slots (increases by £1 per purchase)
+const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots per product
 const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
 
 // Track active reservations: { reservationId: { productName, timestamp } }

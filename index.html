@@ -1450,9 +1450,9 @@
           return;
         }
         
-        // Get dynamic extra slot price from backend
-        const extraPrice = data.extraSlots.currentPrice || 3;
-        console.log(`💰 Extra slot price for ${productName}: £${extraPrice}`);
+        // Get dynamic extra slot price from backend (backend sends as "price")
+        const extraPrice = data.extraSlots.price || data.extraSlots.currentPrice || 3;
+        console.log(`💰 Extra slot price for ${productName}: £${extraPrice}`, data.extraSlots);
         
         // Stripe link for extra slot with promotion codes enabled
         const stripeLink = 'https://buy.stripe.com/3cIdR1dwEcDr6v8bSMcfK0j';

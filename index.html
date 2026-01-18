@@ -1463,9 +1463,55 @@
         const savedSchool = localStorage.getItem('savedSchool');
         
         if (savedUsername && savedPassword && savedSchool) {
-          // User is logged in - go directly to payment page
-          console.log('✅ User logged in - going to payment page');
-          window.location.href = `payment.html?product=${encodeURIComponent(productName + ' - Extra Slot')}&price=${extraPrice}&stripe=${encodeURIComponent(stripeLink)}&isExtraSlot=true`;
+          // User is logged in - reserve slot and go directly to payment page
+          console.log('✅ User logged in - reserving extra slot...');
+          
+          try {
+            // Reserve the extra slot
+            const reserveResponse = await fetch(`${BACKEND_URL}/reserve-slot`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productName: productName,
+                isExtraSlot: true,
+                username: savedUsername
+              })
+            });
+            
+            const reserveData = await reserveResponse.json();
+            
+            if (!reserveData.success || !reserveData.reserved) {
+              console.error('❌ Reservation failed:', reserveData);
+              const errorMsg = document.getElementById('errorMessage');
+              errorMsg.textContent = '⚠️ ' + (reserveData.error || 'Could not reserve slot. Please try again.');
+              errorMsg.style.display = 'block';
+              return;
+            }
+            
+            console.log('✅ Extra slot reserved:', reserveData.reservationId);
+            
+            // Set sessionStorage data (same as login.html does)
+            sessionStorage.setItem('school', savedSchool);
+            sessionStorage.setItem('loginUsername', savedUsername);
+            sessionStorage.setItem('loginPassword', savedPassword);
+            sessionStorage.setItem('productName', productName + ' - Extra Slot');
+            sessionStorage.setItem('productPrice', extraPrice);
+            sessionStorage.setItem('stripeLink', stripeLink);
+            sessionStorage.setItem('slotReserved', 'true');
+            sessionStorage.setItem('reservedProduct', productName); // Clean name
+            sessionStorage.setItem('reservationId', reserveData.reservationId);
+            sessionStorage.setItem('isExtraSlot', 'true');
+            
+            // Now go to payment page
+            console.log('➡️ Going to payment page with session data');
+            window.location.href = 'payment.html';
+            
+          } catch (error) {
+            console.error('❌ Error reserving slot:', error);
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = '⚠️ Error connecting to server. Please try again.';
+            errorMsg.style.display = 'block';
+          }
         } else {
           // User not logged in - go to login page first
           console.log('❌ User not logged in - going to login page');

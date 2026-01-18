@@ -698,7 +698,7 @@
       <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Reader">
         <div class="extra-slot-title">🔥 Slots Finished!</div>
         <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Sparx Reader</div>
-        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-price" id="extraSlotPrice-Sparx Reader">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
         <a href="#" class="extra-slot-buy-btn" data-product="Sparx Reader" data-is-extra="true" onclick="buyExtraSlot(event, 'Sparx Reader')">Buy Extra Slot</a>
@@ -716,7 +716,7 @@
       <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Maths">
         <div class="extra-slot-title">🔥 Slots Finished!</div>
         <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Sparx Maths</div>
-        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-price" id="extraSlotPrice-Sparx Maths">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
         <a href="#" class="extra-slot-buy-btn" data-product="Sparx Maths" data-is-extra="true" onclick="buyExtraSlot(event, 'Sparx Maths')">Buy Extra Slot</a>
@@ -734,7 +734,7 @@
       <div class="extra-slot-overlay" id="extraSlotOverlay-Educate">
         <div class="extra-slot-title">🔥 Slots Finished!</div>
         <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Educate</div>
-        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-price" id="extraSlotPrice-Educate">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
         <a href="#" class="extra-slot-buy-btn" data-product="Educate" data-is-extra="true" onclick="buyExtraSlot(event, 'Educate')">Buy Extra Slot</a>
@@ -752,7 +752,7 @@
       <div class="extra-slot-overlay" id="extraSlotOverlay-Seneca">
         <div class="extra-slot-title">🔥 Slots Finished!</div>
         <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Seneca</div>
-        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-price" id="extraSlotPrice-Seneca">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
         <a href="#" class="extra-slot-buy-btn" data-product="Seneca" data-is-extra="true" onclick="buyExtraSlot(event, 'Seneca')">Buy Extra Slot</a>
@@ -1623,6 +1623,12 @@
                 // Extra slots available! Show overlay
                 console.log(`💎 Extra slots available for ${product}:`, data.extraSlots);
                 if (extraSlotOverlay) {
+                  // Update price dynamically from backend
+                  const priceElement = document.getElementById(`extraSlotPrice-${product}`);
+                  if (priceElement && data.extraSlots.price) {
+                    priceElement.textContent = `£${data.extraSlots.price}`;
+                    console.log(`💰 Updated extra slot price for ${product}: £${data.extraSlots.price}`);
+                  }
                   extraSlotOverlay.classList.add('active');
                   console.log(`✅ Extra slot overlay activated for ${product}`);
                 }

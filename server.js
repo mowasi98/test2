@@ -1393,6 +1393,108 @@ app.post('/admin/set-extra-slot-max', (req, res) => {
   });
 });
 
+// Admin endpoint to set extra slot COUNT (for manual adjustments)
+app.post('/admin/set-extra-slot-count', (req, res) => {
+  const { password, productName, count } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  // Check if product has extra slots feature
+  if (!dailyLimits[productName].extraSlots) {
+    return res.status(400).json({ error: 'This product does not support extra slots' });
+  }
+  
+  // Validate count
+  const newCount = parseInt(count);
+  if (isNaN(newCount) || newCount < 0) {
+    return res.status(400).json({ error: 'Invalid count. Must be 0 or greater.' });
+  }
+  
+  const maxSlots = dailyLimits[productName].extraSlots.max;
+  if (newCount > maxSlots) {
+    return res.status(400).json({ error: `Extra slot count cannot exceed max (${maxSlots}).` });
+  }
+  
+  const oldCount = dailyLimits[productName].extraSlots.count;
+  dailyLimits[productName].extraSlots.count = newCount;
+  
+  // Adjust currentPrice based on new count (price increases by £1 per slot used)
+  dailyLimits[productName].extraSlots.currentPrice = dailyLimits[productName].extraSlots.basePrice + newCount;
+  
+  console.log(`💎 Admin: Set extra slot count for "${productName}": ${oldCount} → ${newCount} (price: £${dailyLimits[productName].extraSlots.currentPrice})`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `Extra slot count for ${productName} set to ${newCount}`,
+    product: productName,
+    oldCount: oldCount,
+    newCount: newCount,
+    max: maxSlots,
+    currentPrice: dailyLimits[productName].extraSlots.currentPrice
+  });
+});
+
+// Admin endpoint to set extra slot BASE PRICE
+app.post('/admin/set-extra-slot-price', (req, res) => {
+  const { password, productName, basePrice } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  // Check if product has extra slots feature
+  if (!dailyLimits[productName].extraSlots) {
+    return res.status(400).json({ error: 'This product does not support extra slots' });
+  }
+  
+  // Validate price
+  const newPrice = parseInt(basePrice);
+  if (isNaN(newPrice) || newPrice < 1) {
+    return res.status(400).json({ error: 'Invalid price. Must be £1 or greater.' });
+  }
+  
+  if (newPrice > 50) {
+    return res.status(400).json({ error: 'Price cannot exceed £50.' });
+  }
+  
+  const oldPrice = dailyLimits[productName].extraSlots.basePrice;
+  dailyLimits[productName].extraSlots.basePrice = newPrice;
+  
+  // Recalculate current price based on how many slots are used
+  const slotsUsed = dailyLimits[productName].extraSlots.count;
+  dailyLimits[productName].extraSlots.currentPrice = newPrice + slotsUsed;
+  
+  console.log(`💰 Admin: Set extra slot base price for "${productName}": £${oldPrice} → £${newPrice} (current: £${dailyLimits[productName].extraSlots.currentPrice})`);
+  
+  // Save to MongoDB
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `Extra slot base price for ${productName} set to £${newPrice}`,
+    product: productName,
+    oldPrice: oldPrice,
+    newPrice: newPrice,
+    currentPrice: dailyLimits[productName].extraSlots.currentPrice,
+    slotsUsed: slotsUsed
+  });
+});
+
 // Admin endpoint to get current counter status
 app.get('/admin/counters-status', (req, res) => {
   resetDailyCountersIfNeeded();

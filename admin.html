@@ -537,17 +537,19 @@
                                   
                                   Object.keys(counters).forEach(product => {
                                     const count = counters[product].count;
-                                    const isFull = count >= 3;
+                                    const isFull = count >= 5; // Changed from 3 to 5
                                     const isUnavailable = counters[product].available === false;
                                     const safeProductId = product.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
                                     
                                     const itemDiv = document.createElement('div');
                                     itemDiv.className = `status-item ${isFull ? 'full' : ''} ${isUnavailable ? 'unavailable' : ''}`;
                                     
-                                    // Check if this product has extra slots (Sparx Reader)
+                                    // Check if this product has extra slots
                                     const hasExtraSlots = counters[product].extraSlots;
                                     const extraSlotCount = hasExtraSlots ? counters[product].extraSlots.count : 0;
                                     const extraSlotMax = hasExtraSlots ? counters[product].extraSlots.max : 0;
+                                    const extraSlotBasePrice = hasExtraSlots ? counters[product].extraSlots.basePrice : 3;
+                                    const extraSlotCurrentPrice = hasExtraSlots ? counters[product].extraSlots.currentPrice : 3;
                                     
                                     itemDiv.innerHTML = `
                                       <div style="flex: 1;">
@@ -573,18 +575,51 @@
                                         ${hasExtraSlots ? `
                                         <!-- Extra Slot Management Controls (All Products) -->
                                         <div class="slot-control" style="margin-top: 0.8rem; background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); padding: 0.8rem; border-radius: 8px; border: 2px solid #ffc107;">
-                                          <label style="font-size: 0.85rem; color: #856404; font-weight: 700; margin-right: 0.5rem;">💎 Extra Slots:</label>
-                                          <button class="btn btn-small btn-danger" onclick="adjustExtraSlotMax('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
-                                          <input type="number" 
-                                                id="extraslot-${safeProductId}" 
-                                                value="${extraSlotMax}" 
-                                                min="0" 
-                                                max="50" 
-                                                onchange="setExtraSlotMax('${product}', this.value)"
-                                                style="width: 80px;">
-                                          <button class="btn btn-small btn-success" onclick="adjustExtraSlotMax('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
-                                          <button class="btn btn-small" onclick="setExtraSlotMax('${product}', document.getElementById('extraslot-${safeProductId}').value)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Set Max</button>
-                                          <span style="font-size: 0.85rem; color: #856404; margin-left: 0.5rem;">Used: ${extraSlotCount}/${extraSlotMax}</span>
+                                          <label style="font-size: 0.85rem; color: #856404; font-weight: 700; display: block; margin-bottom: 0.5rem;">💎 Extra Slots Configuration</label>
+                                          
+                                          <!-- Extra Slot COUNT Control -->
+                                          <div style="margin-bottom: 0.5rem;">
+                                            <label style="font-size: 0.8rem; color: #856404; margin-right: 0.5rem;">Used Count:</label>
+                                            <button class="btn btn-small btn-danger" onclick="adjustExtraSlotCount('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                            <input type="number" 
+                                                  id="extracount-${safeProductId}" 
+                                                  value="${extraSlotCount}" 
+                                                  min="0" 
+                                                  max="${extraSlotMax}" 
+                                                  onchange="setExtraSlotCount('${product}', this.value)"
+                                                  style="width: 60px;">
+                                            <button class="btn btn-small btn-success" onclick="adjustExtraSlotCount('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                            <span style="font-size: 0.8rem; color: #856404; margin-left: 0.3rem;">/ ${extraSlotMax}</span>
+                                          </div>
+                                          
+                                          <!-- Extra Slot MAX Control -->
+                                          <div style="margin-bottom: 0.5rem;">
+                                            <label style="font-size: 0.8rem; color: #856404; margin-right: 0.5rem;">Max Slots:</label>
+                                            <button class="btn btn-small btn-danger" onclick="adjustExtraSlotMax('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                            <input type="number" 
+                                                  id="extraslot-${safeProductId}" 
+                                                  value="${extraSlotMax}" 
+                                                  min="0" 
+                                                  max="50" 
+                                                  onchange="setExtraSlotMax('${product}', this.value)"
+                                                  style="width: 60px;">
+                                            <button class="btn btn-small btn-success" onclick="adjustExtraSlotMax('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          </div>
+                                          
+                                          <!-- Extra Slot PRICE Control -->
+                                          <div>
+                                            <label style="font-size: 0.8rem; color: #856404; margin-right: 0.5rem;">Base Price:</label>
+                                            <button class="btn btn-small btn-danger" onclick="adjustExtraSlotPrice('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                            <input type="number" 
+                                                  id="extraprice-${safeProductId}" 
+                                                  value="${extraSlotBasePrice}" 
+                                                  min="1" 
+                                                  max="50" 
+                                                  onchange="setExtraSlotPrice('${product}', this.value)"
+                                                  style="width: 60px;">
+                                            <button class="btn btn-small btn-success" onclick="adjustExtraSlotPrice('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                            <span style="font-size: 0.8rem; color: #856404; margin-left: 0.3rem;">£ (Current: £${extraSlotCurrentPrice})</span>
+                                          </div>
                                         </div>
                                         ` : ''}
                                         
@@ -596,7 +631,7 @@
                                           </button>
                                         </div>
                                       </div>
-                                      <div class="count">${count} / 3${hasExtraSlots ? `<br><span style="font-size: 0.8rem; color: #ffc107;">+${extraSlotCount}/${extraSlotMax} extra</span>` : ''}</div>
+                                      <div class="count">${count} / 5${hasExtraSlots ? `<br><span style="font-size: 0.8rem; color: #ffc107;">+${extraSlotCount}/${extraSlotMax} extra @ £${extraSlotCurrentPrice}</span>` : ''}</div>
                                     `;
                                     statusItemsDiv.appendChild(itemDiv);
                                   });
@@ -984,6 +1019,135 @@
                                   
                                   input.value = newValue;
                                   await setExtraSlotMax(productName, newValue);
+                                }
+
+                                // Extra Slot COUNT Management (for manual adjustments)
+                                async function setExtraSlotCount(productName, count) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const slotCount = parseInt(count);
+                                  if (isNaN(slotCount) || slotCount < 0) {
+                                    showMessage('Invalid extra slot count. Must be 0 or greater.', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-extra-slot-count`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        count: slotCount
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${productName} extra slot count updated: ${data.oldCount} → ${data.newCount}`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error setting extra slot count', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function adjustExtraSlotCount(productName, delta) {
+                                  const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                  const input = document.getElementById(`extracount-${safeProductId}`);
+                                  const maxInput = document.getElementById(`extraslot-${safeProductId}`);
+                                  const currentValue = parseInt(input.value) || 0;
+                                  const maxValue = parseInt(maxInput.value) || 2;
+                                  const newValue = Math.max(0, Math.min(maxValue, currentValue + delta));
+                                  
+                                  if (newValue === currentValue) {
+                                    if (newValue === 0 && delta < 0) {
+                                      showMessage('Extra slot count is already at minimum (0)', 'error');
+                                    } else if (newValue === maxValue && delta > 0) {
+                                      showMessage(`Extra slot count is already at maximum (${maxValue})`, 'error');
+                                    }
+                                    return;
+                                  }
+                                  
+                                  input.value = newValue;
+                                  await setExtraSlotCount(productName, newValue);
+                                }
+
+                                // Extra Slot PRICE Management
+                                async function setExtraSlotPrice(productName, price) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const basePrice = parseInt(price);
+                                  if (isNaN(basePrice) || basePrice < 1) {
+                                    showMessage('Invalid price. Must be £1 or greater.', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (basePrice > 50) {
+                                    showMessage('Price cannot exceed £50.', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-extra-slot-price`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        basePrice: basePrice
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${productName} extra slot base price updated: £${data.oldPrice} → £${data.newPrice}`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error setting extra slot price', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
+                                }
+
+                                async function adjustExtraSlotPrice(productName, delta) {
+                                  const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                  const input = document.getElementById(`extraprice-${safeProductId}`);
+                                  const currentValue = parseInt(input.value) || 3;
+                                  const newValue = Math.max(1, Math.min(50, currentValue + delta));
+                                  
+                                  if (newValue === currentValue) {
+                                    if (newValue === 1 && delta < 0) {
+                                      showMessage('Extra slot price is already at minimum (£1)', 'error');
+                                    } else if (newValue === 50 && delta > 0) {
+                                      showMessage('Extra slot price is already at maximum (£50)', 'error');
+                                    }
+                                    return;
+                                  }
+                                  
+                                  input.value = newValue;
+                                  await setExtraSlotPrice(productName, newValue);
                                 }
 
                                 // Load current bot mode

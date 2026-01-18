@@ -1767,9 +1767,46 @@
     // Run periodic test mode check every 10 seconds
     setInterval(periodicTestModeCheck, 10000);
 
-    // ✅ SIMPLIFIED: No complex click handlers - just let links work naturally!
-    // The login.html page will handle the logic for logged-in users
-    console.log('✅ Buy Now buttons are normal links - no JavaScript interference!');
+    // Handle Buy Now button clicks - show visual feedback
+    document.querySelectorAll('.buy-btn').forEach(btn => {
+      btn.addEventListener('click', async function(e) {
+        // Don't prevent default if button is disabled
+        if (this.classList.contains('disabled')) {
+          e.preventDefault();
+          return;
+        }
+        
+        const productName = this.getAttribute('data-product');
+        
+        console.log(`🛒 Buy Now clicked for: ${productName}`);
+        
+        // Mark button as processing to show visual feedback
+        this.setAttribute('data-reserving', 'true');
+        this.style.opacity = '0.6';
+        const originalText = this.textContent;
+        this.textContent = 'Processing...';
+        
+        // Optimistically update slot display (will refresh from server in login.html)
+        const slotsDiv = document.getElementById(`slots-${productName}`);
+        if (slotsDiv) {
+          const currentText = slotsDiv.textContent;
+          if (currentText.includes('/')) {
+            const match = currentText.match(/(\d+)\s*\/\s*(\d+)/);
+            if (match) {
+              const current = parseInt(match[1]);
+              const max = parseInt(match[2]);
+              const newCount = Math.min(current + 1, max);
+              slotsDiv.innerHTML = `<div class="slots-message">✅ ${newCount} / ${max} slots filled</div>`;
+            }
+          }
+        }
+        
+        // Let the default link navigation happen
+        // (login.html will handle actual reservation)
+      });
+    });
+    
+    console.log('✅ Buy Now buttons configured with visual feedback!');
   </script>
 </body>
 </html>

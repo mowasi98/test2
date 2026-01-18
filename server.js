@@ -832,6 +832,30 @@ app.post('/reserve-slot', (req, res) => {
     return res.status(400).json({ success: false, error: 'Product not found' });
   }
   
+  // **FIX DOUBLE-COUNTING BUG:** Check if user already has an active reservation for this product
+  if (username) {
+    const existingReservation = Object.entries(activeReservations).find(([id, reservation]) => {
+      // Check if this user has an active reservation for the same product
+      return reservation.productName === productName && 
+             reservation.username === username &&
+             (!!reservation.isExtraSlot === !!isExtraSlot); // Same slot type
+    });
+    
+    if (existingReservation) {
+      const [existingId, existingRes] = existingReservation;
+      const ageMinutes = Math.round((Date.now() - existingRes.timestamp) / 60000);
+      console.log(`⚠️ User "${username}" already has an active reservation for "${productName}" (ID: ${existingId}, age: ${ageMinutes} min) - returning existing reservation`);
+      return res.json({
+        success: true,
+        reserved: true,
+        reservationId: existingId,
+        isExtraSlot: !!existingRes.isExtraSlot,
+        isDuplicate: true, // Flag to indicate this is a duplicate request
+        message: 'You already have an active reservation for this product'
+      });
+    }
+  }
+  
   const product = dailyLimits[productName];
   
   // Check if product is manually disabled
@@ -903,7 +927,8 @@ app.post('/reserve-slot', (req, res) => {
       productName: productName,
       timestamp: Date.now(),
       isExtraSlot: true,
-      extraSlotPrice: currentPrice // Store the price THIS user will pay
+      extraSlotPrice: currentPrice, // Store the price THIS user will pay
+      username: username || 'unknown' // Track who made the reservation
     };
     
     console.log(`💎 EXTRA SLOT RESERVED for "${productName}": ${oldExtraCount} → ${product.extraSlots.count}/${product.extraSlots.max} (${extraRemaining} remaining) - Price: £${currentPrice} (next: £${product.extraSlots.currentPrice}) - Reservation ID: ${reservationId}`);
@@ -956,7 +981,8 @@ app.post('/reserve-slot', (req, res) => {
   activeReservations[reservationId] = {
     productName: productName,
     timestamp: Date.now(),
-    isExtraSlot: false
+    isExtraSlot: false,
+    username: username || 'unknown' // Track who made the reservation
   };
   
   const wasLastSlot = remaining === 0;

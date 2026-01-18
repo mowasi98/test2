@@ -537,7 +537,8 @@
                                   
                                   Object.keys(counters).forEach(product => {
                                     const count = counters[product].count;
-                                    const isFull = count >= 5; // Changed from 3 to 5
+                                    const maxSlots = counters[product].maxSlots || 5; // Get max from backend, default to 5
+                                    const isFull = count >= maxSlots;
                                     const isUnavailable = counters[product].available === false;
                                     const safeProductId = product.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
                                     
@@ -559,17 +560,36 @@
                                         </div>
                                         
                                         <!-- Regular Slot Management Controls -->
-                                        <div class="slot-control">
-                                          <label style="font-size: 0.85rem; color: #666; margin-right: 0.5rem;">Regular:</label>
-                                          <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
-                                          <input type="number" 
-                                                id="slot-${safeProductId}" 
-                                                value="${count}" 
-                                                min="0" 
-                                                max="20" 
-                                                onchange="setSlotCount('${product}', this.value)">
-                                          <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
-                                          <button class="btn btn-small" onclick="setSlotCount('${product}', document.getElementById('slot-${safeProductId}').value)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Set</button>
+                                        <div style="background: linear-gradient(135deg, #e7f3ff 0%, #d0e7ff 100%); padding: 0.8rem; border-radius: 8px; border: 2px solid #6C63FF; margin-top: 0.5rem;">
+                                          <label style="font-size: 0.9rem; color: #6C63FF; font-weight: 700; display: block; margin-bottom: 0.5rem;">📊 Regular Slots</label>
+                                          
+                                          <!-- Used Count Control -->
+                                          <div class="slot-control" style="margin-bottom: 0.5rem;">
+                                            <label style="font-size: 0.85rem; color: #333; margin-right: 0.5rem; font-weight: 600;">Used Count:</label>
+                                            <button class="btn btn-small btn-danger" onclick="adjustSlotCount('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                            <input type="number" 
+                                                  id="slot-${safeProductId}" 
+                                                  value="${count}" 
+                                                  min="0" 
+                                                  max="20" 
+                                                  onchange="setSlotCount('${product}', this.value)"
+                                                  style="width: 60px;">
+                                            <button class="btn btn-small btn-success" onclick="adjustSlotCount('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          </div>
+                                          
+                                          <!-- Max Available Control -->
+                                          <div class="slot-control">
+                                            <label style="font-size: 0.85rem; color: #333; margin-right: 0.5rem; font-weight: 600;">Max Available:</label>
+                                            <button class="btn btn-small btn-danger" onclick="adjustMaxSlots('${product}', -1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">−</button>
+                                            <input type="number" 
+                                                  id="maxslot-${safeProductId}" 
+                                                  value="${maxSlots}" 
+                                                  min="1" 
+                                                  max="20" 
+                                                  onchange="setMaxSlots('${product}', this.value)"
+                                                  style="width: 60px;">
+                                            <button class="btn btn-small btn-success" onclick="adjustMaxSlots('${product}', 1)" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">+</button>
+                                          </div>
                                         </div>
                                         
                                         ${hasExtraSlots ? `
@@ -631,7 +651,7 @@
                                           </button>
                                         </div>
                                       </div>
-                                      <div class="count">${count} / 5${hasExtraSlots ? `<br><span style="font-size: 0.8rem; color: #ffc107;">+${extraSlotCount}/${extraSlotMax} extra @ £${extraSlotCurrentPrice}</span>` : ''}</div>
+                                      <div class="count">${count} / ${maxSlots}${hasExtraSlots ? `<br><span style="font-size: 0.8rem; color: #ffc107;">+${extraSlotCount}/${extraSlotMax} extra @ £${extraSlotCurrentPrice}</span>` : ''}</div>
                                     `;
                                     statusItemsDiv.appendChild(itemDiv);
                                   });
@@ -953,6 +973,72 @@
                                   
                                   input.value = newValue;
                                   await setSlotCount(productName, newValue);
+                                }
+
+                                // Max Available Slot Management
+                                async function adjustMaxSlots(productName, delta) {
+                                  const safeProductId = productName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+                                  const input = document.getElementById(`maxslot-${safeProductId}`);
+                                  const currentValue = parseInt(input.value) || 5;
+                                  const newValue = Math.max(1, Math.min(20, currentValue + delta));
+                                  
+                                  if (newValue === currentValue) {
+                                    if (newValue === 1 && delta < 0) {
+                                      showMessage('Max slots is already at minimum (1)', 'error');
+                                    } else if (newValue === 20 && delta > 0) {
+                                      showMessage('Max slots is already at maximum (20)', 'error');
+                                    }
+                                    return;
+                                  }
+                                  
+                                  input.value = newValue;
+                                  await setMaxSlots(productName, newValue);
+                                }
+
+                                async function setMaxSlots(productName, newMax) {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  const max = parseInt(newMax);
+                                  if (isNaN(max) || max < 1) {
+                                    showMessage('Max slots must be at least 1', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (max > 20) {
+                                    showMessage('Max slots cannot exceed 20', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-max-slots`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        password: password,
+                                        productName: productName,
+                                        maxSlots: max
+                                      }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ ${productName}: Max slots set to ${max}`, 'success');
+                                      checkStatus(); // Refresh status
+                                    } else {
+                                      showMessage(data.error || 'Error setting max slots', 'error');
+                                    }
+                                  } catch (error) {
+                                    showMessage('Error connecting to server', 'error');
+                                    console.error('Error:', error);
+                                  }
                                 }
 
                                 // Extra Slot Management Functions (Sparx Reader)

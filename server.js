@@ -370,10 +370,10 @@ const DataModel = mongoose.model('Data', DataSchema);
 
 // Daily purchase limit tracking (5 per product per day)
 let dailyLimits = {
-  'Sparx Reader': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
-  'Sparx Maths': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
-  'Educate': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
-  'Seneca': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } }
+  'Sparx Reader': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
+  'Sparx Maths': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
+  'Educate': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
+  'Seneca': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } }
 };
 
 // Test mode flag - when enabled, shows "Come back later" screen to all users
@@ -589,11 +589,12 @@ async function loadData() {
       // Restore data
       const loadedLimits = data.dailyLimits || dailyLimits;
       
-      // Merge loaded data with default structure to ensure extraSlots is always present
+      // Merge loaded data with default structure to ensure extraSlots and maxSlots are always present
       dailyLimits = {
         'Sparx Reader': {
           ...dailyLimits['Sparx Reader'],
           ...loadedLimits['Sparx Reader'],
+          maxSlots: loadedLimits['Sparx Reader']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Sparx Reader']?.extraSlots?.count || 0,
             max: loadedLimits['Sparx Reader']?.extraSlots?.max || 2,
@@ -604,6 +605,7 @@ async function loadData() {
         'Sparx Maths': {
           ...dailyLimits['Sparx Maths'],
           ...loadedLimits['Sparx Maths'],
+          maxSlots: loadedLimits['Sparx Maths']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Sparx Maths']?.extraSlots?.count || 0,
             max: loadedLimits['Sparx Maths']?.extraSlots?.max || 2,
@@ -614,6 +616,7 @@ async function loadData() {
         'Educate': {
           ...dailyLimits['Educate'],
           ...loadedLimits['Educate'],
+          maxSlots: loadedLimits['Educate']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Educate']?.extraSlots?.count || 0,
             max: loadedLimits['Educate']?.extraSlots?.max || 2,
@@ -624,6 +627,7 @@ async function loadData() {
         'Seneca': {
           ...dailyLimits['Seneca'],
           ...loadedLimits['Seneca'],
+          maxSlots: loadedLimits['Seneca']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Seneca']?.extraSlots?.count || 0,
             max: loadedLimits['Seneca']?.extraSlots?.max || 2,
@@ -1349,6 +1353,48 @@ app.post('/admin/set-slot-count', (req, res) => {
     newCount: newCount,
     remaining: remaining,
     max: MAX_PURCHASES_PER_DAY
+  });
+});
+
+// Admin endpoint to set max available slots for a product
+app.post('/admin/set-max-slots', (req, res) => {
+  const { password, productName, maxSlots } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!productName || !dailyLimits[productName]) {
+    return res.status(400).json({ error: 'Product not found' });
+  }
+  
+  // Validate max slots
+  const newMax = parseInt(maxSlots);
+  if (isNaN(newMax) || newMax < 1) {
+    return res.status(400).json({ error: 'Max slots must be at least 1.' });
+  }
+  
+  if (newMax > ADMIN_MAX_SLOTS) {
+    return res.status(400).json({ 
+      error: `Max slots cannot exceed ${ADMIN_MAX_SLOTS}.` 
+    });
+  }
+  
+  const oldMax = dailyLimits[productName].maxSlots || MAX_PURCHASES_PER_DAY;
+  dailyLimits[productName].maxSlots = newMax;
+  
+  console.log(`🔧 Admin: Set max available slots for "${productName}": ${oldMax} → ${newMax}`);
+  
+  // Save to disk
+  saveData();
+  
+  res.json({
+    success: true,
+    message: `Max slots for ${productName} set to ${newMax}`,
+    product: productName,
+    oldMax: oldMax,
+    newMax: newMax
   });
 });
 

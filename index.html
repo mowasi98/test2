@@ -1684,11 +1684,13 @@
                 // Extra slots available! Show overlay
                 console.log(`💎 Extra slots available for ${product}:`, data.extraSlots);
                 if (extraSlotOverlay) {
-                  // Update price dynamically from backend
+                  // Update price dynamically from backend (backend sends as "price", not "currentPrice")
                   const priceElement = document.getElementById(`extraSlotPrice-${product}`);
-                  if (priceElement && data.extraSlots.price) {
-                    priceElement.textContent = `£${data.extraSlots.price}`;
-                    console.log(`💰 Updated extra slot price for ${product}: £${data.extraSlots.price}`);
+                  if (priceElement) {
+                    // Backend sends currentPrice as "price" in the API response
+                    const displayPrice = data.extraSlots.price || data.extraSlots.currentPrice || data.extraSlots.basePrice || 3;
+                    priceElement.textContent = `£${displayPrice}`;
+                    console.log(`💰 Updated extra slot price for ${product}: £${displayPrice}`, data.extraSlots);
                   }
                   extraSlotOverlay.classList.add('active');
                   console.log(`✅ Extra slot overlay activated for ${product}`);

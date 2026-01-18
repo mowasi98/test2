@@ -167,6 +167,16 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
           console.log(`📋 WEBHOOK: Order stored as pending (ID: ${orderId}) - email mode active`);
         }
         
+        // Calculate actual dynamic price for extra slots
+        let actualPrice = productPrice;
+        if (isExtraSlot && dailyLimits[productName]?.extraSlots) {
+          // For extra slots, price = basePrice + (count - 1)
+          // Since count was already incremented, we use (currentCount - 1) to get the price this person paid
+          const basePrice = dailyLimits[productName].extraSlots.basePrice;
+          actualPrice = basePrice + (currentCount - 1);
+          console.log(`💰 WEBHOOK: Extra slot price calculated: base £${basePrice} + ${currentCount - 1} = £${actualPrice}`);
+        }
+        
         console.log(`📧 WEBHOOK: Sending card payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
         await sendLoginDetailsNotification({
           school: school || 'Not provided',
@@ -175,7 +185,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
           platform: rawProductName || productName, // Use raw name for display (includes "- Extra Slot")
           sessionId: session.id,
           productName: rawProductName || productName, // Use raw name for display
-          productPrice,
+          productPrice: actualPrice, // Use dynamic price for extra slots
           paymentMethod: 'card',
           remainingSlots,
           currentCount,
@@ -2569,12 +2579,21 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
       console.log(`📋 CASH: Order stored as pending (ID: ${orderId}) - email mode active`);
     }
     
+    // Calculate actual dynamic price for extra slots (CASH)
+    let actualPriceCash = productPrice;
+    if (isExtraSlot && dailyLimits[productName]?.extraSlots) {
+      // For extra slots, price = basePrice + (count - 1)
+      const basePrice = dailyLimits[productName].extraSlots.basePrice;
+      actualPriceCash = basePrice + (currentCount - 1);
+      console.log(`💰 CASH: Extra slot price calculated: base £${basePrice} + ${currentCount - 1} = £${actualPriceCash}`);
+    }
+    
     sendCashPaymentNotification({
       school: school || 'Not provided',
       username,
       password,
       productName: rawProductName || productName, // Use raw name for display
-      productPrice,
+      productPrice: actualPriceCash, // Use dynamic price for extra slots
       remainingSlots: remainingSlots,
       currentCount: currentCount,
       maxSlots: maxSlots,
@@ -2818,6 +2837,16 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
       console.log(`📋 CARD: Order stored as pending (ID: ${orderId}) - email mode active`);
     }
     
+    // Calculate actual dynamic price for extra slots
+    let actualPrice = productPrice || 'N/A';
+    if (isExtraSlot && dailyLimits[productName]?.extraSlots && actualPrice !== 'N/A') {
+      // For extra slots, price = basePrice + (count - 1)
+      // Since count was already incremented, we use (currentCount - 1) to get the price this person paid
+      const basePrice = dailyLimits[productName].extraSlots.basePrice;
+      actualPrice = basePrice + (currentCount - 1);
+      console.log(`💰 CARD: Extra slot price calculated: base £${basePrice} + ${currentCount - 1} = £${actualPrice}`);
+    }
+    
     console.log(`📧 Attempting to send card payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
     await sendLoginDetailsNotification({
       school: school || 'Not provided',
@@ -2826,7 +2855,7 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
       platform,
       sessionId,
       productName: rawProductName || productName || 'Unknown Product', // Use raw name for display
-      productPrice: productPrice || 'N/A',
+      productPrice: actualPrice, // Use dynamic price for extra slots
       paymentMethod: paymentMethod || 'card', // Default to card for this endpoint
       remainingSlots: remainingSlots,
       currentCount: currentCount,

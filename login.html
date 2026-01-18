@@ -220,7 +220,9 @@
       
       <div class="form-group">
         <label>School Email / Username *</label>
-        <input type="text" id="username" required placeholder="Your SCHOOL email (e.g., for Sparx, Educate, etc.)" autocomplete="username">
+        <input type="email" id="username" required placeholder="Your SCHOOL email (e.g., for Sparx, Educate, etc.)" autocomplete="username" 
+               pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.uk|edu|org|net|ac\.uk)"
+               title="Please enter a valid school email address (must contain @ and a valid domain like .com, .co.uk, .edu, etc.)">
         <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
           ⚠️ Use your <strong>SCHOOL EMAIL</strong>, not your personal email!<br>
           (The email you use for Sparx / Educate / Seneca / etc.)
@@ -417,6 +419,27 @@
       // CRITICAL: Add a visible alert to confirm this code is running
       console.log('⚠️ ⚠️ ⚠️ IF YOU SEE THIS, NEW CODE IS LOADED! ⚠️ ⚠️ ⚠️');
       
+      // VERSION CHECK: Force everyone to re-login with new validation rules
+      const CURRENT_VERSION = '2.1'; // Increment this to force logout
+      const savedVersion = localStorage.getItem('appVersion');
+      
+      if (savedVersion !== CURRENT_VERSION) {
+        console.log('🔄 VERSION UPDATE DETECTED - Clearing old credentials');
+        console.log(`   Old version: ${savedVersion || 'none'}, New version: ${CURRENT_VERSION}`);
+        
+        // Clear all saved credentials
+        localStorage.removeItem('savedUsername');
+        localStorage.removeItem('savedPassword');
+        localStorage.removeItem('savedSchool');
+        
+        // Save new version
+        localStorage.setItem('appVersion', CURRENT_VERSION);
+        
+        console.log('✅ All users must re-login with valid email addresses!');
+      } else {
+        console.log(`✅ Version ${CURRENT_VERSION} - credentials still valid`);
+      }
+      
       // Setup school autocomplete
       setupSchoolAutocomplete();
       
@@ -564,6 +587,23 @@
         submitBtn.textContent = 'Continue to Login';
         return;
       }
+      
+      // Validate email format (must contain @ and .com or other valid extensions)
+      if (!username.includes('@')) {
+        errorDiv.textContent = '❌ Invalid email! Your school email must contain an @ symbol.';
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continue to Login';
+        return;
+      }
+      
+      if (!username.includes('.com') && !username.includes('.co.uk') && !username.includes('.edu') && !username.includes('.org') && !username.includes('.net') && !username.includes('.ac.uk')) {
+        errorDiv.textContent = '❌ Invalid email! Your school email must end with a valid domain (e.g., .com, .co.uk, .edu).';
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continue to Login';
+        return;
+      }
 
       // Store previous username BEFORE saving new one (for new login detection)
       const previousUsername = localStorage.getItem('savedUsername');
@@ -575,6 +615,7 @@
       localStorage.setItem('savedUsername', username);
       localStorage.setItem('savedPassword', password);
       localStorage.setItem('savedSchool', school); // Save school info too!
+      localStorage.setItem('appVersion', '2.1'); // Save version number
 
       // Product info is optional - if missing, redirect to homepage to select a product
       if (!productName || !productPrice || !stripeLink) {

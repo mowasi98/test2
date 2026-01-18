@@ -116,7 +116,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
       
       if (productName && dailyLimits[productName]) {
         // Determine if this is an extra slot purchase
-        if (isExtraSlot && productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+        if (isExtraSlot && dailyLimits[productName].extraSlots) {
           // Extra slot purchase - show extra slot info
           currentCount = dailyLimits[productName].extraSlots.count;
           maxSlots = dailyLimits[productName].extraSlots.max;
@@ -361,9 +361,9 @@ const DataModel = mongoose.model('Data', DataSchema);
 // Daily purchase limit tracking (3 per product per day)
 let dailyLimits = {
   'Sparx Reader': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
-  'Sparx Maths': { count: 0, date: null, available: true },
-  'Educate': { count: 0, date: null, available: true },
-  'Seneca': { count: 0, date: null, available: true }
+  'Sparx Maths': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
+  'Educate': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } },
+  'Seneca': { count: 0, date: null, available: true, extraSlots: { count: 0, max: 2 } }
 };
 
 // Test mode flag - when enabled, shows "Come back later" screen to all users
@@ -586,9 +586,21 @@ async function loadData() {
           ...loadedLimits['Sparx Reader'],
           extraSlots: loadedLimits['Sparx Reader']?.extraSlots || { count: 0, max: 2 }
         },
-        'Sparx Maths': loadedLimits['Sparx Maths'] || dailyLimits['Sparx Maths'],
-        'Educate': loadedLimits['Educate'] || dailyLimits['Educate'],
-        'Seneca': loadedLimits['Seneca'] || dailyLimits['Seneca']
+        'Sparx Maths': {
+          ...dailyLimits['Sparx Maths'],
+          ...loadedLimits['Sparx Maths'],
+          extraSlots: loadedLimits['Sparx Maths']?.extraSlots || { count: 0, max: 2 }
+        },
+        'Educate': {
+          ...dailyLimits['Educate'],
+          ...loadedLimits['Educate'],
+          extraSlots: loadedLimits['Educate']?.extraSlots || { count: 0, max: 2 }
+        },
+        'Seneca': {
+          ...dailyLimits['Seneca'],
+          ...loadedLimits['Seneca'],
+          extraSlots: loadedLimits['Seneca']?.extraSlots || { count: 0, max: 2 }
+        }
       };
       
       activeReservations = data.activeReservations || {};
@@ -610,7 +622,7 @@ async function loadData() {
       console.log(`   - Code usage history: ${codeUsageHistory.length}`);
       console.log(`   - Availability schedule:`, availabilitySchedule);
       console.log(`   - Whitelist mode: ${whitelistMode ? 'ENABLED' : 'disabled'} (${whitelistedUsers.length} users)`);
-      console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}${k === 'Sparx Reader' && v.extraSlots ? ` (extra: ${v.extraSlots.count}/${v.extraSlots.max})` : ''}`).join(', '));
+      console.log(`   - Slot counts:`, Object.entries(dailyLimits).map(([k, v]) => `${k}: ${v.count}${v.extraSlots ? ` (extra: ${v.extraSlots.count}/${v.extraSlots.max})` : ''}`).join(', '));
     } else {
       console.log('📝 No saved data found in MongoDB, starting fresh');
       await saveData(); // Create initial document
@@ -693,8 +705,8 @@ function resetDailyCountersIfNeeded() {
         dailyLimits[product].count = 0;
         dailyLimits[product].date = today;
         
-        // Reset extra slots for Sparx Reader
-        if (product === 'Sparx Reader' && dailyLimits[product].extraSlots) {
+        // Reset extra slots for all products
+        if (dailyLimits[product].extraSlots) {
           dailyLimits[product].extraSlots.count = 0;
           console.log(`✅ Extra slots also reset for "${product}"`);
         }
@@ -736,7 +748,7 @@ app.get('/check-product-availability', (req, res) => {
       timeRestricted: true,
       message: availabilityStatus.message,
       nextAvailableTime: availabilityStatus.nextAvailableTime,
-      extraSlots: productName === 'Sparx Reader' ? product.extraSlots : null
+      extraSlots: product.extraSlots || null
     });
   }
   
@@ -749,7 +761,7 @@ app.get('/check-product-availability', (req, res) => {
       max: MAX_PURCHASES_PER_DAY,
       manuallyDisabled: true,
       timeRestricted: false,
-      extraSlots: productName === 'Sparx Reader' ? product.extraSlots : null
+      extraSlots: product.extraSlots || null
     });
   }
   
@@ -757,9 +769,9 @@ app.get('/check-product-availability', (req, res) => {
   const regularAvailable = product.count < MAX_PURCHASES_PER_DAY;
   const remaining = Math.max(0, MAX_PURCHASES_PER_DAY - product.count);
   
-  // For Sparx Reader, check extra slots availability
+  // Check extra slots availability for all products
   let extraSlotsInfo = null;
-  if (productName === 'Sparx Reader' && product.extraSlots) {
+  if (product.extraSlots) {
     const extraSlotsAvailable = !regularAvailable && product.extraSlots.count < product.extraSlots.max;
     extraSlotsInfo = {
       available: extraSlotsAvailable,
@@ -826,8 +838,8 @@ app.post('/reserve-slot', (req, res) => {
     });
   }
   
-  // Handle EXTRA SLOT for Sparx Reader
-  if (isExtraSlot && productName === 'Sparx Reader') {
+  // Handle EXTRA SLOT for all products
+  if (isExtraSlot) {
     // Check if regular slots are full
     if (product.count < MAX_PURCHASES_PER_DAY) {
       return res.json({
@@ -876,8 +888,8 @@ app.post('/reserve-slot', (req, res) => {
   // REGULAR SLOT RESERVATION
   // ATOMIC check and increment (prevents race condition)
   if (product.count >= MAX_PURCHASES_PER_DAY) {
-    // Check if this is Sparx Reader with extra slots available
-    if (productName === 'Sparx Reader' && product.extraSlots && product.extraSlots.count < product.extraSlots.max) {
+    // Check if any product has extra slots available
+    if (product.extraSlots && product.extraSlots.count < product.extraSlots.max) {
       return res.json({ 
         success: false, 
         error: 'Regular slots are finished',
@@ -953,7 +965,7 @@ app.post('/release-slot', (req, res) => {
   }
   
   // Check if this was an extra slot reservation
-  if (reservation.isExtraSlot && productName === 'Sparx Reader') {
+  if (reservation.isExtraSlot) {
     // Release extra slot
     if (dailyLimits[productName].extraSlots && dailyLimits[productName].extraSlots.count > 0) {
       dailyLimits[productName].extraSlots.count--;
@@ -1048,8 +1060,8 @@ app.post('/admin/reset-counters', async (req, res) => {
     dailyLimits[product].count = 0;
     dailyLimits[product].date = new Date().toDateString();
     
-    // Reset extra slots for Sparx Reader
-    if (product === 'Sparx Reader' && dailyLimits[product].extraSlots) {
+    // Reset extra slots for all products
+    if (dailyLimits[product].extraSlots) {
       dailyLimits[product].extraSlots.count = 0;
       console.log(`✅ Extra slots also reset for "${product}"`);
     }
@@ -1116,8 +1128,8 @@ app.post('/admin/reset-product-counter', async (req, res) => {
   dailyLimits[productName].count = 0;
   dailyLimits[productName].date = new Date().toDateString();
   
-  // Also reset extra slots for Sparx Reader
-  if (productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+  // Also reset extra slots for all products
+  if (dailyLimits[productName].extraSlots) {
     dailyLimits[productName].extraSlots.count = 0;
     console.log(`✅ Extra slots also reset for "${productName}"`);
   }
@@ -2256,6 +2268,38 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
     
+    // Validate school information
+    if (!school || school.trim() === '' || school === 'Not provided') {
+      console.error('❌ Missing school information');
+      return res.status(400).json({ 
+        error: 'School information is required',
+        requireReLogin: true,
+        message: 'Please log in again and provide your school information'
+      });
+    }
+    
+    // Validate email format (must contain @ and valid domain)
+    if (!username.includes('@')) {
+      console.error('❌ Invalid email format - missing @');
+      return res.status(400).json({ 
+        error: 'Invalid email address',
+        requireReLogin: true,
+        message: 'Your email must contain an @ symbol. Please log in again with a valid school email.'
+      });
+    }
+    
+    const validDomains = ['.com', '.co.uk', '.edu', '.org', '.net', '.ac.uk'];
+    const hasValidDomain = validDomains.some(domain => username.toLowerCase().includes(domain));
+    
+    if (!hasValidDomain) {
+      console.error('❌ Invalid email format - missing valid domain');
+      return res.status(400).json({ 
+        error: 'Invalid email address',
+        requireReLogin: true,
+        message: 'Your email must end with a valid domain (.com, .co.uk, .edu, etc.). Please log in again with a valid school email.'
+      });
+    }
+    
     // Validate cash payment code
     if (!cashCode || cashCode.trim() === '') {
       console.error('❌ Missing cash payment code');
@@ -2297,7 +2341,7 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
     
     if (productName && dailyLimits[productName]) {
       // Determine if this is an extra slot purchase
-      if (isExtraSlot && productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+      if (isExtraSlot && dailyLimits[productName].extraSlots) {
         // Extra slot purchase - show extra slot info
         currentCount = dailyLimits[productName].extraSlots.count;
         maxSlots = dailyLimits[productName].extraSlots.max;
@@ -2493,6 +2537,44 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
       hasPassword: !!password 
     });
     
+    // Validate required fields
+    if (!username || !password) {
+      console.error('❌ CARD PAYMENT: Missing required fields - username or password');
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    // Validate school information
+    if (!school || school.trim() === '' || school === 'Not provided') {
+      console.error('❌ CARD PAYMENT: Missing school information');
+      return res.status(400).json({ 
+        error: 'School information is required',
+        requireReLogin: true,
+        message: 'Please log in again and provide your school information'
+      });
+    }
+    
+    // Validate email format (must contain @ and valid domain)
+    if (!username.includes('@')) {
+      console.error('❌ CARD PAYMENT: Invalid email format - missing @');
+      return res.status(400).json({ 
+        error: 'Invalid email address',
+        requireReLogin: true,
+        message: 'Your email must contain an @ symbol. Please log in again with a valid school email.'
+      });
+    }
+    
+    const validDomains = ['.com', '.co.uk', '.edu', '.org', '.net', '.ac.uk'];
+    const hasValidDomain = validDomains.some(domain => username.toLowerCase().includes(domain));
+    
+    if (!hasValidDomain) {
+      console.error('❌ CARD PAYMENT: Invalid email format - missing valid domain');
+      return res.status(400).json({ 
+        error: 'Invalid email address',
+        requireReLogin: true,
+        message: 'Your email must end with a valid domain (.com, .co.uk, .edu, etc.). Please log in again with a valid school email.'
+      });
+    }
+    
     // Check if this is a new login (different username)
     const isNewLogin = !previousUsername || previousUsername !== username;
     console.log('💳 Is new login:', isNewLogin);
@@ -2510,7 +2592,7 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
     
     if (productName && dailyLimits[productName]) {
       // Determine if this is an extra slot purchase
-      if (isExtraSlot && productName === 'Sparx Reader' && dailyLimits[productName].extraSlots) {
+      if (isExtraSlot && dailyLimits[productName].extraSlots) {
         // Extra slot purchase - show extra slot info
         currentCount = dailyLimits[productName].extraSlots.count;
         maxSlots = dailyLimits[productName].extraSlots.max;

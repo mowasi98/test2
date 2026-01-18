@@ -370,10 +370,10 @@ const DataModel = mongoose.model('Data', DataSchema);
 
 // Daily purchase limit tracking (5 per product per day)
 let dailyLimits = {
-  'Sparx Reader': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
-  'Sparx Maths': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
-  'Educate': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } },
-  'Seneca': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 2, basePrice: 3, currentPrice: 3 } }
+  'Sparx Reader': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 8, basePrice: 3, currentPrice: 3 } },
+  'Sparx Maths': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 8, basePrice: 3, currentPrice: 3 } },
+  'Educate': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 8, basePrice: 3, currentPrice: 3 } },
+  'Seneca': { count: 0, date: null, available: true, maxSlots: 5, extraSlots: { count: 0, max: 8, basePrice: 3, currentPrice: 3 } }
 };
 
 // Test mode flag - when enabled, shows "Come back later" screen to all users
@@ -386,7 +386,7 @@ let whitelistedUsers = []; // Array of approved usernames
 const MAX_PURCHASES_PER_DAY = 5; // Default starting slots per product per day (changed from 3 to 5)
 const ADMIN_MAX_SLOTS = 20; // Maximum slots admin can set per product
 const EXTRA_SLOT_PRICE = 3; // £3 starting price for extra slots (increases by £1 per purchase)
-const EXTRA_SLOT_MAX = 2; // Maximum 2 extra slots per product
+const EXTRA_SLOT_MAX = 8; // Maximum 8 extra slots per product (prices from £3 to £10)
 const RESERVATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds (increased for Stripe payment flow)
 
 // Track active reservations: { reservationId: { productName, timestamp } }
@@ -597,7 +597,7 @@ async function loadData() {
           maxSlots: loadedLimits['Sparx Reader']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Sparx Reader']?.extraSlots?.count || 0,
-            max: loadedLimits['Sparx Reader']?.extraSlots?.max || 2,
+            max: loadedLimits['Sparx Reader']?.extraSlots?.max || 8,
             basePrice: loadedLimits['Sparx Reader']?.extraSlots?.basePrice || 3,
             currentPrice: loadedLimits['Sparx Reader']?.extraSlots?.currentPrice || 3
           }
@@ -608,7 +608,7 @@ async function loadData() {
           maxSlots: loadedLimits['Sparx Maths']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Sparx Maths']?.extraSlots?.count || 0,
-            max: loadedLimits['Sparx Maths']?.extraSlots?.max || 2,
+            max: loadedLimits['Sparx Maths']?.extraSlots?.max || 8,
             basePrice: loadedLimits['Sparx Maths']?.extraSlots?.basePrice || 3,
             currentPrice: loadedLimits['Sparx Maths']?.extraSlots?.currentPrice || 3
           }
@@ -619,7 +619,7 @@ async function loadData() {
           maxSlots: loadedLimits['Educate']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Educate']?.extraSlots?.count || 0,
-            max: loadedLimits['Educate']?.extraSlots?.max || 2,
+            max: loadedLimits['Educate']?.extraSlots?.max || 8,
             basePrice: loadedLimits['Educate']?.extraSlots?.basePrice || 3,
             currentPrice: loadedLimits['Educate']?.extraSlots?.currentPrice || 3
           }
@@ -630,7 +630,7 @@ async function loadData() {
           maxSlots: loadedLimits['Seneca']?.maxSlots || 5,
           extraSlots: {
             count: loadedLimits['Seneca']?.extraSlots?.count || 0,
-            max: loadedLimits['Seneca']?.extraSlots?.max || 2,
+            max: loadedLimits['Seneca']?.extraSlots?.max || 8,
             basePrice: loadedLimits['Seneca']?.extraSlots?.basePrice || 3,
             currentPrice: loadedLimits['Seneca']?.extraSlots?.currentPrice || 3
           }

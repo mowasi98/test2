@@ -711,6 +711,16 @@
       <div class="price">&pound;2</div>
       <div id="slots-Sparx Maths"></div>
       <a href="login.html?product=Sparx%20Maths&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F5kQ00b64c7j7g5IbSMcfK0g" class="buy-btn" data-product="Sparx Maths">Buy Now</a>
+      
+      <!-- Extra Slot Overlay (only shown when regular slots are full) -->
+      <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Maths">
+        <div class="extra-slot-title">🔥 Slots Finished!</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Sparx Maths</div>
+        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-badge">Limited Time</div>
+        <div class="extra-slot-info">Extra Slot Available</div>
+        <a href="#" class="extra-slot-buy-btn" data-product="Sparx Maths" data-is-extra="true" onclick="buyExtraSlot(event, 'Sparx Maths')">Buy Extra Slot</a>
+      </div>
     </div>
     
     <div class="item-card" data-product="Educate">
@@ -719,6 +729,16 @@
       <div class="price">&pound;2</div>
       <div id="slots-Educate"></div>
       <a href="login.html?product=Educate&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2FfZubITfEM32R6v81e8cfK0i" class="buy-btn" data-product="Educate">Buy Now</a>
+      
+      <!-- Extra Slot Overlay (only shown when regular slots are full) -->
+      <div class="extra-slot-overlay" id="extraSlotOverlay-Educate">
+        <div class="extra-slot-title">🔥 Slots Finished!</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Educate</div>
+        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-badge">Limited Time</div>
+        <div class="extra-slot-info">Extra Slot Available</div>
+        <a href="#" class="extra-slot-buy-btn" data-product="Educate" data-is-extra="true" onclick="buyExtraSlot(event, 'Educate')">Buy Extra Slot</a>
+      </div>
     </div>
     
     <div class="item-card" data-product="Seneca">
@@ -727,6 +747,16 @@
       <div class="price">&pound;2</div>
       <div id="slots-Seneca"></div>
       <a href="login.html?product=Seneca&price=2&stripe=https%3A%2F%2Fbuy.stripe.com%2F6oUfZ978g1YNcTw6yscfK01" class="buy-btn" data-product="Seneca">Buy Now</a>
+      
+      <!-- Extra Slot Overlay (only shown when regular slots are full) -->
+      <div class="extra-slot-overlay" id="extraSlotOverlay-Seneca">
+        <div class="extra-slot-title">🔥 Slots Finished!</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Seneca</div>
+        <div class="extra-slot-price">£3</div>
+        <div class="extra-slot-badge">Limited Time</div>
+        <div class="extra-slot-info">Extra Slot Available</div>
+        <a href="#" class="extra-slot-buy-btn" data-product="Seneca" data-is-extra="true" onclick="buyExtraSlot(event, 'Seneca')">Buy Extra Slot</a>
+      </div>
     </div>
   </section>
 
@@ -1392,7 +1422,7 @@
       }
     }
 
-    // Buy extra slot function (Sparx Reader only)
+    // Buy extra slot function (all products)
     async function buyExtraSlot(event, productName) {
       event.preventDefault();
       console.log(`💎 Buying extra slot for ${productName}`);
@@ -1544,7 +1574,7 @@
           
           // Only update if button is not currently disabled due to reservation in progress
           if (buyBtn && !buyBtn.hasAttribute('data-reserving')) {
-            // Check for extra slot overlay (Sparx Reader only)
+            // Check for extra slot overlay (all products)
             const extraSlotOverlay = document.getElementById(`extraSlotOverlay-${product}`);
             
             if (data.timeRestricted) {
@@ -1586,15 +1616,15 @@
               
               if (extraSlotOverlay) extraSlotOverlay.classList.remove('active');
             } else {
-              // Regular slots finished - check for extra slots (Sparx Reader only)
+              // Regular slots finished - check for extra slots (ALL PRODUCTS)
               console.log(`🔍 Regular slots finished for "${product}". Extra slot data:`, data.extraSlots);
               
-              if (product === 'Sparx Reader' && data.extraSlots && data.extraSlots.available) {
+              if (data.extraSlots && data.extraSlots.available) {
                 // Extra slots available! Show overlay
-                console.log('💎 Extra slots available for Sparx Reader:', data.extraSlots);
+                console.log(`💎 Extra slots available for ${product}:`, data.extraSlots);
                 if (extraSlotOverlay) {
                   extraSlotOverlay.classList.add('active');
-                  console.log('✅ Extra slot overlay activated');
+                  console.log(`✅ Extra slot overlay activated for ${product}`);
                 }
                 slotsDiv.innerHTML = '<div class="slots-message">Regular slots finished</div>';
               } else {

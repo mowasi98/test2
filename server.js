@@ -748,7 +748,9 @@ function resetDailyCountersIfNeeded() {
     }
   });
   if (hasChanges) {
+    lastTimerResetTime = Date.now(); // Update timer for frontend countdown
     console.log('🔄 Daily counters reset (new day) - only for available products');
+    console.log(`⏰ Timer reset time updated: ${new Date(lastTimerResetTime).toLocaleString()}`);
     saveData();
   }
 }

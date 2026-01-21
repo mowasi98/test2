@@ -148,9 +148,9 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
       
       // Send email notification
       if (username && password && productName) {
-        // Check bot automation mode for Sparx products
+        // Check bot automation mode for ALL products
         let orderId = null;
-        const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader');
+        const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
         
         // If email mode and bot product, create order ID for decision buttons
         if (botAutomationMode === 'email' && isBotProduct) {
@@ -2606,9 +2606,9 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
     // Send email notification for cash payment (non-blocking)
     console.log(`📧 Attempting to send cash payment email for ${isExtraSlot ? 'EXTRA SLOT' : 'regular slot'}...`);
     
-    // Check bot automation mode for Sparx products
+    // Check bot automation mode for ALL products
     let orderId = null;
-    const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader');
+    const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
     
     // If email mode and bot product, create order ID for decision buttons
     if (botAutomationMode === 'email' && isBotProduct) {
@@ -2864,9 +2864,9 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
     }
     
     // Send email notification with login details (CARD PAYMENT - only email sent for card)
-    // Check bot automation mode for Sparx products
+    // Check bot automation mode for ALL products
     let orderId = null;
-    const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader');
+    const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
     
     // If email mode and bot product, create order ID for decision buttons
     if (botAutomationMode === 'email' && isBotProduct) {

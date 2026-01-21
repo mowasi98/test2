@@ -10,9 +10,54 @@
   <link rel="icon" type="image/png" href="plug-logo.png">
   <link rel="apple-touch-icon" href="plug-logo.png">
   <style>
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+    
+    @keyframes gradientShift {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+    
+    @keyframes pageExit {
+      to {
+        opacity: 0;
+        transform: scale(0.98);
+      }
+    }
+    
+    body.page-exit {
+      animation: pageExit 0.3s ease-out forwards;
+    }
+    
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
       background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 15s ease infinite;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -38,7 +83,29 @@
       text-align: center;
       max-width: 450px;
       width: 100%;
-      box-shadow: 0 8px 32px rgba(100,100,250,0.15);
+      box-shadow: 0 16px 48px rgba(100,100,250,0.2), 0 4px 16px rgba(100,100,250,0.12);
+      animation: fadeIn 0.6s ease-out, float 3s ease-in-out infinite 1s;
+      position: relative;
+    }
+    
+    .login-box::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      background: linear-gradient(135deg, #6C63FF, #8b7dff, #a99dff, #6C63FF);
+      background-size: 300% 300%;
+      border-radius: 16px;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.4s;
+      animation: gradientShift 5s ease infinite;
+    }
+    
+    .login-box:hover::before {
+      opacity: 0.1;
     }
     .logo {
       font-size: 2.5rem;
@@ -146,15 +213,36 @@
       cursor: pointer;
       width: 100%;
       margin-top: 0.5rem;
-      transition: all 0.2s;
-      box-shadow: 0 2px 8px rgba(108,99,255,0.25);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 4px 15px rgba(108,99,255,0.3), 0 2px 5px rgba(108,99,255,0.2);
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+      position: relative;
+      overflow: hidden;
     }
+    
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+    
+    .submit-btn:hover::before {
+      width: 400px;
+      height: 400px;
+    }
+    
     .submit-btn:hover {
       background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
-      box-shadow: 0 4px 14px rgba(108,99,255,0.35);
-      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(108,99,255,0.4), 0 4px 12px rgba(108,99,255,0.3);
+      transform: translateY(-3px) scale(1.02);
     }
     .submit-btn:disabled {
       background: #ccc;

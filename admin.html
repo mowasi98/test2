@@ -9,15 +9,40 @@
                               <!-- Favicon for all devices -->
                               <link rel="icon" type="image/png" href="plug-logo.png">
                               <link rel="apple-touch-icon" href="plug-logo.png">
-                              <style>
-                                body {
-                                  font-family: 'Segoe UI', Arial, sans-serif;
-                                  background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
-                                  color: #222;
-                                  margin: 0;
-                                  padding: 2rem;
-                                  min-height: 100vh;
-                                }
+              <style>
+                @keyframes fadeIn {
+                  from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                  }
+                  to {
+                    opacity: 1;
+                    transform: translateY(0);
+                  }
+                }
+                
+                @keyframes gradientShift {
+                  0% {
+                    background-position: 0% 50%;
+                  }
+                  50% {
+                    background-position: 100% 50%;
+                  }
+                  100% {
+                    background-position: 0% 50%;
+                  }
+                }
+                
+                body {
+                  font-family: 'Segoe UI', Arial, sans-serif;
+                  background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+                  background-size: 200% 200%;
+                  animation: gradientShift 15s ease infinite;
+                  color: #222;
+                  margin: 0;
+                  padding: 2rem;
+                  min-height: 100vh;
+                }
                                 
                                 /* Smooth scrolling for mobile and iPad only */
                                 @media (max-width: 1024px) {
@@ -29,14 +54,31 @@
                                     -webkit-overflow-scrolling: touch;
                                   }
                                 }
-                                .admin-container {
-                                  max-width: 800px;
-                                  margin: 0 auto;
-                                  background: #fff;
-                                  padding: 2rem;
-                                  border-radius: 16px;
-                                  box-shadow: 0 8px 32px rgba(100,100,250,0.15);
-                                }
+                .admin-container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  background: #fff;
+                  padding: 2rem;
+                  border-radius: 16px;
+                  box-shadow: 0 16px 48px rgba(100,100,250,0.2), 0 4px 16px rgba(100,100,250,0.12);
+                  animation: fadeIn 0.6s ease-out;
+                  position: relative;
+                }
+                
+                .admin-container::before {
+                  content: '';
+                  position: absolute;
+                  top: -2px;
+                  left: -2px;
+                  right: -2px;
+                  bottom: -2px;
+                  background: linear-gradient(135deg, #6C63FF, #8b7dff, #a99dff, #6C63FF);
+                  background-size: 300% 300%;
+                  border-radius: 16px;
+                  z-index: -1;
+                  opacity: 0.1;
+                  animation: gradientShift 5s ease infinite;
+                }
                                 h1 {
                                   color: #6C63FF;
                                   text-align: center;
@@ -66,29 +108,52 @@
                                   font-size: 1rem;
                                   box-sizing: border-box;
                                 }
-                                .btn {
-                                  background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
-                                  color: #fff;
-                                  padding: 0.75rem 2rem;
-                                  border: none;
-                                  border-radius: 10px;
-                                  font-size: 1rem;
-                                  font-weight: 600;
-                                  cursor: pointer;
-                                  transition: all 0.2s;
-                                  width: 100%;
-                                  margin-top: 1rem;
-                                  touch-action: manipulation;
-                                  user-select: none;
-                                  -webkit-tap-highlight-color: transparent;
-                                }
-                                .btn:hover {
-                                  background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
-                                }
-                                .btn:active {
-                                  transform: scale(0.97);
-                                  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                                }
+                .btn {
+                  background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+                  color: #fff;
+                  padding: 0.75rem 2rem;
+                  border: none;
+                  border-radius: 10px;
+                  font-size: 1rem;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                  width: 100%;
+                  margin-top: 1rem;
+                  touch-action: manipulation;
+                  user-select: none;
+                  -webkit-tap-highlight-color: transparent;
+                  box-shadow: 0 4px 15px rgba(108,99,255,0.3), 0 2px 5px rgba(108,99,255,0.2);
+                  position: relative;
+                  overflow: hidden;
+                }
+                
+                .btn::before {
+                  content: '';
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  width: 0;
+                  height: 0;
+                  border-radius: 50%;
+                  background: rgba(255, 255, 255, 0.3);
+                  transform: translate(-50%, -50%);
+                  transition: width 0.6s, height 0.6s;
+                }
+                
+                .btn:hover::before {
+                  width: 400px;
+                  height: 400px;
+                }
+                
+                .btn:hover {
+                  background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
+                  box-shadow: 0 8px 25px rgba(108,99,255,0.4), 0 4px 12px rgba(108,99,255,0.3);
+                  transform: translateY(-3px) scale(1.02);
+                }
+                .btn:active {
+                  transform: scale(0.98);
+                }
                                 .btn-danger {
                                   background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%);
                                 }

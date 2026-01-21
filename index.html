@@ -19,9 +19,63 @@
   <meta name="twitter:title" content="hwplug">
   <meta name="twitter:image" content="plug-logo.png">
   <style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+    
+    @keyframes shimmer {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+    
+    @keyframes gradientShift {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+    
+    @keyframes pageExit {
+      to {
+        opacity: 0;
+        transform: scale(0.98);
+      }
+    }
+    
+    body.page-exit {
+      animation: pageExit 0.3s ease-out forwards;
+    }
+    
     body {
       font-family: 'Segoe UI', Arial, sans-serif;
       background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%);
+      background-size: 200% 200%;
+      animation: gradientShift 15s ease infinite;
       color: #222;
       margin: 0;
       padding: 0;
@@ -42,8 +96,20 @@
       color: #fff;
       padding: 2.5rem 0 1.8rem 0;
       text-align: center;
-      box-shadow: 0 3px 12px rgba(50,50,150,0.15);
+      box-shadow: 0 8px 32px rgba(50,50,150,0.25), 0 2px 8px rgba(50,50,150,0.15);
       position: relative;
+      animation: fadeInUp 0.8s ease-out;
+    }
+    
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.05) 100%);
+      pointer-events: none;
     }
     .auth-buttons {
       position: absolute;
@@ -202,6 +268,8 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      filter: drop-shadow(0 4px 12px rgba(255,255,255,0.3));
+      animation: float 3s ease-in-out infinite;
     }
     .tagline {
       font-size: 1.2rem;
@@ -221,18 +289,72 @@
     .item-card {
       background: #fff;
       border-radius: 16px;
-      box-shadow: 0 3px 20px rgba(100,100,250,0.1);
+      box-shadow: 0 8px 32px rgba(100,100,250,0.12), 0 2px 8px rgba(100,100,250,0.08);
       padding: 2rem 1.8rem 1.5rem 1.8rem;
       text-align: center;
       width: 240px;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       position: relative;
-      border: 2px solid #f0f0ff;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      animation: fadeInUp 0.8s ease-out backwards;
+      transform-style: preserve-3d;
+      perspective: 1000px;
     }
+    
+    .item-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+    }
+    
+    .item-card:hover .item-card-inner {
+      transform: rotateY(5deg) scale(1.02);
+    }
+    
+    .item-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 16px;
+      padding: 2px;
+      background: linear-gradient(135deg, #f0f0ff, #e0e0ff, #d0d0ff);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0.6;
+      transition: opacity 0.4s;
+    }
+    
     .item-card:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 6px 28px rgba(100,100,250,0.18);
-      border-color: #c8c4ff;
+      transform: translateY(-12px) scale(1.02);
+      box-shadow: 0 16px 48px rgba(100,100,250,0.2), 0 4px 16px rgba(108,99,255,0.15);
+    }
+    
+    .item-card:hover::before {
+      opacity: 1;
+      background: linear-gradient(135deg, #6C63FF, #8b7dff, #a99dff);
+    }
+    
+    .item-card:nth-child(1) {
+      animation-delay: 0.1s;
+    }
+    
+    .item-card:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    
+    .item-card:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+    
+    .item-card:nth-child(4) {
+      animation-delay: 0.4s;
     }
     .extra-slot-overlay {
       position: absolute;
@@ -338,8 +460,8 @@
       font-size: 1.08rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
-      box-shadow: 0 2px 8px rgba(108,99,255,0.25);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 4px 15px rgba(108,99,255,0.3), 0 2px 5px rgba(108,99,255,0.2);
       text-decoration: none;
       display: inline-block;
       pointer-events: auto;
@@ -347,14 +469,34 @@
       position: relative;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
     }
+    
+    .buy-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+    
+    .buy-btn:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+    
     .buy-btn:hover {
       background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%);
-      box-shadow: 0 4px 14px rgba(108,99,255,0.35);
-      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(108,99,255,0.4), 0 4px 12px rgba(108,99,255,0.3);
+      transform: translateY(-3px) scale(1.05);
     }
     .buy-btn:active {
-      transform: scale(0.97);
+      transform: scale(0.98);
     }
     .buy-btn:disabled,
     .buy-btn.disabled {
@@ -382,6 +524,137 @@
     .slots-remaining.updating {
       opacity: 0.6;
       transform: scale(0.98);
+    }
+    
+    /* Slot Progress Bar Styles */
+    .slot-progress-container {
+      margin-top: 0.8rem;
+    }
+    
+    .slot-progress-label {
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+    }
+    
+    .slot-progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .slot-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6C63FF 0%, #8b7dff 100%);
+      border-radius: 10px;
+      transition: width 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .slot-progress-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: shimmer 2s infinite;
+    }
+    
+    .slot-progress-text {
+      font-size: 0.8rem;
+      color: #6C63FF;
+      margin-top: 0.3rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    
+    .slot-progress-fill.warning {
+      background: linear-gradient(90deg, #ff6b6b 0%, #ff8787 100%);
+    }
+    
+    .slot-progress-fill.full {
+      background: linear-gradient(90deg, #d32f2f 0%, #c62828 100%);
+    }
+    
+    /* Toast Notification Styles */
+    .toast-notification {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
+      color: #fff;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(108,99,255,0.4);
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      z-index: 10000;
+      animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      max-width: 320px;
+    }
+    
+    .toast-notification.hide {
+      animation: slideOutRight 0.5s cubic-bezier(0.6, -0.28, 0.735, 0.045);
+    }
+    
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+    
+    .toast-icon {
+      font-size: 1.5rem;
+      animation: bounce 1s ease-in-out infinite;
+    }
+    
+    .toast-content {
+      flex: 1;
+    }
+    
+    .toast-title {
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+    
+    .toast-subtitle {
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+    
+    @media (max-width: 600px) {
+      .toast-notification {
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+        max-width: none;
+      }
     }
     footer {
       text-align: center;
@@ -1663,12 +1936,28 @@
               const oldContent = slotsDiv.innerHTML;
               let newContent = '';
               
-              // Highlight if only 1 slot remaining
+              // Calculate progress
+              const maxSlots = data.maxSlots || 5;
+              const usedSlots = maxSlots - data.remaining;
+              const progressPercent = (usedSlots / maxSlots) * 100;
+              
+              let fillClass = '';
               if (data.remaining === 1) {
-                newContent = `<div class="slots-remaining" style="color: #ff6b6b; font-weight: 700; animation: pulse 2s infinite;">⚠️ Only 1 slot remaining today!</div>`;
-              } else {
-                newContent = `<div class="slots-remaining">${data.remaining} slot${data.remaining !== 1 ? 's' : ''} remaining today</div>`;
+                fillClass = 'warning';
+              } else if (data.remaining === 0) {
+                fillClass = 'full';
               }
+              
+              // Progress bar display
+              newContent = `
+                <div class="slot-progress-container">
+                  <div class="slot-progress-label">Daily Slots</div>
+                  <div class="slot-progress-bar">
+                    <div class="slot-progress-fill ${fillClass}" style="width: ${progressPercent}%"></div>
+                  </div>
+                  <div class="slot-progress-text">${usedSlots}/${maxSlots} filled • ${data.remaining} left</div>
+                </div>
+              `;
               
               // Only update if content actually changed (prevents flickering)
               if (oldContent.trim() !== newContent.trim()) {
@@ -1855,6 +2144,65 @@
     });
     
     console.log('✅ Buy Now buttons configured with visual feedback!');
+    
+    // 🔥 Toast Notification System
+    function showToast(icon, title, subtitle) {
+      const toast = document.createElement('div');
+      toast.className = 'toast-notification';
+      toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">
+          <div class="toast-title">${title}</div>
+          <div class="toast-subtitle">${subtitle}</div>
+        </div>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      // Remove after 4 seconds
+      setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => {
+          document.body.removeChild(toast);
+        }, 500);
+      }, 4000);
+    }
+    
+    // Simulate "Just Sold!" notifications
+    function showRandomSoldNotification() {
+      const products = ['Sparx Maths', 'Sparx Reader', 'Educate', 'Seneca'];
+      const randomProduct = products[Math.floor(Math.random() * products.length)];
+      const timeAgo = ['Just now', '2 minutes ago', '5 minutes ago', '10 minutes ago'];
+      const randomTime = timeAgo[Math.floor(Math.random() * timeAgo.length)];
+      
+      showToast('🔥', `${randomProduct} - Just Sold!`, randomTime);
+    }
+    
+    // Show first notification after 10 seconds
+    setTimeout(() => {
+      showRandomSoldNotification();
+      // Then show randomly every 15-30 seconds
+      setInterval(() => {
+        showRandomSoldNotification();
+      }, Math.random() * 15000 + 15000); // Random between 15-30 seconds
+    }, 10000);
+    
+    // 🌊 Smooth Page Transitions
+    function smoothNavigate(url) {
+      document.body.classList.add('page-exit');
+      setTimeout(() => {
+        window.location.href = url;
+      }, 300);
+    }
+    
+    // Intercept all internal link clicks for smooth transitions
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a');
+      if (link && link.href && link.href.startsWith(window.location.origin) && !link.target && !link.hasAttribute('data-no-transition')) {
+        e.preventDefault();
+        smoothNavigate(link.href);
+      }
+    });
   </script>
 </body>
 </html>

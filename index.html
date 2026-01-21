@@ -625,6 +625,65 @@
     .slot-progress-fill.full {
       background: linear-gradient(90deg, #d32f2f 0%, #c62828 100%);
     }
+    
+    /* Most Popular Badge */
+    .popular-badge {
+      position: absolute;
+      top: 15px;
+      right: -5px;
+      background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+      color: #fff;
+      padding: 0.5rem 2rem;
+      font-weight: 800;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transform: rotate(5deg);
+      box-shadow: 0 4px 15px rgba(255, 82, 82, 0.4);
+      z-index: 5;
+      border-radius: 4px;
+    }
+    
+    .popular-badge::before {
+      content: '⭐';
+      margin-right: 0.3rem;
+    }
+    
+    .popular-badge::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      right: 10px;
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid #d32f2f;
+    }
+    
+    /* Popular badge for extra slot overlay */
+    .extra-slot-popular-badge {
+      position: absolute;
+      top: 10px;
+      right: -5px;
+      background: linear-gradient(135deg, #fff 0%, #f5f5f5 100%);
+      color: #ff5252;
+      padding: 0.4rem 1.5rem;
+      font-weight: 800;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transform: rotate(5deg);
+      box-shadow: 0 4px 15px rgba(255, 255, 255, 0.5);
+      z-index: 15;
+      border-radius: 4px;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+    }
+    
+    .extra-slot-popular-badge::before {
+      content: '⭐';
+      margin-right: 0.3rem;
+    }
     footer {
       text-align: center;
       padding: 1.5rem;
@@ -930,6 +989,7 @@
 
   <section class="items">
     <div class="item-card" data-product="Sparx Reader">
+      <div class="popular-badge">Most Popular</div>
       <div class="item-title">Sparx Reader</div>
       <div class="item-desc">Improve reading comprehension with interactive tasks</div>
       <div class="price">&pound;2</div>
@@ -938,6 +998,7 @@
       
       <!-- Extra Slot Overlay (only shown when regular slots are full) -->
       <div class="extra-slot-overlay" id="extraSlotOverlay-Sparx Reader">
+        <div class="extra-slot-popular-badge">Most Popular</div>
         <div class="extra-slot-title">🔥 Slots Finished!</div>
         <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Sparx Reader</div>
         <div class="extra-slot-price" id="extraSlotPrice-Sparx Reader">£3</div>

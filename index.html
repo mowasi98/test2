@@ -1966,10 +1966,18 @@
                   // Update progress bar for extra slots
                   const progressContainer = document.getElementById(`extraSlotProgress-${product}`);
                   if (progressContainer && data.extraSlots) {
+                    // Get data from backend: count = how many extra slots sold, max = total available
                     const maxExtraSlots = data.extraSlots.max || 8;
-                    const usedExtraSlots = data.extraSlots.used || 0;
-                    const remainingExtraSlots = data.extraSlots.remaining || (maxExtraSlots - usedExtraSlots);
+                    const usedExtraSlots = data.extraSlots.count || 0;
+                    const remainingExtraSlots = maxExtraSlots - usedExtraSlots;
                     const extraProgressPercent = (usedExtraSlots / maxExtraSlots) * 100;
+                    
+                    console.log(`📊 Extra slot progress for ${product}:`, {
+                      maxExtraSlots,
+                      usedExtraSlots,
+                      remainingExtraSlots,
+                      extraSlotsData: data.extraSlots
+                    });
                     
                     progressContainer.innerHTML = `
                       <div class="extra-slot-progress-bar">

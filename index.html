@@ -408,6 +408,49 @@
       margin-bottom: 1.2rem;
       font-weight: 600;
     }
+    
+    /* Extra Slot Progress Bar */
+    .extra-slot-progress {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    
+    .extra-slot-progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 0.5rem;
+    }
+    
+    .extra-slot-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #fff 0%, #f0f0f0 100%);
+      border-radius: 10px;
+      transition: width 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .extra-slot-progress-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+      animation: shimmer 2s infinite;
+    }
+    
+    .extra-slot-progress-text {
+      font-size: 0.8rem;
+      color: #fff;
+      font-weight: 700;
+      text-align: center;
+    }
     .extra-slot-buy-btn {
       background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
       color: #fff;
@@ -581,80 +624,6 @@
     
     .slot-progress-fill.full {
       background: linear-gradient(90deg, #d32f2f 0%, #c62828 100%);
-    }
-    
-    /* Toast Notification Styles */
-    .toast-notification {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%);
-      color: #fff;
-      padding: 1rem 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(108,99,255,0.4);
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-      font-weight: 600;
-      font-size: 0.95rem;
-      z-index: 10000;
-      animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      max-width: 320px;
-    }
-    
-    .toast-notification.hide {
-      animation: slideOutRight 0.5s cubic-bezier(0.6, -0.28, 0.735, 0.045);
-    }
-    
-    @keyframes slideInRight {
-      from {
-        transform: translateX(400px);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-    
-    @keyframes slideOutRight {
-      from {
-        transform: translateX(0);
-        opacity: 1;
-      }
-      to {
-        transform: translateX(400px);
-        opacity: 0;
-      }
-    }
-    
-    .toast-icon {
-      font-size: 1.5rem;
-      animation: bounce 1s ease-in-out infinite;
-    }
-    
-    .toast-content {
-      flex: 1;
-    }
-    
-    .toast-title {
-      font-weight: 700;
-      margin-bottom: 0.2rem;
-    }
-    
-    .toast-subtitle {
-      font-size: 0.85rem;
-      opacity: 0.9;
-    }
-    
-    @media (max-width: 600px) {
-      .toast-notification {
-        bottom: 1rem;
-        right: 1rem;
-        left: 1rem;
-        max-width: none;
-      }
     }
     footer {
       text-align: center;
@@ -974,6 +943,9 @@
         <div class="extra-slot-price" id="extraSlotPrice-Sparx Reader">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
+        <div class="extra-slot-progress" id="extraSlotProgress-Sparx Reader">
+          <!-- Progress bar will be dynamically inserted here -->
+        </div>
         <a href="#" class="extra-slot-buy-btn" data-product="Sparx Reader" data-is-extra="true" onclick="buyExtraSlot(event, 'Sparx Reader')">Buy Extra Slot</a>
       </div>
     </div>
@@ -992,6 +964,9 @@
         <div class="extra-slot-price" id="extraSlotPrice-Sparx Maths">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
+        <div class="extra-slot-progress" id="extraSlotProgress-Sparx Maths">
+          <!-- Progress bar will be dynamically inserted here -->
+        </div>
         <a href="#" class="extra-slot-buy-btn" data-product="Sparx Maths" data-is-extra="true" onclick="buyExtraSlot(event, 'Sparx Maths')">Buy Extra Slot</a>
       </div>
     </div>
@@ -1010,6 +985,9 @@
         <div class="extra-slot-price" id="extraSlotPrice-Educate">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
+        <div class="extra-slot-progress" id="extraSlotProgress-Educate">
+          <!-- Progress bar will be dynamically inserted here -->
+        </div>
         <a href="#" class="extra-slot-buy-btn" data-product="Educate" data-is-extra="true" onclick="buyExtraSlot(event, 'Educate')">Buy Extra Slot</a>
       </div>
     </div>
@@ -1028,6 +1006,9 @@
         <div class="extra-slot-price" id="extraSlotPrice-Seneca">£3</div>
         <div class="extra-slot-badge">Limited Time</div>
         <div class="extra-slot-info">Extra Slot Available</div>
+        <div class="extra-slot-progress" id="extraSlotProgress-Seneca">
+          <!-- Progress bar will be dynamically inserted here -->
+        </div>
         <a href="#" class="extra-slot-buy-btn" data-product="Seneca" data-is-extra="true" onclick="buyExtraSlot(event, 'Seneca')">Buy Extra Slot</a>
       </div>
     </div>
@@ -1981,6 +1962,23 @@
                     priceElement.textContent = `£${displayPrice}`;
                     console.log(`💰 Updated extra slot price for ${product}: £${displayPrice}`, data.extraSlots);
                   }
+                  
+                  // Update progress bar for extra slots
+                  const progressContainer = document.getElementById(`extraSlotProgress-${product}`);
+                  if (progressContainer && data.extraSlots) {
+                    const maxExtraSlots = data.extraSlots.max || 8;
+                    const usedExtraSlots = data.extraSlots.used || 0;
+                    const remainingExtraSlots = data.extraSlots.remaining || (maxExtraSlots - usedExtraSlots);
+                    const extraProgressPercent = (usedExtraSlots / maxExtraSlots) * 100;
+                    
+                    progressContainer.innerHTML = `
+                      <div class="extra-slot-progress-bar">
+                        <div class="extra-slot-progress-fill" style="width: ${extraProgressPercent}%"></div>
+                      </div>
+                      <div class="extra-slot-progress-text">${usedExtraSlots}/${maxExtraSlots} filled • ${remainingExtraSlots} left</div>
+                    `;
+                  }
+                  
                   extraSlotOverlay.classList.add('active');
                   console.log(`✅ Extra slot overlay activated for ${product}`);
                 }
@@ -2144,48 +2142,6 @@
     });
     
     console.log('✅ Buy Now buttons configured with visual feedback!');
-    
-    // 🔥 Toast Notification System
-    function showToast(icon, title, subtitle) {
-      const toast = document.createElement('div');
-      toast.className = 'toast-notification';
-      toast.innerHTML = `
-        <div class="toast-icon">${icon}</div>
-        <div class="toast-content">
-          <div class="toast-title">${title}</div>
-          <div class="toast-subtitle">${subtitle}</div>
-        </div>
-      `;
-      
-      document.body.appendChild(toast);
-      
-      // Remove after 4 seconds
-      setTimeout(() => {
-        toast.classList.add('hide');
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 500);
-      }, 4000);
-    }
-    
-    // Simulate "Just Sold!" notifications
-    function showRandomSoldNotification() {
-      const products = ['Sparx Maths', 'Sparx Reader', 'Educate', 'Seneca'];
-      const randomProduct = products[Math.floor(Math.random() * products.length)];
-      const timeAgo = ['Just now', '2 minutes ago', '5 minutes ago', '10 minutes ago'];
-      const randomTime = timeAgo[Math.floor(Math.random() * timeAgo.length)];
-      
-      showToast('🔥', `${randomProduct} - Just Sold!`, randomTime);
-    }
-    
-    // Show first notification after 10 seconds
-    setTimeout(() => {
-      showRandomSoldNotification();
-      // Then show randomly every 15-30 seconds
-      setInterval(() => {
-        showRandomSoldNotification();
-      }, Math.random() * 15000 + 15000); // Random between 15-30 seconds
-    }, 10000);
     
     // 🌊 Smooth Page Transitions
     function smoothNavigate(url) {

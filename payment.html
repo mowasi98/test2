@@ -197,6 +197,10 @@
     .payment-option:nth-child(2) {
       animation-delay: 0.2s;
     }
+    
+    .payment-option:nth-child(3) {
+      animation-delay: 0.3s;
+    }
     .payment-option-title {
       font-weight: 700;
       font-size: 1.1rem;
@@ -340,6 +344,14 @@
           <span>Pay with Card</span>
         </div>
         <div class="payment-option-desc">Secure payment via Stripe</div>
+      </div>
+      
+      <div class="payment-option" data-method="paypal" onclick="selectPaymentMethod('paypal')">
+        <div class="payment-option-title">
+          <span class="payment-icon">🅿️</span>
+          <span>Pay with PayPal</span>
+        </div>
+        <div class="payment-option-desc">Fast & secure PayPal checkout</div>
       </div>
       
       <div class="payment-option" data-method="cash" onclick="selectPaymentMethod('cash')">
@@ -487,9 +499,15 @@
         cashCodeInput.style.display = 'none';
       }
       
-      // Enable pay button
+      // Enable pay button and update text
       document.getElementById('payBtn').disabled = false;
-      document.getElementById('payBtn').textContent = method === 'card' ? 'Continue to Payment' : 'Submit Cash Payment';
+      if (method === 'card') {
+        document.getElementById('payBtn').textContent = 'Continue to Payment';
+      } else if (method === 'paypal') {
+        document.getElementById('payBtn').textContent = 'Continue to PayPal';
+      } else {
+        document.getElementById('payBtn').textContent = 'Submit Cash Payment';
+      }
     }
 
     async function processPayment() {
@@ -525,24 +543,25 @@
 
       console.log('Processing payment:', { selectedMethod, username, productName, productPrice, stripeLink });
       
-      if (selectedMethod === 'card') {
+      if (selectedMethod === 'card' || selectedMethod === 'paypal') {
         // Get reservation ID (stored when slot was reserved)
         const reservationId = sessionStorage.getItem('reservationId');
         
-        // Set flag to prevent slot release when navigating to Stripe
+        // Set flag to prevent slot release when navigating to payment provider
         isProceedingToStripe = true;
-        console.log('✅ Setting flag: proceeding to Stripe - slot will NOT be released');
+        console.log(`✅ Setting flag: proceeding to ${selectedMethod.toUpperCase()} - slot will NOT be released`);
         
-        // Create Stripe checkout session with metadata (for webhook)
+        // Create checkout session with metadata (for webhook)
         try {
-          console.log('💳 Creating Stripe checkout session with data:', {
+          console.log(`💳 Creating ${selectedMethod.toUpperCase()} checkout session with data:`, {
             reservationId,
             school,
             username,
             productName,
             productPrice,
             previousUsername,
-            hasPassword: !!password
+            hasPassword: !!password,
+            paymentMethod: selectedMethod
           });
           
           const checkoutResponse = await fetch(`${BACKEND_URL}/create-checkout-session`, {
@@ -558,6 +577,7 @@
               productName: productName,
               productPrice: productPrice,
               previousUsername: previousUsername || '',
+              paymentMethod: selectedMethod, // 'card' or 'paypal'
               successUrl: `${window.location.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
               cancelUrl: `${window.location.origin}/payment.html`
             }),
@@ -565,17 +585,17 @@
           
           if (!checkoutResponse.ok) {
             const errorData = await checkoutResponse.json();
-            console.error('💳 Checkout session creation failed:', errorData);
+            console.error(`💳 ${selectedMethod.toUpperCase()} checkout session creation failed:`, errorData);
             isProceedingToStripe = false;
             document.getElementById('errorMessage').textContent = errorData.error || 'Failed to create checkout session. Please try again.';
             document.getElementById('errorMessage').style.display = 'block';
             payBtn.disabled = false;
-            payBtn.textContent = 'Continue to Payment';
+            payBtn.textContent = selectedMethod === 'card' ? 'Continue to Payment' : 'Continue to PayPal';
             return;
           }
           
           const checkoutData = await checkoutResponse.json();
-          console.log('✅ Stripe checkout session created:', checkoutData.sessionId);
+          console.log(`✅ ${selectedMethod.toUpperCase()} checkout session created:`, checkoutData.sessionId);
           
           // Store minimal data in localStorage for success page fallback
           localStorage.setItem('cardPaymentProductName', productName);
@@ -585,10 +605,11 @@
           localStorage.setItem('cardPaymentPassword', password || '');
           localStorage.setItem('cardPaymentPreviousUsername', previousUsername || '');
           localStorage.setItem('cardPaymentReservationId', reservationId || '');
+          localStorage.setItem('cardPaymentMethod', selectedMethod);
           
-          // Redirect to Stripe checkout (webhook will handle purchase completion)
+          // Redirect to payment provider (webhook will handle purchase completion)
           if (checkoutData.url) {
-            console.log('🔀 Redirecting to Stripe checkout...');
+            console.log(`🔀 Redirecting to ${selectedMethod.toUpperCase()} checkout...`);
             setTimeout(() => {
               window.location.href = checkoutData.url;
             }, 50);
@@ -596,12 +617,12 @@
             throw new Error('No checkout URL received from server');
           }
         } catch (error) {
-          console.error('💳 Error creating checkout session:', error);
+          console.error(`💳 Error creating ${selectedMethod} checkout session:`, error);
           isProceedingToStripe = false;
           document.getElementById('errorMessage').textContent = 'Something went wrong: ' + error.message;
           document.getElementById('errorMessage').style.display = 'block';
           payBtn.disabled = false;
-          payBtn.textContent = 'Continue to Payment';
+          payBtn.textContent = selectedMethod === 'card' ? 'Continue to Payment' : 'Continue to PayPal';
         }
       } else if (selectedMethod === 'cash') {
         // Get and validate cash code

@@ -2362,17 +2362,19 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
       productName, 
       productPrice,
       previousUsername,
+      paymentMethod,
       successUrl,
       cancelUrl
     } = req.body;
     
-    console.log('💳 Creating Stripe checkout session with metadata:', {
+    console.log(`💳 Creating ${paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'} checkout session with metadata:`, {
       reservationId,
       school,
       username,
       productName,
       productPrice,
       previousUsername,
+      paymentMethod,
       hasPassword: !!password
     });
     
@@ -2395,9 +2397,12 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
       quantity: 1,
     }];
 
+    // Determine payment method types based on request
+    const paymentMethodTypes = paymentMethod === 'paypal' ? ['paypal'] : ['card'];
+
     // Create checkout session with metadata
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: paymentMethodTypes,
       line_items: lineItems,
       mode: 'payment',
       success_url: successUrl || `${req.headers.origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
@@ -2412,14 +2417,15 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
         password: password,
         productName: productName,
         productPrice: productPrice,
-        previousUsername: previousUsername || ''
+        previousUsername: previousUsername || '',
+        paymentMethod: paymentMethod || 'card'
       }
     });
     
-    console.log('✅ Stripe checkout session created:', session.id);
+    console.log(`✅ ${paymentMethod === 'paypal' ? 'PayPal' : 'Stripe'} checkout session created:`, session.id);
     res.json({ 
       sessionId: session.id,
-      url: session.url // Return the Stripe checkout URL
+      url: session.url // Return the checkout URL
     });
   } catch (error) {
     console.error('❌ Error creating checkout session:', error);

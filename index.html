@@ -371,6 +371,46 @@
       padding: 1.5rem;
       z-index: 10;
       animation: fadeIn 0.3s ease-in;
+      overflow: hidden;
+    }
+    
+    /* Mobile fix for extra slot overlay */
+    @media (max-width: 900px) {
+      .extra-slot-overlay {
+        padding: 1rem;
+      }
+      .extra-slot-title {
+        font-size: 1.1rem !important;
+        margin-bottom: 0.5rem !important;
+      }
+      .extra-slot-overlay > div[style*="font-size: 1.1rem"] {
+        font-size: 0.95rem !important;
+        margin-bottom: 0.4rem !important;
+      }
+      .extra-slot-price {
+        font-size: 1.8rem !important;
+        margin-bottom: 0.4rem !important;
+      }
+      .extra-slot-badge {
+        font-size: 0.7rem !important;
+        padding: 0.3rem 0.6rem !important;
+        margin-bottom: 0.6rem !important;
+      }
+      .extra-slot-info {
+        font-size: 0.8rem !important;
+        margin-bottom: 0.8rem !important;
+      }
+      .extra-slot-buy-btn {
+        padding: 0.7rem 1.4rem !important;
+        font-size: 0.9rem !important;
+      }
+      .extra-slot-progress {
+        margin-bottom: 0.8rem !important;
+      }
+      .extra-slot-popular-badge {
+        font-size: 0.65rem !important;
+        padding: 0.3rem 1rem !important;
+      }
     }
     .extra-slot-overlay.active {
       display: flex;

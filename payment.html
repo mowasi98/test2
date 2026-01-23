@@ -387,21 +387,8 @@
     // Load product info from sessionStorage
     window.addEventListener('DOMContentLoaded', () => {
       // VERSION CHECK: Force everyone to re-login with new validation rules
-      const CURRENT_VERSION = '2.1';
-      const savedVersion = localStorage.getItem('appVersion');
-      
-      if (savedVersion !== CURRENT_VERSION) {
-        console.log('🔄 VERSION UPDATE - Clearing credentials and redirecting to login');
-        localStorage.removeItem('savedUsername');
-        localStorage.removeItem('savedPassword');
-        localStorage.removeItem('savedSchool');
-        localStorage.setItem('appVersion', CURRENT_VERSION);
-        
-        // Redirect to homepage (they'll need to login again)
-        alert('⚠️ System update detected. Please log in again to continue.');
-        window.location.href = 'index.html';
-        return;
-      }
+      // Version check is now handled in login.html - no need to check here
+      // Just continue to payment page normally
       
       const productName = sessionStorage.getItem('productName');
       const productPrice = sessionStorage.getItem('productPrice');

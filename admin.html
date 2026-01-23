@@ -444,6 +444,14 @@
                                     <strong>Note:</strong> "Reset Timer Only" resets the 24-hour timer but keeps current slot counts. "Reset All Counters" resets both timer and slot counts to 0.
                                   </p>
                                   
+                                  <!-- Force Re-login Section -->
+                                  <div style="margin: 2rem 0; padding: 1.5rem; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); border-radius: 12px; border: 3px solid #ff6f00; box-shadow: 0 4px 12px rgba(255,152,0,0.3);">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #fff;">🔄 Force All Users to Re-login</h4>
+                                    <p style="font-size: 0.9rem; color: rgba(255,255,255,0.9); margin-bottom: 1rem;">Force all users to login again (credentials will be saved after re-login)</p>
+                                    <button class="btn" id="forceReloginBtn" style="background: #fff; color: #ff6f00; font-weight: 700; border: 2px solid #fff; touch-action: manipulation;">⚠️ Force All Users to Re-login</button>
+                                    <div id="forceReloginStatus" style="margin-top: 0.8rem; padding: 0.8rem; background: rgba(255,255,255,0.9); border-radius: 8px; display: none; color: #333;"></div>
+                                  </div>
+                                  
                                   <div class="availability-section">
                                     <h3 style="margin-top: 0; color: #856404;">🌐 Global Availability Controls</h3>
                                     <p style="color: #856404; margin-bottom: 1rem;">Mark all products as available or not available</p>
@@ -1117,6 +1125,59 @@
                                     showMessage(`Error: ${error.message}`, 'error');
                                   }
                                 }
+                                
+                                async function forceAllUsersToRelogin() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (!confirm('⚠️ Are you sure you want to force ALL users to re-login?\n\nThis will clear all saved credentials. Users will need to login once more, then auto-login will work again.')) {
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const statusDiv = document.getElementById('forceReloginStatus');
+                                    statusDiv.style.display = 'block';
+                                    statusDiv.innerHTML = '⏳ Processing...';
+                                    
+                                    const response = await fetch(`${BACKEND_URL}/admin/force-relogin`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      statusDiv.style.background = '#d4edda';
+                                      statusDiv.style.color = '#155724';
+                                      statusDiv.innerHTML = `
+                                        <strong style="color: #28a745;">✅ Force Re-login Activated!</strong><br>
+                                        <span style="font-size: 0.9rem;">All users will need to login again on their next visit.<br>
+                                        After they login once, auto-login will work normally.</span>
+                                      `;
+                                      showMessage('✅ All users will be forced to re-login!', 'success');
+                                    } else {
+                                      statusDiv.style.background = '#f8d7da';
+                                      statusDiv.style.color = '#721c24';
+                                      statusDiv.innerHTML = `<strong>❌ Error:</strong> ${data.error || 'Unknown error'}`;
+                                      showMessage(data.error || 'Error forcing re-login', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error forcing re-login:', error);
+                                    const statusDiv = document.getElementById('forceReloginStatus');
+                                    statusDiv.style.display = 'block';
+                                    statusDiv.style.background = '#f8d7da';
+                                    statusDiv.style.color = '#721c24';
+                                    statusDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                                    showMessage(`Error: ${error.message}`, 'error');
+                                  }
+                                }
 
                                 async function resetCounters() {
                                   const password = document.getElementById('adminPassword').value;
@@ -1588,6 +1649,19 @@
                                     setGlobalQueueBtn.addEventListener('touchstart', function(e) {
                                       e.preventDefault();
                                       setGlobalQueueTime();
+                                    });
+                                  }
+                                  
+                                  // Force Re-login button
+                                  const forceReloginBtn = document.getElementById('forceReloginBtn');
+                                  if (forceReloginBtn) {
+                                    forceReloginBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      forceAllUsersToRelogin();
+                                    });
+                                    forceReloginBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      forceAllUsersToRelogin();
                                     });
                                   }
                                   

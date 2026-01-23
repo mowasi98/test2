@@ -1952,6 +1952,94 @@ app.post('/admin/set-same-product-queue-time', (req, res) => {
   }
 });
 
+// Force all users to re-login by incrementing the required version
+app.post('/admin/force-relogin', (req, res) => {
+  const { password } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'queue-config.json');
+    
+    // Read current config
+    let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60, requiredVersion: '2.2' };
+    if (fs.existsSync(configPath)) {
+      try {
+        const data = fs.readFileSync(configPath, 'utf8');
+        config = JSON.parse(data);
+      } catch (e) {
+        console.error('Error reading queue config:', e.message);
+      }
+    }
+    
+    // Increment version (e.g., 2.2 -> 2.3)
+    const currentVersion = config.requiredVersion || '2.2';
+    const versionParts = currentVersion.split('.');
+    const majorVersion = parseInt(versionParts[0]) || 2;
+    const minorVersion = parseInt(versionParts[1]) || 2;
+    const newVersion = `${majorVersion}.${minorVersion + 1}`;
+    
+    config.requiredVersion = newVersion;
+    
+    // Save to file
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    
+    console.log(`\n${'='.repeat(60)}`);
+    console.log('🔄 FORCE RE-LOGIN ACTIVATED');
+    console.log(`${'='.repeat(60)}`);
+    console.log(`Version updated: ${currentVersion} → ${newVersion}`);
+    console.log(`All users will be required to re-login on next visit`);
+    console.log(`File location: ${configPath}`);
+    console.log(`${'='.repeat(60)}\n`);
+    
+    res.json({
+      success: true,
+      message: `All users will be forced to re-login (version ${newVersion})`,
+      newVersion: newVersion
+    });
+  } catch (error) {
+    console.error('Error forcing re-login:', error);
+    res.status(500).json({ error: 'Error updating version config' });
+  }
+});
+
+// Endpoint to get the required version for force re-login
+app.get('/get-required-version', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'queue-config.json');
+    
+    let requiredVersion = '2.2'; // Default version
+    
+    if (fs.existsSync(configPath)) {
+      try {
+        const data = fs.readFileSync(configPath, 'utf8');
+        const config = JSON.parse(data);
+        requiredVersion = config.requiredVersion || '2.2';
+      } catch (e) {
+        console.error('Error reading version from queue config:', e.message);
+      }
+    }
+    
+    res.json({
+      success: true,
+      requiredVersion: requiredVersion
+    });
+  } catch (error) {
+    console.error('Error getting required version:', error);
+    res.json({
+      success: true,
+      requiredVersion: '2.2' // Return default on error
+    });
+  }
+});
+
 // Endpoint to get timer reset time (for frontend sync)
 app.get('/admin/timer-reset-time', (req, res) => {
   res.json({

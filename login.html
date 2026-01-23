@@ -519,25 +519,42 @@
       console.log('⚠️ ⚠️ ⚠️ IF YOU SEE THIS, NEW CODE IS LOADED! ⚠️ ⚠️ ⚠️');
       
       // VERSION CHECK: Force everyone to re-login with new login type system
-      const CURRENT_VERSION = '2.2'; // Increment this to force logout
-      const savedVersion = localStorage.getItem('appVersion');
+      // Check required version from server (for force re-login feature)
+      const BACKEND_URL = 'https://test2-adsw.onrender.com';
       
-      if (savedVersion !== CURRENT_VERSION) {
-        console.log('🔄 VERSION UPDATE DETECTED - Clearing old credentials');
-        console.log(`   Old version: ${savedVersion || 'none'}, New version: ${CURRENT_VERSION}`);
+      try {
+        const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
+        const versionData = await versionResponse.json();
+        const requiredVersion = versionData.requiredVersion || '2.2';
+        const savedVersion = localStorage.getItem('appVersion');
         
-        // Clear all saved credentials (including loginType)
-        localStorage.removeItem('savedUsername');
-        localStorage.removeItem('savedPassword');
-        localStorage.removeItem('savedSchool');
-        localStorage.removeItem('savedLoginType');
+        console.log('═══════════════════════════════════════════════════');
+        console.log('🔍 VERSION CHECK');
+        console.log('═══════════════════════════════════════════════════');
+        console.log(`Server requires: ${requiredVersion}`);
+        console.log(`User has: ${savedVersion || 'none'}`);
         
-        // Save new version
-        localStorage.setItem('appVersion', CURRENT_VERSION);
-        
-        console.log('✅ All users must re-login with the new login type system!');
-      } else {
-        console.log(`✅ Version ${CURRENT_VERSION} - credentials still valid`);
+        if (savedVersion !== requiredVersion) {
+          console.log('🔄 VERSION MISMATCH - Forcing re-login');
+          
+          // Clear all saved credentials
+          localStorage.removeItem('savedUsername');
+          localStorage.removeItem('savedPassword');
+          localStorage.removeItem('savedSchool');
+          localStorage.removeItem('savedLoginType');
+          
+          // Save new version
+          localStorage.setItem('appVersion', requiredVersion);
+          
+          console.log('✅ User must re-login (credentials cleared)');
+          console.log('═══════════════════════════════════════════════════');
+        } else {
+          console.log(`✅ Version ${requiredVersion} - credentials still valid`);
+          console.log('═══════════════════════════════════════════════════');
+        }
+      } catch (error) {
+        console.error('❌ Error checking version:', error.message);
+        console.log('Continuing with default version check...');
       }
       
       // Setup school autocomplete

@@ -152,8 +152,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
         let orderId = null;
         const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
         
-        // If email mode and bot product, create order ID for decision buttons
-        if (botAutomationMode === 'email' && isBotProduct) {
+        // Create order ID for all bot products (for skip queue functionality)
+        if (isBotProduct) {
           orderId = `order_${session.id}_${Date.now()}`;
           pendingOrders[orderId] = {
             productName: productName,
@@ -163,9 +163,10 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
             school: school || 'Not provided',
             sessionId: session.id,
             createdAt: new Date().toISOString(),
-            processed: false
+            processed: false,
+            autoMode: botAutomationMode === 'auto' // Track if this was auto-triggered
           };
-          console.log(`📋 WEBHOOK: Order stored as pending (ID: ${orderId}) - email mode active`);
+          console.log(`📋 WEBHOOK: Order stored (ID: ${orderId}) - Mode: ${botAutomationMode}`);
         }
         
         // Calculate actual dynamic price for extra slots
@@ -193,7 +194,8 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
           maxSlots,
           isExtraSlot: isExtraSlot || false,
           isNewLogin,
-          orderId: orderId // Will be null in auto mode, set in email mode
+          orderId: orderId, // Now set for both auto and email modes
+          botMode: botAutomationMode // Pass the bot mode to email
         });
         console.log('✅ WEBHOOK: Email sent successfully');
         
@@ -3484,7 +3486,7 @@ async function sendCashPaymentNotification(data) {
 
 // Send login details notification via email (after card payment)
 async function sendLoginDetailsNotification(data) {
-  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false, orderId = null } = data;
+  const { school, username, password, platform, sessionId, productName, productPrice, paymentMethod, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false, orderId = null, botMode = 'none' } = data;
   
   if (!resend) {
     console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
@@ -3577,18 +3579,30 @@ async function sendLoginDetailsNotification(data) {
                 </div>
               </div>
 
-              ${orderId ? `
-              <!-- Bot Decision Buttons (Email Confirmation Mode) -->
+              ${orderId ? (botMode === 'auto' ? `
+              <!-- Auto Mode with Skip Queue Option -->
+              <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
+                <p style="margin: 0 0 10px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Bot is Processing (In Queue...)</p>
+                <p style="margin: 0 0 20px 0; color: rgba(255,255,255,0.9); font-size: 14px;">The bot will start automatically after queue wait time.</p>
+                <div style="display: inline-block;">
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue & Do NOW</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
+                </div>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Click "Skip Queue" to bypass wait time instantly</p>
+              </div>
+              ` : `
+              <!-- Email Confirmation Mode with Skip Queue -->
               <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
                 <p style="margin: 0 0 15px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Choose How to Process:</p>
                 <div style="display: inline-block;">
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-bot?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">🤖 Bot Does It</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">Click one to choose how to handle this homework</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ "Skip Queue" = Bot does it immediately | 🤖 "Bot Does It" = Normal queue wait</p>
               </div>
-              ` : `
-              <!-- No Buttons (Auto Mode) -->
+              `) : `
+              <!-- No Buttons -->
               <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 20px; border-radius: 12px; border: 2px solid #28a745; margin-top: 25px; text-align: center;">
                 <p style="margin: 0; color: #fff; font-weight: 600; font-size: 15px;">🤖 Bot is automatically processing this homework!</p>
               </div>
@@ -3853,6 +3867,197 @@ app.get('/process-order-bot', async (req, res) => {
           <p>Could not connect to the bot server.</p>
           <p style="color: #666; font-size: 14px;">${botError.message}</p>
           <p style="color: #666; font-size: 14px; margin-top: 20px;">Please do this homework manually.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
+
+// Email Button Endpoint: Skip Queue & Do NOW (clicked from email)
+app.get('/process-order-skip-queue', async (req, res) => {
+  const { orderId } = req.query;
+  
+  console.log(`⚡ EMAIL BUTTON: Skip Queue clicked - Order ID: ${orderId}`);
+  
+  if (!orderId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Error</h1>
+          <p>Missing order ID</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if order exists
+  if (!pendingOrders[orderId]) {
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Order Not Found - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Order Not Found</h1>
+          <p>This order has already been processed or doesn't exist.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if already processed
+  if (pendingOrders[orderId].processed) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Already Processed - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #ffc107; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Already Processed</h1>
+          <p>This order has already been handled.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  const order = pendingOrders[orderId];
+  
+  // Mark as processed
+  pendingOrders[orderId].processed = true;
+  pendingOrders[orderId].processedAt = new Date().toISOString();
+  pendingOrders[orderId].processedBy = 'bot-skip-queue';
+  
+  console.log(`⚡ EMAIL BUTTON: SKIP QUEUE - Triggering bot IMMEDIATELY for order: ${orderId}`);
+  console.log(`   Product: ${order.productName}`);
+  console.log(`   Username: ${order.username}`);
+  
+  // Trigger the bot with skipQueue flag
+  try {
+    console.log(`📡 SKIP QUEUE: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+    const botResponse = await fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productName: order.productName,
+        username: order.username,
+        password: order.password,
+        loginType: order.loginType || 'Google',
+        school: order.school,
+        skipQueue: true // ⚡ THIS IS THE KEY - SKIP ALL QUEUE WAIT TIMES
+      })
+    });
+    
+    console.log(`📥 SKIP QUEUE: Bot API response status: ${botResponse.status}`);
+    const botResult = await botResponse.json();
+    console.log(`📥 SKIP QUEUE: Bot API response:`, botResult);
+    
+    if (botResult.success) {
+      console.log(`✅ SKIP QUEUE: Bot successfully triggered IMMEDIATELY for ${order.productName}!`);
+      
+      // Show success page
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Queue Skipped! - hwplug</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+            .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            h1 { color: #28a745; }
+            .emoji { font-size: 80px; margin: 20px 0; }
+            .warning { background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 20px; color: #856404; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="emoji">⚡</div>
+            <h1>Queue Skipped!</h1>
+            <p style="font-size: 18px; color: #28a745; font-weight: 600;">Bot is processing your homework immediately!</p>
+            <p style="color: #666;">The bot has started working on your homework right away, bypassing all queue wait times.</p>
+            <div class="warning">
+              <p style="margin: 0; font-weight: 600;">📱 Check your Discord DM for progress updates!</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      console.error(`❌ SKIP QUEUE: Bot trigger failed: ${botResult.error}`);
+      
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Error - hwplug</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+            .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            h1 { color: #d9534f; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>❌ Bot Error</h1>
+            <p>${botResult.error || 'Unknown error'}</p>
+            <p style="color: #666; margin-top: 20px;">Please contact support if this persists.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  } catch (error) {
+    console.error(`❌ SKIP QUEUE: Error calling bot:`, error);
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Error</h1>
+          <p>Failed to connect to bot API</p>
+          <p style="color: #666; margin-top: 20px;">Error: ${error.message}</p>
         </div>
       </body>
       </html>

@@ -440,12 +440,22 @@ async function waitForProductQueue(productName) {
 }
 
 // Main function: Submit homework to SparxNow (with retry logic for detached frames)
-async function submitToSparxNow(productName, username, password, school = '', loginType = 'Google') {
+async function submitToSparxNow(productName, username, password, school = '', loginType = 'Google', skipQueue = false) {
   const MAX_RETRIES = 2;
   let lastError = null;
   
-  // Wait for queue (5-minute gap between same product)
-  await waitForProductQueue(productName);
+  // Wait for queue (5-minute gap between same product) - UNLESS skipQueue is true
+  if (skipQueue) {
+    console.log('');
+    console.log('⚡ ═══════════════════════════════════════════════════');
+    console.log('⚡  SKIP QUEUE ACTIVATED - BYPASSING ALL WAIT TIMES');
+    console.log('⚡ ═══════════════════════════════════════════════════');
+    console.log('⚡  Processing order IMMEDIATELY without queue delays');
+    console.log('⚡ ═══════════════════════════════════════════════════');
+    console.log('');
+  } else {
+    await waitForProductQueue(productName);
+  }
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {

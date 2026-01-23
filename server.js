@@ -1784,6 +1784,98 @@ app.post('/admin/set-test-timer', (req, res) => {
   });
 });
 
+// Admin endpoint to set global queue time (wait between ANY orders)
+app.post('/admin/set-global-queue-time', (req, res) => {
+  const { password, minutes } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (minutes === undefined || minutes < 0 || minutes > 60) {
+    return res.status(400).json({ error: 'Invalid minutes value (must be 0-60)' });
+  }
+  
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'queue-config.json');
+    
+    // Load existing config or create new
+    let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
+    if (fs.existsSync(configPath)) {
+      const data = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(data);
+    }
+    
+    // Update global wait time
+    config.globalWaitMinutes = minutes;
+    
+    // Save config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    console.log(`✅ Global queue time updated to ${minutes} minute(s)`);
+    
+    res.json({
+      success: true,
+      message: `Global queue time set to ${minutes} minute(s)`,
+      config: config
+    });
+  } catch (error) {
+    console.error('Error setting global queue time:', error);
+    res.status(500).json({ error: 'Error updating queue config' });
+  }
+});
+
+// Admin endpoint to set same product queue time (wait between SAME product orders)
+app.post('/admin/set-same-product-queue-time', (req, res) => {
+  const { password, minutes } = req.body;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hwplug2025';
+  
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  if (!minutes || minutes < 1 || minutes > 1440) {
+    return res.status(400).json({ error: 'Invalid minutes value (must be 1-1440)' });
+  }
+  
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'queue-config.json');
+    
+    // Load existing config or create new
+    let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
+    if (fs.existsSync(configPath)) {
+      const data = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(data);
+    }
+    
+    // Update same product wait time
+    config.sameProductWaitMinutes = minutes;
+    
+    // Save config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    const displayText = hours > 0 ? `${hours} hour(s) ${mins} minute(s)` : `${minutes} minute(s)`;
+    
+    console.log(`✅ Same product queue time updated to ${displayText}`);
+    
+    res.json({
+      success: true,
+      message: `Same product queue time set to ${displayText}`,
+      config: config
+    });
+  } catch (error) {
+    console.error('Error setting same product queue time:', error);
+    res.status(500).json({ error: 'Error updating queue config' });
+  }
+});
+
 // Endpoint to get timer reset time (for frontend sync)
 app.get('/admin/timer-reset-time', (req, res) => {
   res.json({

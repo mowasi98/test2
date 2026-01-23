@@ -409,6 +409,37 @@
                                     <small style="color: #856404; display: block; margin-top: 0.5rem;">⚠️ This will override the 24-hour timer. Use for testing only!</small>
                                   </div>
                                   
+                                  <div style="background: #e8f5e9; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #4caf50;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #2e7d32;">⏱️ Bot Queue Time Settings</h4>
+                                    <p style="font-size: 0.85rem; color: #2e7d32; margin-bottom: 0.8rem;">Control wait times between orders:</p>
+                                    
+                                    <!-- Global Queue Time (ANY product) -->
+                                    <div style="margin-bottom: 0.8rem;">
+                                      <label style="font-weight: 600; color: #2e7d32; display: block; margin-bottom: 0.3rem;">⏳ Wait between ANY orders (any product):</label>
+                                      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                        <input type="number" id="globalQueueMinutes" min="0" max="60" value="5" placeholder="Minutes" style="width: 80px; padding: 0.5rem; border: 2px solid #4caf50; border-radius: 4px; font-size: 1rem;">
+                                        <span style="color: #2e7d32; font-weight: 600;">minutes</span>
+                                        <button class="btn btn-success" id="setGlobalQueueBtn" style="touch-action: manipulation;">Update</button>
+                                      </div>
+                                      <small style="color: #2e7d32; display: block; margin-top: 0.3rem;">Example: User buys Sparx Maths, then someone buys Sparx Reader = waits this many minutes</small>
+                                    </div>
+                                    
+                                    <!-- Same Product Queue Time -->
+                                    <div>
+                                      <label style="font-weight: 600; color: #2e7d32; display: block; margin-bottom: 0.3rem;">⏳ Wait between SAME product orders:</label>
+                                      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                        <input type="number" id="sameProductHours" min="0" max="24" value="1" placeholder="Hours" style="width: 80px; padding: 0.5rem; border: 2px solid #4caf50; border-radius: 4px; font-size: 1rem;">
+                                        <span style="color: #2e7d32; font-weight: 600;">hours</span>
+                                        <input type="number" id="sameProductMinutes" min="0" max="59" value="0" placeholder="Minutes" style="width: 80px; padding: 0.5rem; border: 2px solid #4caf50; border-radius: 4px; font-size: 1rem;">
+                                        <span style="color: #2e7d32; font-weight: 600;">minutes</span>
+                                        <button class="btn btn-success" id="setSameProductQueueBtn" style="touch-action: manipulation;">Update</button>
+                                      </div>
+                                      <small style="color: #2e7d32; display: block; margin-top: 0.3rem;">Example: User buys Sparx Maths, then someone else buys Sparx Maths = waits this long</small>
+                                    </div>
+                                    
+                                    <div id="queueTimeStatus" style="margin-top: 0.8rem; padding: 0.5rem; background: #fff; border-radius: 4px; display: none;"></div>
+                                  </div>
+                                  
                                   <p style="font-size: 0.85rem; color: #666; margin-top: 0.5rem; margin-bottom: 1rem;">
                                     <strong>Note:</strong> "Reset Timer Only" resets the 24-hour timer but keeps current slot counts. "Reset All Counters" resets both timer and slot counts to 0.
                                   </p>
@@ -939,6 +970,92 @@
                                     console.error('Error:', error);
                                   }
                                 }
+                                
+                                async function setGlobalQueueTime() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const minutes = parseInt(document.getElementById('globalQueueMinutes').value);
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (isNaN(minutes) || minutes < 0 || minutes > 60) {
+                                    showMessage('Please enter a valid number of minutes (0-60)', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-global-queue-time`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password, minutes: minutes }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      showMessage(`✅ Global queue time set to ${minutes} minute(s)!`, 'success');
+                                      const statusDiv = document.getElementById('queueTimeStatus');
+                                      statusDiv.style.display = 'block';
+                                      statusDiv.innerHTML = `<strong style="color: #4caf50;">✓</strong> Wait between ANY orders: <strong>${minutes} minutes</strong>`;
+                                    } else {
+                                      showMessage(data.error || 'Error setting global queue time', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error setting global queue time:', error);
+                                    showMessage(`Error: ${error.message}`, 'error');
+                                  }
+                                }
+                                
+                                async function setSameProductQueueTime() {
+                                  const password = document.getElementById('adminPassword').value;
+                                  const hours = parseInt(document.getElementById('sameProductHours').value) || 0;
+                                  const minutes = parseInt(document.getElementById('sameProductMinutes').value) || 0;
+                                  
+                                  if (!password) {
+                                    showMessage('Please enter admin password first', 'error');
+                                    return;
+                                  }
+                                  
+                                  if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 24 || minutes < 0 || minutes > 59) {
+                                    showMessage('Please enter valid hours (0-24) and minutes (0-59)', 'error');
+                                    return;
+                                  }
+                                  
+                                  const totalMinutes = (hours * 60) + minutes;
+                                  if (totalMinutes === 0) {
+                                    showMessage('Please enter at least 1 minute', 'error');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/set-same-product-queue-time`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ password: password, minutes: totalMinutes }),
+                                    });
+                                    
+                                    const data = await response.json();
+                                    
+                                    if (data.success) {
+                                      const displayText = hours > 0 ? `${hours} hour(s) ${minutes} minute(s)` : `${minutes} minute(s)`;
+                                      showMessage(`✅ Same product queue time set to ${displayText}!`, 'success');
+                                      const statusDiv = document.getElementById('queueTimeStatus');
+                                      statusDiv.style.display = 'block';
+                                      statusDiv.innerHTML = `<strong style="color: #4caf50;">✓</strong> Wait between SAME product orders: <strong>${displayText}</strong>`;
+                                    } else {
+                                      showMessage(data.error || 'Error setting same product queue time', 'error');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error setting same product queue time:', error);
+                                    showMessage(`Error: ${error.message}`, 'error');
+                                  }
+                                }
 
                                 async function resetCounters() {
                                   const password = document.getElementById('adminPassword').value;
@@ -1396,6 +1513,32 @@
                                     setTestTimerBtn.addEventListener('touchstart', function(e) {
                                       e.preventDefault();
                                       setTestTimer();
+                                    });
+                                  }
+
+                                  // Set Global Queue Time button
+                                  const setGlobalQueueBtn = document.getElementById('setGlobalQueueBtn');
+                                  if (setGlobalQueueBtn) {
+                                    setGlobalQueueBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      setGlobalQueueTime();
+                                    });
+                                    setGlobalQueueBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      setGlobalQueueTime();
+                                    });
+                                  }
+                                  
+                                  // Set Same Product Queue Time button
+                                  const setSameProductQueueBtn = document.getElementById('setSameProductQueueBtn');
+                                  if (setSameProductQueueBtn) {
+                                    setSameProductQueueBtn.addEventListener('click', function(e) {
+                                      e.preventDefault();
+                                      setSameProductQueueTime();
+                                    });
+                                    setSameProductQueueBtn.addEventListener('touchstart', function(e) {
+                                      e.preventDefault();
+                                      setSameProductQueueTime();
                                     });
                                   }
 

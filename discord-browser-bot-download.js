@@ -103,9 +103,44 @@ const lastSubmissionTime = {
   'Seneca': 0
 };
 
+// Track last known config values to detect changes
+let lastKnownConfig = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
+
 // Queue wait times (loaded from config file, updated by admin panel)
 function getQueueWaitTimes() {
   const config = loadQueueConfig();
+  
+  // Check if settings have changed and log it
+  if (config.globalWaitMinutes !== lastKnownConfig.globalWaitMinutes || 
+      config.sameProductWaitMinutes !== lastKnownConfig.sameProductWaitMinutes) {
+    console.log('');
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log('⏱️  QUEUE SETTINGS DETECTED - RELOADING...');
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    
+    if (config.globalWaitMinutes !== lastKnownConfig.globalWaitMinutes) {
+      console.log(`⏱️  Wait between ANY product: ${lastKnownConfig.globalWaitMinutes}min → ${config.globalWaitMinutes}min`);
+    }
+    
+    if (config.sameProductWaitMinutes !== lastKnownConfig.sameProductWaitMinutes) {
+      const oldHours = Math.floor(lastKnownConfig.sameProductWaitMinutes / 60);
+      const oldMins = lastKnownConfig.sameProductWaitMinutes % 60;
+      const newHours = Math.floor(config.sameProductWaitMinutes / 60);
+      const newMins = config.sameProductWaitMinutes % 60;
+      
+      const oldText = oldHours > 0 ? `${oldHours}h ${oldMins}m` : `${lastKnownConfig.sameProductWaitMinutes}min`;
+      const newText = newHours > 0 ? `${newHours}h ${newMins}m` : `${config.sameProductWaitMinutes}min`;
+      
+      console.log(`⏱️  Wait between SAME product: ${oldText} → ${newText}`);
+    }
+    
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log('');
+    
+    // Update last known config
+    lastKnownConfig = { ...config };
+  }
+  
   return {
     global: config.globalWaitMinutes * 60 * 1000, // Convert minutes to milliseconds
     sameProduct: config.sameProductWaitMinutes * 60 * 1000

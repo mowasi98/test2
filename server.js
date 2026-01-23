@@ -1833,9 +1833,11 @@ app.post('/admin/set-global-queue-time', (req, res) => {
     
     // Load existing config or create new
     let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
+    let oldValue = 5;
     if (fs.existsSync(configPath)) {
       const data = fs.readFileSync(configPath, 'utf8');
       config = JSON.parse(data);
+      oldValue = config.globalWaitMinutes || 5;
     }
     
     // Update global wait time
@@ -1844,7 +1846,14 @@ app.post('/admin/set-global-queue-time', (req, res) => {
     // Save config
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     
-    console.log(`✅ Global queue time updated to ${minutes} minute(s)`);
+    console.log('');
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log('⏱️  QUEUE TIME SETTINGS UPDATED');
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log(`⏱️  Wait between ANY product orders:`);
+    console.log(`⏱️  OLD: ${oldValue} minutes → NEW: ${minutes} minutes`);
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log('');
     
     res.json({
       success: true,
@@ -1877,9 +1886,11 @@ app.post('/admin/set-same-product-queue-time', (req, res) => {
     
     // Load existing config or create new
     let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
+    let oldValue = 60;
     if (fs.existsSync(configPath)) {
       const data = fs.readFileSync(configPath, 'utf8');
       config = JSON.parse(data);
+      oldValue = config.sameProductWaitMinutes || 60;
     }
     
     // Update same product wait time
@@ -1888,11 +1899,22 @@ app.post('/admin/set-same-product-queue-time', (req, res) => {
     // Save config
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     
+    const oldHours = Math.floor(oldValue / 60);
+    const oldMins = oldValue % 60;
+    const oldDisplayText = oldHours > 0 ? `${oldHours}h ${oldMins}m` : `${oldValue}m`;
+    
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    const displayText = hours > 0 ? `${hours} hour(s) ${mins} minute(s)` : `${minutes} minute(s)`;
+    const displayText = hours > 0 ? `${hours}h ${mins}m` : `${minutes}m`;
     
-    console.log(`✅ Same product queue time updated to ${displayText}`);
+    console.log('');
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log('⏱️  QUEUE TIME SETTINGS UPDATED');
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log(`⏱️  Wait between SAME product orders:`);
+    console.log(`⏱️  OLD: ${oldDisplayText} → NEW: ${displayText}`);
+    console.log('⏱️ ═══════════════════════════════════════════════════');
+    console.log('');
     
     res.json({
       success: true,

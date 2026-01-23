@@ -545,12 +545,15 @@
       
       const savedUsername = localStorage.getItem('savedUsername');
       const savedPassword = localStorage.getItem('savedPassword');
+      const savedLoginType = localStorage.getItem('savedLoginType');
       
       console.log('👤 Saved username:', savedUsername ? 'EXISTS (' + savedUsername + ')' : 'NONE');
       console.log('🔑 Saved password:', savedPassword ? 'EXISTS' : 'NONE');
+      console.log('🔐 Saved loginType:', savedLoginType ? 'EXISTS (' + savedLoginType + ')' : 'NONE');
       
-      if (savedUsername && savedPassword) {
-        console.log('✅ User has saved credentials');
+      // Only auto-login if ALL required fields exist (including loginType)
+      if (savedUsername && savedPassword && savedLoginType) {
+        console.log('✅ User has complete saved credentials (with login type)');
         
         // Get product info from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -578,6 +581,29 @@
           // Auto-fill the form
           document.getElementById('username').value = savedUsername;
           document.getElementById('password').value = savedPassword;
+        }
+      } else if (savedUsername && savedPassword && !savedLoginType) {
+        console.log('⚠️ Old credentials detected (missing login type) - showing login form');
+        console.log('🔄 User needs to select login type and re-submit');
+        // Pre-fill all fields except login type (which will be auto-detected)
+        const savedSchool = localStorage.getItem('savedSchool') || '';
+        if (savedSchool) {
+          document.getElementById('school').value = savedSchool;
+        }
+        document.getElementById('username').value = savedUsername;
+        document.getElementById('password').value = savedPassword;
+        // Auto-detect login type based on username
+        const usernameInput = document.getElementById('username');
+        const loginTypeSelect = document.getElementById('loginType');
+        const hasAtSymbol = savedUsername.includes('@');
+        if (hasAtSymbol) {
+          loginTypeSelect.value = 'Google';
+          loginTypeSelect.dataset.autoSelected = 'true';
+          console.log('🤖 Auto-selected "Google" based on @ symbol in username');
+        } else {
+          loginTypeSelect.value = 'Normal';
+          loginTypeSelect.dataset.autoSelected = 'true';
+          console.log('🤖 Auto-selected "Normal" based on username format');
         }
       } else {
         console.log('ℹ️ No saved credentials - showing normal login form');

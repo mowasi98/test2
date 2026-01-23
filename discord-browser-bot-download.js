@@ -273,9 +273,12 @@ async function getProductTab(productName) {
     const newPage = await browser.newPage();
     await newPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     
-    // Navigate to Discord in this tab
-    await newPage.goto('https://discord.com/app', { waitUntil: 'domcontentloaded', timeout: 120000 });
-    console.log(`✅ Tab created for "${productName}"`);
+    // Start navigation to Discord but DON'T WAIT for it to complete
+    // This allows other tabs to be created in parallel!
+    newPage.goto('https://discord.com/app', { waitUntil: 'domcontentloaded', timeout: 120000 }).catch(err => {
+      console.error(`⚠️ Tab navigation error for ${productName}:`, err.message);
+    });
+    console.log(`✅ Tab created for "${productName}" (loading in background...)`);
     
     tabInfo.page = newPage;
   } else {
@@ -466,11 +469,13 @@ async function submitToSparxNowInternal(productName, username, password, school 
       const productPage = await getProductTab(productName);
     }
     
-    // CRITICAL: Check if Discord is logged in on the MAIN page before EVERY submission
-    console.log('🔐 Checking Discord login status on main tab before submission...');
-    const isLoggedIn = await ensureDiscordLoggedIn();
-    if (!isLoggedIn) {
-      throw new Error('Failed to log into Discord');
+    // Wait a bit for the tab to finish loading Discord (if it's a new tab)
+    console.log(`⏳ Waiting for Discord to load in "${productName}" tab...`);
+    try {
+      await productPage.waitForSelector('[class*="app"]', { timeout: 30000 });
+      console.log(`✅ Discord loaded in "${productName}" tab`);
+    } catch (e) {
+      console.log(`⚠️ Discord app selector not found, continuing anyway...`);
     }
     
     console.log(`🔍 Navigating "${productName}" tab to channel...`);

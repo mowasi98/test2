@@ -49,6 +49,35 @@ function saveQueueConfig(config) {
   }
 }
 
+// Fetch queue config from backend API (async)
+async function fetchQueueConfigFromAPI() {
+  try {
+    const BACKEND_URL = process.env.BACKEND_URL || 'https://test2-adsw.onrender.com';
+    const fetch = (await import('node-fetch')).default;
+    
+    console.log('🌐 Fetching queue settings from backend API...');
+    const response = await fetch(`${BACKEND_URL}/admin/get-queue-settings`);
+    
+    if (!response.ok) {
+      console.error('❌ Failed to fetch queue settings from API:', response.statusText);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.success && data.settings) {
+      console.log('✅ Queue settings fetched from API:', data.settings);
+      return data.settings;
+    } else {
+      console.error('❌ Invalid response from API:', data);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error fetching queue config from API:', error.message);
+    return null;
+  }
+}
+
 // Use stealth plugin to avoid detection
 puppeteer.use(StealthPlugin());
 
@@ -108,9 +137,10 @@ let lastKnownConfig = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
 
 // Queue wait times (loaded from config file, updated by admin panel)
 // ALWAYS reloads config file on EVERY call to ensure sync
-function getQueueWaitTimes() {
-  // FORCE reload config from file on EVERY call
-  const config = loadQueueConfig();
+async function getQueueWaitTimes() {
+  // FORCE reload config from BACKEND API on EVERY call
+  const apiConfig = await fetchQueueConfigFromAPI();
+  const config = apiConfig || loadQueueConfig(); // Fallback to local file if API fails
   
   // Check if settings have changed and log it (but ALWAYS use the new values)
   if (config.globalWaitMinutes !== lastKnownConfig.globalWaitMinutes || 
@@ -369,8 +399,8 @@ async function waitForProductQueue(productName) {
   // Update last order received time
   lastOrderReceivedTime = now;
   
-  // Load current queue wait times from config
-  const queueTimes = getQueueWaitTimes();
+  // Load current queue wait times from config (now fetches from backend API)
+  const queueTimes = await getQueueWaitTimes();
   const config = loadQueueConfig();
   
   // Determine wait times based on batch vs separate purchase

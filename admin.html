@@ -974,12 +974,27 @@
                                 // Load current queue settings from server
                                 async function loadQueueSettings() {
                                   try {
+                                    console.log('🔄 Loading queue settings from server...');
                                     const response = await fetch(`${BACKEND_URL}/admin/get-queue-settings`);
+                                    console.log('📥 Response status:', response.status);
+                                    
+                                    if (!response.ok) {
+                                      console.error('❌ Failed to fetch queue settings:', response.statusText);
+                                      // Use defaults if server error
+                                      document.getElementById('globalQueueMinutes').value = 5;
+                                      document.getElementById('sameProductHours').value = 1;
+                                      document.getElementById('sameProductMinutes').value = 0;
+                                      return;
+                                    }
+                                    
                                     const data = await response.json();
+                                    console.log('📦 Queue settings data:', data);
                                     
                                     if (data.success && data.settings) {
                                       // Update global wait input
-                                      document.getElementById('globalQueueMinutes').value = data.settings.globalWaitMinutes || 5;
+                                      const globalMins = data.settings.globalWaitMinutes || 5;
+                                      document.getElementById('globalQueueMinutes').value = globalMins;
+                                      console.log('✅ Set globalQueueMinutes to:', globalMins);
                                       
                                       // Update same product wait inputs (convert minutes to hours and minutes)
                                       const totalMinutes = data.settings.sameProductWaitMinutes || 60;
@@ -987,11 +1002,33 @@
                                       const minutes = totalMinutes % 60;
                                       document.getElementById('sameProductHours').value = hours;
                                       document.getElementById('sameProductMinutes').value = minutes;
+                                      console.log('✅ Set sameProduct to:', hours, 'hours', minutes, 'minutes');
                                       
-                                      console.log('✅ Queue settings loaded:', data.settings);
+                                      console.log('✅ Queue settings loaded successfully!');
+                                      
+                                      // Show visual confirmation
+                                      const statusDiv = document.getElementById('queueTimeStatus');
+                                      if (statusDiv) {
+                                        statusDiv.style.display = 'block';
+                                        statusDiv.style.background = '#d4edda';
+                                        statusDiv.style.color = '#155724';
+                                        statusDiv.style.padding = '10px';
+                                        statusDiv.innerHTML = `✅ Current settings loaded: ${globalMins}min ANY / ${hours}h ${minutes}m SAME`;
+                                        setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+                                      }
+                                    } else {
+                                      console.warn('⚠️ No settings in response, using defaults');
+                                      document.getElementById('globalQueueMinutes').value = 5;
+                                      document.getElementById('sameProductHours').value = 1;
+                                      document.getElementById('sameProductMinutes').value = 0;
                                     }
                                   } catch (error) {
                                     console.error('❌ Error loading queue settings:', error);
+                                    console.error('Error details:', error.message, error.stack);
+                                    // Use defaults on error
+                                    document.getElementById('globalQueueMinutes').value = 5;
+                                    document.getElementById('sameProductHours').value = 1;
+                                    document.getElementById('sameProductMinutes').value = 0;
                                   }
                                 }
 

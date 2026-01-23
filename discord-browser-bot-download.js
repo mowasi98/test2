@@ -678,12 +678,8 @@ async function submitToSparxNowInternal(productName, username, password, school 
       await new Promise(resolve => setTimeout(resolve, 4000));
       
       // SENECA: Select login type from dropdown FIRST (EXACT same method as Sparx Maths!)
-      // Skip dropdown if loginType is "Normal" (no @ symbol)
-      if (loginType === 'Normal') {
-        console.log('📋 Step 1: Login Type is "Normal" - SKIPPING dropdown selection');
-      } else {
-        console.log(`📋 Step 1: Selecting Login Type: ${loginType} FIRST...`);
-        console.log('⚠️ Selecting dropdown first to prevent field clearing');
+      console.log(`📋 Step 1: Selecting Login Type: ${loginType} FIRST...`);
+      console.log('⚠️ Selecting dropdown first to prevent field clearing');
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -870,7 +866,6 @@ async function submitToSparxNowInternal(productName, username, password, school 
         console.log(`✅ Selected ${loginType} using keyboard!`);
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      } // Close the if (loginType !== 'Normal') block
       
       // NOW fill form fields (NO SCHOOL for Seneca!)
       console.log('📝 NOW filling Seneca form fields (Email, Password - NO SCHOOL)...');
@@ -1017,12 +1012,8 @@ async function submitToSparxNowInternal(productName, username, password, school 
     // Skip form filling for Seneca (it handles login automatically)
     if (!productName.toLowerCase().includes('seneca')) {
       // FIRST: Select login type from dropdown (do this BEFORE filling fields!)
-      // Skip dropdown if loginType is "Normal" (no @ symbol)
-      if (loginType === 'Normal') {
-        console.log('📋 Step 1: Login Type is "Normal" - SKIPPING dropdown selection');
-      } else {
-        console.log(`📋 Step 1: Selecting Login Type: ${loginType} FIRST...`);
-        console.log('⚠️ Selecting dropdown first to prevent field clearing');
+      console.log(`📋 Step 1: Selecting Login Type: ${loginType} FIRST...`);
+      console.log('⚠️ Selecting dropdown first to prevent field clearing');
     
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -1209,9 +1200,8 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log(`✅ Selected ${loginType} using keyboard!`);
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    } // Close the if (loginType !== 'Normal') block
     
-    // NOW fill the form fields using Puppeteer typing (AFTER Google is selected)
+    // NOW fill the form fields using Puppeteer typing (AFTER login type is selected)
     console.log('📝 Step 2: NOW filling form fields by clicking each one...');
     await new Promise(resolve => setTimeout(resolve, 1000));
     

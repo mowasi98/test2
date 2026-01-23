@@ -568,9 +568,13 @@
         // If product info exists, auto-submit immediately (skip login page entirely)
         if (productName && productPrice && stripeLink) {
           console.log('⚡ All product info present - auto-submitting to payment');
-          // Just auto-fill quietly and redirect immediately (don't change title/button text)
+          // Pre-fill ALL form fields (including school and loginType) before auto-login
+          const savedSchool = localStorage.getItem('savedSchool') || '';
+          document.getElementById('school').value = savedSchool;
+          document.getElementById('loginType').value = savedLoginType;
           document.getElementById('username').value = savedUsername;
           document.getElementById('password').value = savedPassword;
+          console.log(`📝 Form pre-filled: School="${savedSchool}", LoginType="${savedLoginType}", Username="${savedUsername}"`);
           // Auto-login and redirect directly to payment (instant)
           handleAutoLogin(savedUsername, savedPassword, productName, productPrice, stripeLink);
         } else {
@@ -578,7 +582,10 @@
           // No product selected, show "Switch Account" UI for account switching
           document.getElementById('loginTitle').textContent = 'Switch Account';
           document.getElementById('submitBtn').textContent = 'Switch Account';
-          // Auto-fill the form
+          // Auto-fill ALL form fields
+          const savedSchool = localStorage.getItem('savedSchool') || '';
+          document.getElementById('school').value = savedSchool;
+          document.getElementById('loginType').value = savedLoginType;
           document.getElementById('username').value = savedUsername;
           document.getElementById('password').value = savedPassword;
         }

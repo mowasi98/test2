@@ -801,26 +801,26 @@ async function submitToSparxNowInternal(productName, username, password, school 
           console.log(`  [${i}] "${el.textContent?.trim()}" - tag: ${el.tagName}, clickable: ${el.onclick !== null}`);
         });
         
-        // Try to find and click "Google"
-        const googleOption = optionLike.find(el => el.textContent?.trim() === 'Google');
+        // Try to find and click the selected login type
+        const loginOption = optionLike.find(el => el.textContent?.trim() === loginType);
         
-        if (googleOption) {
-          console.log('✅ Found Google option!');
-          console.log('Tag:', googleOption.tagName);
-          console.log('Parent:', googleOption.parentElement?.tagName);
-          googleOption.click();
+        if (loginOption) {
+          console.log(`✅ Found ${loginType} option!`);
+          console.log('Tag:', loginOption.tagName);
+          console.log('Parent:', loginOption.parentElement?.tagName);
+          loginOption.click();
           return true;
         }
         
-        console.log('❌ Could not find Google option');
+        console.log(`❌ Could not find ${loginType} option`);
         return false;
-      });
+      }, loginType);
       
       if (googleClicked) {
-        console.log('✅ Google selected by clicking!');
+        console.log(`✅ ${loginType} selected by clicking!`);
         await new Promise(resolve => setTimeout(resolve, 500));
       } else {
-        console.log('⚠️ Could not click Google, trying keyboard navigation...');
+        console.log(`⚠️ Could not click ${loginType}, trying keyboard navigation...`);
         
         // Focus back on the dropdown first
         await page.evaluate(() => {
@@ -1122,26 +1122,26 @@ async function submitToSparxNowInternal(productName, username, password, school 
         console.log(`  [${i}] "${el.textContent?.trim()}" - tag: ${el.tagName}, clickable: ${el.onclick !== null}`);
       });
       
-      // Try to find and click "Google"
-      const googleOption = optionLike.find(el => el.textContent?.trim() === 'Google');
+      // Try to find and click the selected login type
+      const loginOption = optionLike.find(el => el.textContent?.trim() === loginType);
       
-      if (googleOption) {
-        console.log('✅ Found Google option!');
-        console.log('Tag:', googleOption.tagName);
-        console.log('Parent:', googleOption.parentElement?.tagName);
-        googleOption.click();
+      if (loginOption) {
+        console.log(`✅ Found ${loginType} option!`);
+        console.log('Tag:', loginOption.tagName);
+        console.log('Parent:', loginOption.parentElement?.tagName);
+        loginOption.click();
         return true;
       }
       
-      console.log('❌ Could not find Google option');
+      console.log(`❌ Could not find ${loginType} option`);
       return false;
-    });
+    }, loginType);
     
     if (googleClicked) {
-      console.log('✅ Google selected by clicking!');
+      console.log(`✅ ${loginType} selected by clicking!`);
       await new Promise(resolve => setTimeout(resolve, 500));
     } else {
-      console.log('⚠️ Could not click Google, trying keyboard navigation...');
+      console.log(`⚠️ Could not click ${loginType}, trying keyboard navigation...`);
       
       // Focus back on the dropdown first
       await page.evaluate(() => {

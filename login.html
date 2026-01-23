@@ -672,9 +672,12 @@
         schoolType: typeof school,
         schoolLength: school ? school.length : 0,
         username,
+        loginType,
+        loginTypeType: typeof loginType,
         password: '***'
       });
       console.log(`📝 Saving school to localStorage: "${school}"`);
+      console.log(`📝 Login Type captured from form: "${loginType}"`);
       
       // Get product info from URL params
       const urlParams = new URLSearchParams(window.location.search);

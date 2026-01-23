@@ -582,6 +582,41 @@
         console.log('ℹ️ No saved credentials - showing normal login form');
         console.log('═══════════════════════════════════════════════════');
       }
+      
+      // ✨ AUTO-DETECT LOGIN TYPE based on username format
+      const usernameInput = document.getElementById('username');
+      const loginTypeSelect = document.getElementById('loginType');
+      
+      usernameInput.addEventListener('input', function() {
+        const username = usernameInput.value.trim();
+        
+        // Only auto-select if user hasn't manually chosen yet
+        if (loginTypeSelect.value === '' || loginTypeSelect.dataset.autoSelected === 'true') {
+          if (username.length > 0) {
+            const hasAtSymbol = username.includes('@');
+            
+            if (hasAtSymbol) {
+              // Has @ symbol = likely email, default to Google (user can change to Microsoft)
+              loginTypeSelect.value = 'Google';
+              loginTypeSelect.dataset.autoSelected = 'true';
+              console.log('🤖 Auto-detected: Email format → Selected "Google"');
+            } else {
+              // No @ symbol = username only, select Normal
+              loginTypeSelect.value = 'Normal';
+              loginTypeSelect.dataset.autoSelected = 'true';
+              console.log('🤖 Auto-detected: Username format → Selected "Normal"');
+            }
+          }
+        }
+      });
+      
+      // Mark manual selection (so auto-detect doesn't override)
+      loginTypeSelect.addEventListener('change', function() {
+        if (loginTypeSelect.value !== '') {
+          loginTypeSelect.dataset.autoSelected = 'false';
+          console.log('👤 User manually selected:', loginTypeSelect.value);
+        }
+      });
     });
 
     async function handleAutoLogin(username, password, productName, productPrice, stripeLink) {
@@ -621,11 +656,18 @@
         // Store login info in sessionStorage for payment page
         // Retrieve school and loginType from localStorage if available
         const savedSchool = localStorage.getItem('savedSchool') || '';
-        const savedLoginType = localStorage.getItem('savedLoginType') || 'Google'; // Default to Google for backwards compatibility
+        let savedLoginType = localStorage.getItem('savedLoginType');
+        
+        // Auto-detect if no saved loginType
+        if (!savedLoginType) {
+          savedLoginType = username.includes('@') ? 'Google' : 'Normal';
+          console.log(`🤖 AUTO-DETECT: No saved loginType, auto-detected: "${savedLoginType}" (based on username format)`);
+        }
+        
         sessionStorage.setItem('school', savedSchool);
         sessionStorage.setItem('loginType', savedLoginType);
         console.log(`📝 AUTO-LOGIN: Retrieved school from localStorage: "${savedSchool}"`);
-        console.log(`📝 AUTO-LOGIN: Retrieved loginType from localStorage: "${savedLoginType}"`);
+        console.log(`📝 AUTO-LOGIN: Retrieved/detected loginType: "${savedLoginType}"`);
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
         sessionStorage.setItem('productName', productName); // Keep original display name

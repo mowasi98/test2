@@ -107,15 +107,17 @@ const lastSubmissionTime = {
 let lastKnownConfig = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
 
 // Queue wait times (loaded from config file, updated by admin panel)
+// ALWAYS reloads config file on EVERY call to ensure sync
 function getQueueWaitTimes() {
+  // FORCE reload config from file on EVERY call
   const config = loadQueueConfig();
   
-  // Check if settings have changed and log it
+  // Check if settings have changed and log it (but ALWAYS use the new values)
   if (config.globalWaitMinutes !== lastKnownConfig.globalWaitMinutes || 
       config.sameProductWaitMinutes !== lastKnownConfig.sameProductWaitMinutes) {
     console.log('');
     console.log('⏱️ ═══════════════════════════════════════════════════');
-    console.log('⏱️  QUEUE SETTINGS DETECTED - RELOADING...');
+    console.log('⏱️  QUEUE SETTINGS CHANGED - USING NEW VALUES');
     console.log('⏱️ ═══════════════════════════════════════════════════');
     
     if (config.globalWaitMinutes !== lastKnownConfig.globalWaitMinutes) {
@@ -134,13 +136,18 @@ function getQueueWaitTimes() {
       console.log(`⏱️  Wait between SAME product: ${oldText} → ${newText}`);
     }
     
+    console.log('⏱️  ✅ Bot will use NEW queue times for this order');
     console.log('⏱️ ═══════════════════════════════════════════════════');
     console.log('');
     
     // Update last known config
     lastKnownConfig = { ...config };
+  } else {
+    // Config hasn't changed, but still log current settings periodically for confirmation
+    console.log(`⏱️ Queue config: ${config.globalWaitMinutes}min ANY / ${config.sameProductWaitMinutes}min SAME`);
   }
   
+  // ALWAYS return the freshly loaded config values
   return {
     global: config.globalWaitMinutes * 60 * 1000, // Convert minutes to milliseconds
     sameProduct: config.sameProductWaitMinutes * 60 * 1000

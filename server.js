@@ -2768,19 +2768,21 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
     let orderId = null;
     const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
     
-    // If email mode and bot product, create order ID for decision buttons
-    if (botAutomationMode === 'email' && isBotProduct) {
+    // Create order ID for all bot products (for skip queue functionality)
+    if (isBotProduct) {
       orderId = `order_cash_${Date.now()}`;
       pendingOrders[orderId] = {
         productName: productName,
         username: username,
         password: password,
+        loginType: loginType || 'Google', // Add loginType
         school: school || 'Not provided',
         createdAt: new Date().toISOString(),
         processed: false,
-        paymentMethod: 'cash'
+        paymentMethod: 'cash',
+        autoMode: botAutomationMode === 'auto' // Track if this was auto-triggered
       };
-      console.log(`📋 CASH: Order stored as pending (ID: ${orderId}) - email mode active`);
+      console.log(`📋 CASH: Order stored (ID: ${orderId}) - Mode: ${botAutomationMode}`);
     }
     
     // Calculate actual dynamic price for extra slots (CASH)
@@ -2803,7 +2805,8 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
       maxSlots: maxSlots,
       isExtraSlot: isExtraSlot || false,
       isNewLogin: isNewLogin,
-      orderId: orderId // Will be null in auto mode, set in email mode
+      orderId: orderId, // Now set for both auto and email modes
+      botMode: botAutomationMode // Pass the bot mode to email
     }).then(() => {
       console.log('✅ Cash payment email sent successfully');
       
@@ -3350,7 +3353,7 @@ async function sendLoginNotification(data) {
 
 // Send cash payment notification via email
 async function sendCashPaymentNotification(data) {
-  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false, orderId = null } = data;
+  const { school, username, password, productName, productPrice, remainingSlots = 0, currentCount = 0, maxSlots = 3, isExtraSlot = false, isNewLogin = false, orderId = null, botMode = 'none' } = data;
   
   if (!resend) {
     console.error('❌ Cannot send email - Resend not initialized. Check RESEND_API_KEY environment variable.');
@@ -3436,17 +3439,29 @@ async function sendCashPaymentNotification(data) {
                 <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">(${currentCount} / ${maxSlots} used)</p>
               </div>
 
-              ${orderId ? `
-              <!-- Bot Decision Buttons (Email Confirmation Mode) -->
+              ${orderId ? (botMode === 'auto' ? `
+              <!-- Auto Mode with Skip Queue Option -->
+              <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
+                <p style="margin: 0 0 10px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Bot is Processing (In Queue...)</p>
+                <p style="margin: 0 0 20px 0; color: rgba(255,255,255,0.9); font-size: 14px;">The bot will start automatically after queue wait time.</p>
+                <div style="display: inline-block;">
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue & Do NOW</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
+                </div>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Click "Skip Queue" to bypass wait time instantly</p>
+              </div>
+              ` : `
+              <!-- Email Confirmation Mode with Skip Queue -->
               <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
                 <p style="margin: 0 0 15px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Choose How to Process:</p>
                 <div style="display: inline-block;">
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-bot?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">🤖 Bot Does It</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">Click one to choose how to handle this homework</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ "Skip Queue" = Bot does it immediately | 🤖 "Bot Does It" = Normal queue wait</p>
               </div>
-              ` : ''}
+              `) : ''}
 
               <!-- Action Required -->
               <div style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); padding: 20px; border-radius: 12px; border: 2px solid #d9534f; text-align: center;">

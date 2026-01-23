@@ -1812,14 +1812,16 @@
         // Stripe link for extra slot with promotion codes enabled
         const stripeLink = 'https://buy.stripe.com/3cIdR1dwEcDr6v8bSMcfK0j';
         
-        // Check if user is already logged in
+        // Check if user is already logged in (with all required credentials)
         const savedUsername = localStorage.getItem('savedUsername');
         const savedPassword = localStorage.getItem('savedPassword');
         const savedSchool = localStorage.getItem('savedSchool');
+        const savedLoginType = localStorage.getItem('savedLoginType');
         
-        if (savedUsername && savedPassword && savedSchool) {
+        if (savedUsername && savedPassword && savedSchool && savedLoginType) {
           // User is logged in - reserve slot and go directly to payment page
           console.log('✅ User logged in - reserving extra slot...');
+          console.log(`   Username: ${savedUsername}, LoginType: ${savedLoginType}`);
           
           try {
             // Reserve the extra slot
@@ -1847,6 +1849,7 @@
             
             // Set sessionStorage data (same as login.html does)
             sessionStorage.setItem('school', savedSchool);
+            sessionStorage.setItem('loginType', savedLoginType);
             sessionStorage.setItem('loginUsername', savedUsername);
             sessionStorage.setItem('loginPassword', savedPassword);
             sessionStorage.setItem('productName', productName + ' - Extra Slot');
@@ -2211,7 +2214,7 @@
     // Run periodic test mode check every 10 seconds
     setInterval(periodicTestModeCheck, 10000);
 
-    // Handle Buy Now button clicks - show visual feedback
+    // Handle Buy Now button clicks - check if already logged in
     document.querySelectorAll('.buy-btn').forEach(btn => {
       btn.addEventListener('click', async function(e) {
         // Don't prevent default if button is disabled
@@ -2223,6 +2226,45 @@
         const productName = this.getAttribute('data-product');
         
         console.log(`🛒 Buy Now clicked for: ${productName}`);
+        
+        // CHECK IF ALREADY LOGGED IN (have all required credentials)
+        const savedUsername = localStorage.getItem('savedUsername');
+        const savedPassword = localStorage.getItem('savedPassword');
+        const savedLoginType = localStorage.getItem('savedLoginType');
+        const savedSchool = localStorage.getItem('savedSchool') || '';
+        
+        if (savedUsername && savedPassword && savedLoginType) {
+          // USER IS LOGGED IN - Skip login page and go straight to payment!
+          e.preventDefault(); // Stop default navigation to login.html
+          
+          console.log('✅ User already logged in - going straight to payment!');
+          console.log(`   Username: ${savedUsername}, LoginType: ${savedLoginType}`);
+          
+          // Store credentials in sessionStorage for payment page
+          sessionStorage.setItem('school', savedSchool);
+          sessionStorage.setItem('loginType', savedLoginType);
+          sessionStorage.setItem('loginUsername', savedUsername);
+          sessionStorage.setItem('loginPassword', savedPassword);
+          
+          // Get product info from the button's href
+          const urlParams = new URLSearchParams(this.href.split('?')[1]);
+          const productDisplayName = urlParams.get('product');
+          const productPrice = urlParams.get('price');
+          const stripeLink = urlParams.get('stripe');
+          
+          sessionStorage.setItem('productName', productDisplayName);
+          sessionStorage.setItem('productPrice', productPrice);
+          sessionStorage.setItem('stripeLink', stripeLink);
+          
+          console.log(`📦 Product: ${productDisplayName}, Price: £${productPrice}`);
+          
+          // Redirect to payment page
+          window.location.href = 'payment.html';
+          return;
+        }
+        
+        // NOT LOGGED IN - Continue to login.html (default behavior)
+        console.log('❌ No saved credentials - redirecting to login page');
         
         // Mark button as processing to show visual feedback
         this.setAttribute('data-reserving', 'true');
@@ -2245,8 +2287,7 @@
           }
         }
         
-        // Let the default link navigation happen
-        // (login.html will handle actual reservation)
+        // Let the default link navigation happen to login.html
       });
     });
     

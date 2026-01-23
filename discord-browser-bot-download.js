@@ -782,9 +782,9 @@ async function submitToSparxNowInternal(productName, username, password, school 
       await page.screenshot({ path: 'seneca-dropdown-debug.png' });
       console.log('📸 Screenshot saved: seneca-dropdown-debug.png');
       
-      // Step 3: Click "Google" from the list
-      console.log('🖱️ Step 2: Clicking "Google" option...');
-      const googleClicked = await page.evaluate(() => {
+      // Step 3: Click the selected login type from the list
+      console.log(`🖱️ Step 2: Clicking "${loginType}" option...`);
+      const googleClicked = await page.evaluate((loginType) => {
         console.log('=== DROPDOWN DEBUG ===');
         
         // Find all elements with "Google", "Normal", or "Microsoft"
@@ -801,14 +801,32 @@ async function submitToSparxNowInternal(productName, username, password, school 
           console.log(`  [${i}] "${el.textContent?.trim()}" - tag: ${el.tagName}, clickable: ${el.onclick !== null}`);
         });
         
-        // Try to find and click the selected login type
+        // AGGRESSIVE CLICKING: Try to find and click the selected login type with multiple methods
         const loginOption = optionLike.find(el => el.textContent?.trim() === loginType);
         
         if (loginOption) {
           console.log(`✅ Found ${loginType} option!`);
           console.log('Tag:', loginOption.tagName);
           console.log('Parent:', loginOption.parentElement?.tagName);
+          
+          // METHOD 1: Direct click
           loginOption.click();
+          
+          // METHOD 2: Click on parent
+          if (loginOption.parentElement) {
+            loginOption.parentElement.click();
+          }
+          
+          // METHOD 3: MouseEvent
+          const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+          loginOption.dispatchEvent(clickEvent);
+          
+          // METHOD 4: Focus and Enter
+          loginOption.focus();
+          const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true });
+          loginOption.dispatchEvent(enterEvent);
+          
+          console.log(`🔥 Used 4 click methods on ${loginType}!`);
           return true;
         }
         
@@ -1103,9 +1121,9 @@ async function submitToSparxNowInternal(productName, username, password, school 
     await page.screenshot({ path: 'dropdown-debug.png' });
     console.log('📸 Screenshot saved: dropdown-debug.png');
     
-    // Step 3: Click "Google" from the list
-    console.log('🖱️ Step 2: Clicking "Google" option...');
-    const googleClicked = await page.evaluate(() => {
+    // Step 3: Click the selected login type from the list
+    console.log(`🖱️ Step 2: Clicking "${loginType}" option...`);
+    const googleClicked = await page.evaluate((loginType) => {
       console.log('=== DROPDOWN DEBUG ===');
       
       // Find all elements with "Google", "Normal", or "Microsoft"
@@ -1122,14 +1140,32 @@ async function submitToSparxNowInternal(productName, username, password, school 
         console.log(`  [${i}] "${el.textContent?.trim()}" - tag: ${el.tagName}, clickable: ${el.onclick !== null}`);
       });
       
-      // Try to find and click the selected login type
+      // AGGRESSIVE CLICKING: Try to find and click the selected login type with multiple methods
       const loginOption = optionLike.find(el => el.textContent?.trim() === loginType);
       
       if (loginOption) {
         console.log(`✅ Found ${loginType} option!`);
         console.log('Tag:', loginOption.tagName);
         console.log('Parent:', loginOption.parentElement?.tagName);
+        
+        // METHOD 1: Direct click
         loginOption.click();
+        
+        // METHOD 2: Click on parent
+        if (loginOption.parentElement) {
+          loginOption.parentElement.click();
+        }
+        
+        // METHOD 3: MouseEvent
+        const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+        loginOption.dispatchEvent(clickEvent);
+        
+        // METHOD 4: Focus and Enter
+        loginOption.focus();
+        const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true });
+        loginOption.dispatchEvent(enterEvent);
+        
+        console.log(`🔥 Used 4 click methods on ${loginType}!`);
         return true;
       }
       

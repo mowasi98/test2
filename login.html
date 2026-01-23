@@ -515,50 +515,64 @@
       console.log('📍 Current pathname:', window.location.pathname);
       console.log('🔍 URL search params:', window.location.search);
       
-      // CRITICAL: Add a visible alert to confirm this code is running
-      console.log('⚠️ ⚠️ ⚠️ IF YOU SEE THIS, NEW CODE IS LOADED! ⚠️ ⚠️ ⚠️');
-      
-      // VERSION CHECK: Force everyone to re-login with new login type system
-      // Check required version from server (for force re-login feature)
+      // VERSION CHECK: Force everyone to re-login when admin triggers it
       const BACKEND_URL = 'https://test2-adsw.onrender.com';
       
       // Store required version globally so handleLogin can access it
       window.REQUIRED_VERSION = '2.2'; // Default fallback
       
-      try {
-        const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
-        const versionData = await versionResponse.json();
-        const requiredVersion = versionData.requiredVersion || '2.2';
-        window.REQUIRED_VERSION = requiredVersion; // Store globally
-        const savedVersion = localStorage.getItem('appVersion');
-        
-        console.log('═══════════════════════════════════════════════════');
-        console.log('🔍 VERSION CHECK');
-        console.log('═══════════════════════════════════════════════════');
-        console.log(`Server requires: ${requiredVersion}`);
-        console.log(`User has: ${savedVersion || 'none'}`);
-        
-        if (savedVersion !== requiredVersion) {
-          console.log('🔄 VERSION MISMATCH - Forcing re-login');
+      // Only do version check ONCE on first load (don't repeat on every refresh)
+      const versionCheckDone = sessionStorage.getItem('versionCheckDone');
+      
+      if (!versionCheckDone) {
+        try {
+          const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
+          const versionData = await versionResponse.json();
+          const requiredVersion = versionData.requiredVersion || '2.2';
+          window.REQUIRED_VERSION = requiredVersion; // Store globally
+          const savedVersion = localStorage.getItem('appVersion');
           
-          // Clear all saved credentials
-          localStorage.removeItem('savedUsername');
-          localStorage.removeItem('savedPassword');
-          localStorage.removeItem('savedSchool');
-          localStorage.removeItem('savedLoginType');
-          
-          // Save new version
-          localStorage.setItem('appVersion', requiredVersion);
-          
-          console.log('✅ User must re-login (credentials cleared)');
           console.log('═══════════════════════════════════════════════════');
-        } else {
-          console.log(`✅ Version ${requiredVersion} - credentials still valid`);
+          console.log('🔍 VERSION CHECK (First load only)');
           console.log('═══════════════════════════════════════════════════');
+          console.log(`Server requires: ${requiredVersion}`);
+          console.log(`User has: ${savedVersion || 'none'}`);
+          
+          if (savedVersion !== requiredVersion) {
+            console.log('🔄 VERSION MISMATCH - Forcing re-login');
+            
+            // Clear all saved credentials
+            localStorage.removeItem('savedUsername');
+            localStorage.removeItem('savedPassword');
+            localStorage.removeItem('savedSchool');
+            localStorage.removeItem('savedLoginType');
+            
+            // Don't save version yet - only save it when user logs in
+            // This prevents loops where version gets saved but credentials don't
+            
+            console.log('✅ Credentials cleared - user must login');
+            console.log('═══════════════════════════════════════════════════');
+          } else {
+            console.log(`✅ Version ${requiredVersion} - credentials valid`);
+            console.log('═══════════════════════════════════════════════════');
+          }
+          
+          // Mark version check as done for this session
+          sessionStorage.setItem('versionCheckDone', 'true');
+        } catch (error) {
+          console.error('❌ Error checking version:', error.message);
+          console.log('Continuing with default version...');
+          sessionStorage.setItem('versionCheckDone', 'true'); // Don't retry on error
         }
-      } catch (error) {
-        console.error('❌ Error checking version:', error.message);
-        console.log('Continuing with default version check...');
+      } else {
+        // Version check already done this session - fetch required version but don't clear credentials
+        try {
+          const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
+          const versionData = await versionResponse.json();
+          window.REQUIRED_VERSION = versionData.requiredVersion || '2.2';
+        } catch (error) {
+          console.log('Using default version 2.2');
+        }
       }
       
       // Setup school autocomplete

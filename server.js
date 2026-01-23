@@ -2638,26 +2638,30 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
       });
     }
     
-    // Validate email format (must contain @ and valid domain)
-    if (!username.includes('@')) {
-      console.error('❌ Invalid email format - missing @');
-      return res.status(400).json({ 
-        error: 'Invalid email address',
-        requireReLogin: true,
-        message: 'Your email must contain an @ symbol. Please log in again with a valid school email.'
-      });
-    }
-    
-    const validDomains = ['.com', '.co.uk', '.edu', '.org', '.net', '.ac.uk'];
-    const hasValidDomain = validDomains.some(domain => username.toLowerCase().includes(domain));
-    
-    if (!hasValidDomain) {
-      console.error('❌ Invalid email format - missing valid domain');
-      return res.status(400).json({ 
-        error: 'Invalid email address',
-        requireReLogin: true,
-        message: 'Your email must end with a valid domain (.com, .co.uk, .edu, etc.). Please log in again with a valid school email.'
-      });
+    // Validate email format (ONLY for Google/Microsoft login types, NOT for Normal)
+    if (loginType !== 'Normal') {
+      if (!username.includes('@')) {
+        console.error('❌ Invalid email format - missing @');
+        return res.status(400).json({ 
+          error: 'Invalid email address',
+          requireReLogin: true,
+          message: 'Your email must contain an @ symbol. Please log in again with a valid school email.'
+        });
+      }
+      
+      const validDomains = ['.com', '.co.uk', '.edu', '.org', '.net', '.ac.uk'];
+      const hasValidDomain = validDomains.some(domain => username.toLowerCase().includes(domain));
+      
+      if (!hasValidDomain) {
+        console.error('❌ Invalid email format - missing valid domain');
+        return res.status(400).json({ 
+          error: 'Invalid email address',
+          requireReLogin: true,
+          message: 'Your email must end with a valid domain (.com, .co.uk, .edu, etc.). Please log in again with a valid school email.'
+        });
+      }
+    } else {
+      console.log('✅ Normal login type - skipping email validation');
     }
     
     // Validate cash payment code
@@ -2862,7 +2866,7 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
     console.log('💳 CARD PAYMENT - LOGIN DETAILS REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { school, username, password, platform, sessionId, productName: rawProductName, productPrice, paymentMethod, previousUsername, reservationId, isWebhookFallback } = req.body;
+    const { school, username, password, loginType, platform, sessionId, productName: rawProductName, productPrice, paymentMethod, previousUsername, reservationId, isWebhookFallback } = req.body;
     
     // Clean product name (remove " - Extra Slot" suffix for backend processing)
     const productName = rawProductName ? rawProductName.replace(' - Extra Slot', '').trim() : '';
@@ -2923,26 +2927,30 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
       });
     }
     
-    // Validate email format (must contain @ and valid domain)
-    if (!username.includes('@')) {
-      console.error('❌ CARD PAYMENT: Invalid email format - missing @');
-      return res.status(400).json({ 
-        error: 'Invalid email address',
-        requireReLogin: true,
-        message: 'Your email must contain an @ symbol. Please log in again with a valid school email.'
-      });
-    }
-    
-    const validDomains = ['.com', '.co.uk', '.edu', '.org', '.net', '.ac.uk'];
-    const hasValidDomain = validDomains.some(domain => username.toLowerCase().includes(domain));
-    
-    if (!hasValidDomain) {
-      console.error('❌ CARD PAYMENT: Invalid email format - missing valid domain');
-      return res.status(400).json({ 
-        error: 'Invalid email address',
-        requireReLogin: true,
-        message: 'Your email must end with a valid domain (.com, .co.uk, .edu, etc.). Please log in again with a valid school email.'
-      });
+    // Validate email format (ONLY for Google/Microsoft login types, NOT for Normal)
+    if (loginType !== 'Normal') {
+      if (!username.includes('@')) {
+        console.error('❌ CARD PAYMENT: Invalid email format - missing @');
+        return res.status(400).json({ 
+          error: 'Invalid email address',
+          requireReLogin: true,
+          message: 'Your email must contain an @ symbol. Please log in again with a valid school email.'
+        });
+      }
+      
+      const validDomains = ['.com', '.co.uk', '.edu', '.org', '.net', '.ac.uk'];
+      const hasValidDomain = validDomains.some(domain => username.toLowerCase().includes(domain));
+      
+      if (!hasValidDomain) {
+        console.error('❌ CARD PAYMENT: Invalid email format - missing valid domain');
+        return res.status(400).json({ 
+          error: 'Invalid email address',
+          requireReLogin: true,
+          message: 'Your email must end with a valid domain (.com, .co.uk, .edu, etc.). Please log in again with a valid school email.'
+        });
+      }
+    } else {
+      console.log('✅ CARD PAYMENT: Normal login type - skipping email validation');
     }
     
     // Check if this is a new login (different username)

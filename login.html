@@ -518,23 +518,24 @@
       // CRITICAL: Add a visible alert to confirm this code is running
       console.log('⚠️ ⚠️ ⚠️ IF YOU SEE THIS, NEW CODE IS LOADED! ⚠️ ⚠️ ⚠️');
       
-      // VERSION CHECK: Force everyone to re-login with new validation rules
-      const CURRENT_VERSION = '2.1'; // Increment this to force logout
+      // VERSION CHECK: Force everyone to re-login with new login type system
+      const CURRENT_VERSION = '2.2'; // Increment this to force logout
       const savedVersion = localStorage.getItem('appVersion');
       
       if (savedVersion !== CURRENT_VERSION) {
         console.log('🔄 VERSION UPDATE DETECTED - Clearing old credentials');
         console.log(`   Old version: ${savedVersion || 'none'}, New version: ${CURRENT_VERSION}`);
         
-        // Clear all saved credentials
+        // Clear all saved credentials (including loginType)
         localStorage.removeItem('savedUsername');
         localStorage.removeItem('savedPassword');
         localStorage.removeItem('savedSchool');
+        localStorage.removeItem('savedLoginType');
         
         // Save new version
         localStorage.setItem('appVersion', CURRENT_VERSION);
         
-        console.log('✅ All users must re-login with valid email addresses!');
+        console.log('✅ All users must re-login with the new login type system!');
       } else {
         console.log(`✅ Version ${CURRENT_VERSION} - credentials still valid`);
       }
@@ -775,7 +776,7 @@
       localStorage.setItem('savedPassword', password);
       localStorage.setItem('savedSchool', school); // Save school info too!
       localStorage.setItem('savedLoginType', loginType); // Save login type too!
-      localStorage.setItem('appVersion', '2.1'); // Save version number
+      localStorage.setItem('appVersion', '2.2'); // Save version number
 
       // Product info is optional - if missing, redirect to homepage to select a product
       if (!productName || !productPrice || !stripeLink) {

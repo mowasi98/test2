@@ -306,7 +306,16 @@ async function initBrowser() {
   }
 
   console.log('🌐 Launching Chrome browser...');
-  console.log('📋 Queue: BATCH=2min, SEPARATE=5min any/1hr same');
+  
+  // Fetch current queue settings from backend API
+  const queueTimes = await getQueueWaitTimes();
+  const config = await fetchQueueConfigFromAPI() || loadQueueConfig();
+  const batchAny = 2; // Hardcoded batch time for different products
+  const batchSame = config.globalWaitMinutes + 10; // Batch time for same product (global + 10)
+  
+  console.log('📋 Queue system configured:');
+  console.log(`   📦 BATCH (orders within 30s): ${batchAny} min different products, ${batchSame} min same product`);
+  console.log(`   📋 SEPARATE (orders >30s apart): ${config.globalWaitMinutes} min any product, ${Math.floor(config.sameProductWaitMinutes/60)}h ${config.sameProductWaitMinutes%60}m same product`);
   console.log(`📺 DISPLAY environment: ${process.env.DISPLAY || 'NOT SET'}`);
   
   browser = await puppeteer.launch({

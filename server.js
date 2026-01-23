@@ -1791,26 +1791,33 @@ app.post('/admin/set-test-timer', (req, res) => {
 // Admin endpoint to GET current queue settings
 app.get('/admin/get-queue-settings', (req, res) => {
   try {
-    // Read from environment variables (persist across Render deployments)
-    // Also try reading from file as fallback for local development
-    let config = { 
-      globalWaitMinutes: parseInt(process.env.GLOBAL_QUEUE_MINUTES) || 5, 
-      sameProductWaitMinutes: parseInt(process.env.SAME_PRODUCT_QUEUE_MINUTES) || 60 
-    };
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'queue-config.json');
     
-    // If no env vars set, try reading from file (local dev)
-    if (!process.env.GLOBAL_QUEUE_MINUTES && !process.env.SAME_PRODUCT_QUEUE_MINUTES) {
-      const fs = require('fs');
-      const path = require('path');
-      const configPath = path.join(__dirname, 'queue-config.json');
-      
-      if (fs.existsSync(configPath)) {
+    let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 }; // Defaults
+    
+    // FIRST: Try reading from file (this is where admin panel saves)
+    if (fs.existsSync(configPath)) {
+      try {
         const data = fs.readFileSync(configPath, 'utf8');
         config = JSON.parse(data);
+        console.log('✅ Loaded queue settings from FILE:', config);
+      } catch (error) {
+        console.error('❌ Error reading file:', error.message);
       }
+    } else {
+      console.log('⚠️ queue-config.json does not exist, using defaults');
     }
     
-    console.log('📊 Current queue settings:', config);
+    // FALLBACK: Environment variables (if file doesn't exist or failed to read)
+    if (process.env.GLOBAL_QUEUE_MINUTES || process.env.SAME_PRODUCT_QUEUE_MINUTES) {
+      config.globalWaitMinutes = parseInt(process.env.GLOBAL_QUEUE_MINUTES) || config.globalWaitMinutes;
+      config.sameProductWaitMinutes = parseInt(process.env.SAME_PRODUCT_QUEUE_MINUTES) || config.sameProductWaitMinutes;
+      console.log('✅ Overridden by environment variables:', config);
+    }
+    
+    console.log('📊 Returning queue settings:', config);
     
     res.json({ 
       success: true, 

@@ -522,10 +522,14 @@
       // Check required version from server (for force re-login feature)
       const BACKEND_URL = 'https://test2-adsw.onrender.com';
       
+      // Store required version globally so handleLogin can access it
+      window.REQUIRED_VERSION = '2.2'; // Default fallback
+      
       try {
         const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
         const versionData = await versionResponse.json();
         const requiredVersion = versionData.requiredVersion || '2.2';
+        window.REQUIRED_VERSION = requiredVersion; // Store globally
         const savedVersion = localStorage.getItem('appVersion');
         
         console.log('═══════════════════════════════════════════════════');
@@ -826,7 +830,9 @@
       localStorage.setItem('savedPassword', password);
       localStorage.setItem('savedSchool', school); // Save school info too!
       localStorage.setItem('savedLoginType', loginType); // Save login type too!
-      localStorage.setItem('appVersion', '2.2'); // Save version number
+      localStorage.setItem('appVersion', window.REQUIRED_VERSION || '2.2'); // Save current required version
+      
+      console.log(`✅ Credentials saved! Version set to: ${window.REQUIRED_VERSION || '2.2'}`);
 
       // Product info is optional - if missing, redirect to homepage to select a product
       if (!productName || !productPrice || !stripeLink) {

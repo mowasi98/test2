@@ -1791,16 +1791,26 @@ app.post('/admin/set-test-timer', (req, res) => {
 // Admin endpoint to GET current queue settings
 app.get('/admin/get-queue-settings', (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const configPath = path.join(__dirname, 'queue-config.json');
+    // Read from environment variables (persist across Render deployments)
+    // Also try reading from file as fallback for local development
+    let config = { 
+      globalWaitMinutes: parseInt(process.env.GLOBAL_QUEUE_MINUTES) || 5, 
+      sameProductWaitMinutes: parseInt(process.env.SAME_PRODUCT_QUEUE_MINUTES) || 60 
+    };
     
-    // Load existing config or return defaults
-    let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
-    if (fs.existsSync(configPath)) {
-      const data = fs.readFileSync(configPath, 'utf8');
-      config = JSON.parse(data);
+    // If no env vars set, try reading from file (local dev)
+    if (!process.env.GLOBAL_QUEUE_MINUTES && !process.env.SAME_PRODUCT_QUEUE_MINUTES) {
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, 'queue-config.json');
+      
+      if (fs.existsSync(configPath)) {
+        const data = fs.readFileSync(configPath, 'utf8');
+        config = JSON.parse(data);
+      }
     }
+    
+    console.log('📊 Current queue settings:', config);
     
     res.json({ 
       success: true, 
@@ -1854,6 +1864,9 @@ app.post('/admin/set-global-queue-time', (req, res) => {
     console.log('⏱️ ═══════════════════════════════════════════════════');
     console.log(`⏱️  Wait between ANY product orders:`);
     console.log(`⏱️  OLD: ${oldValue} minutes → NEW: ${minutes} minutes`);
+    console.log(`⏱️  File location: ${configPath}`);
+    console.log(`⏱️  File exists after write: ${fs.existsSync(configPath)}`);
+    console.log(`⏱️  File contents: ${fs.readFileSync(configPath, 'utf8')}`);
     console.log('⏱️ ═══════════════════════════════════════════════════');
     console.log('');
     
@@ -1915,6 +1928,9 @@ app.post('/admin/set-same-product-queue-time', (req, res) => {
     console.log('⏱️ ═══════════════════════════════════════════════════');
     console.log(`⏱️  Wait between SAME product orders:`);
     console.log(`⏱️  OLD: ${oldDisplayText} → NEW: ${displayText}`);
+    console.log(`⏱️  File location: ${configPath}`);
+    console.log(`⏱️  File exists after write: ${fs.existsSync(configPath)}`);
+    console.log(`⏱️  File contents: ${fs.readFileSync(configPath, 'utf8')}`);
     console.log('⏱️ ═══════════════════════════════════════════════════');
     console.log('');
     

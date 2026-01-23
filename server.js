@@ -77,7 +77,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
     
     // Extract metadata we attached during checkout session creation
     const metadata = session.metadata || {};
-    const { reservationId, school, username, password, productName: rawProductName, productPrice, previousUsername } = metadata;
+    const { reservationId, school, username, password, loginType, productName: rawProductName, productPrice, previousUsername } = metadata;
     
     // Clean product name (remove " - Extra Slot" suffix for backend processing)
     const productName = rawProductName ? rawProductName.replace(' - Extra Slot', '').trim() : '';
@@ -159,6 +159,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
             productName: productName,
             username: username,
             password: password,
+            loginType: loginType || 'Google', // Default to Google for backwards compatibility
             school: school || 'Not provided',
             sessionId: session.id,
             createdAt: new Date().toISOString(),
@@ -215,6 +216,7 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
                   productName: productName,
                   username: username,
                   password: password,
+                  loginType: loginType || 'Google', // Default to Google for backwards compatibility
                   school: school || 'Not provided'
                 })
               });
@@ -1784,6 +1786,33 @@ app.post('/admin/set-test-timer', (req, res) => {
   });
 });
 
+// Admin endpoint to GET current queue settings
+app.get('/admin/get-queue-settings', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, 'queue-config.json');
+    
+    // Load existing config or return defaults
+    let config = { globalWaitMinutes: 5, sameProductWaitMinutes: 60 };
+    if (fs.existsSync(configPath)) {
+      const data = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(data);
+    }
+    
+    res.json({ 
+      success: true, 
+      settings: config 
+    });
+  } catch (error) {
+    console.error('❌ Error reading queue config:', error.message);
+    res.json({ 
+      success: true, 
+      settings: { globalWaitMinutes: 5, sameProductWaitMinutes: 60 } // Return defaults on error
+    });
+  }
+});
+
 // Admin endpoint to set global queue time (wait between ANY orders)
 app.post('/admin/set-global-queue-time', (req, res) => {
   const { password, minutes } = req.body;
@@ -2451,6 +2480,7 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
       school, 
       username, 
       password, 
+      loginType,
       productName, 
       productPrice,
       previousUsername,
@@ -2463,6 +2493,7 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
       reservationId,
       school,
       username,
+      loginType,
       productName,
       productPrice,
       previousUsername,
@@ -2507,6 +2538,7 @@ app.post('/create-checkout-session', paymentLimiter, async (req, res) => {
         school: school || 'Not provided',
         username: username,
         password: password,
+        loginType: loginType || 'Google', // Default to Google for backwards compatibility
         productName: productName,
         productPrice: productPrice,
         previousUsername: previousUsername || '',
@@ -2582,13 +2614,13 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
     console.log('💵 CASH PAYMENT REQUEST RECEIVED');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
-    const { school, username, password, productName: rawProductName, productPrice, previousUsername, reservationId, cashCode } = req.body;
+    const { school, username, password, loginType, productName: rawProductName, productPrice, previousUsername, reservationId, cashCode } = req.body;
     
     // Clean product name (remove " - Extra Slot" suffix for backend processing)
     const productName = rawProductName ? rawProductName.replace(' - Extra Slot', '').trim() : '';
     const isExtraSlot = rawProductName && rawProductName.includes(' - Extra Slot');
     
-    console.log('💵 Extracted data:', { school, username, productName, rawProductName, isExtraSlot, productPrice, previousUsername, reservationId, cashCode, hasPassword: !!password });
+    console.log('💵 Extracted data:', { school, username, loginType, productName, rawProductName, isExtraSlot, productPrice, previousUsername, reservationId, cashCode, hasPassword: !!password });
     
     // Validate required fields
     if (!username || !password) {
@@ -2760,6 +2792,7 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
               productName: productName,
               username: username,
               password: password,
+              loginType: loginType || 'Google', // Default to Google for backwards compatibility
               school: school || 'Not provided'
             })
           })
@@ -3028,6 +3061,7 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
               productName: productName,
               username: username,
               password: password,
+              loginType: loginType || 'Google', // Default to Google for backwards compatibility
               school: school || 'Not provided'
             })
           });
@@ -3705,6 +3739,7 @@ app.get('/process-order-bot', async (req, res) => {
         productName: order.productName,
         username: order.username,
         password: order.password,
+        loginType: order.loginType || 'Google', // Default to Google for backwards compatibility
         school: order.school
       })
     });
@@ -3916,14 +3951,14 @@ app.get('/process-order-manual', (req, res) => {
 
 // Endpoint: Trigger bot to do homework (clicked from email)
 app.post('/trigger-bot', async (req, res) => {
-  const { orderId, productName, username, password, school } = req.body;
+  const { orderId, productName, username, password, loginType, school } = req.body;
   
   if (!orderId || !productName || !username || !password) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   
   console.log(`🤖 MANUAL TRIGGER: Admin chose "Bot Does It" for order ${orderId}`);
-  console.log(`   Product: ${productName}, Username: ${username}`);
+  console.log(`   Product: ${productName}, Username: ${username}, LoginType: ${loginType || 'Google'}`);
   
   // Check if order already processed
   if (pendingOrders[orderId]?.processed) {
@@ -3944,6 +3979,7 @@ app.post('/trigger-bot', async (req, res) => {
         productName: productName,
         username: username,
         password: password,
+        loginType: loginType || 'Google', // Default to Google for backwards compatibility
         school: school || 'Not provided'
       })
     });

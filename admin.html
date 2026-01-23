@@ -971,6 +971,30 @@
                                   }
                                 }
                                 
+                                // Load current queue settings from server
+                                async function loadQueueSettings() {
+                                  try {
+                                    const response = await fetch(`${BACKEND_URL}/admin/get-queue-settings`);
+                                    const data = await response.json();
+                                    
+                                    if (data.success && data.settings) {
+                                      // Update global wait input
+                                      document.getElementById('globalQueueMinutes').value = data.settings.globalWaitMinutes || 5;
+                                      
+                                      // Update same product wait inputs (convert minutes to hours and minutes)
+                                      const totalMinutes = data.settings.sameProductWaitMinutes || 60;
+                                      const hours = Math.floor(totalMinutes / 60);
+                                      const minutes = totalMinutes % 60;
+                                      document.getElementById('sameProductHours').value = hours;
+                                      document.getElementById('sameProductMinutes').value = minutes;
+                                      
+                                      console.log('✅ Queue settings loaded:', data.settings);
+                                    }
+                                  } catch (error) {
+                                    console.error('❌ Error loading queue settings:', error);
+                                  }
+                                }
+
                                 async function setGlobalQueueTime() {
                                   const password = document.getElementById('adminPassword').value;
                                   const minutes = parseInt(document.getElementById('globalQueueMinutes').value);
@@ -1474,8 +1498,9 @@
 
                                 // Add mobile-friendly event listeners when page loads
                                 document.addEventListener('DOMContentLoaded', function() {
-                                  // Load bot mode on page load
+                                  // Load bot mode and queue settings on page load
                                   loadBotMode();
+                                  loadQueueSettings();
                                   // Reset All Counters button
                                   const resetAllBtn = document.getElementById('resetAllBtn');
                                   if (resetAllBtn) {

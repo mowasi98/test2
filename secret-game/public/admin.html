@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Admin Dashboard - Secret</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Admin Password Protection -->
+    <div id="adminLogin" class="admin-login-screen">
+        <div class="auth-container">
+            <h1 class="logo">🎭 Secret</h1>
+            <h2 style="margin-bottom: 30px; text-align: center; font-size: clamp(1.5rem, 4vw, 2rem);">Admin Access</h2>
+            <form onsubmit="checkAdminPassword(event)" style="width: 100%;">
+                <input type="password" id="adminPassword" placeholder="Enter Admin Password" required style="width: 100%; padding: 18px; margin-bottom: 16px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 14px; font-size: 1.05rem; background: rgba(255, 255, 255, 0.05); color: white;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">🔓 Unlock Dashboard</button>
+            </form>
+            <p class="error-msg" id="adminLoginError"></p>
+        </div>
+    </div>
+
+    <div class="admin-container" id="adminDashboard" style="display: none;">
+        <div class="admin-header">
+            <h1>🎭 Secret - Admin Dashboard</h1>
+            <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
+        </div>
+
+        <div class="admin-stats">
+            <div class="stat-card">
+                <h3>Total Games</h3>
+                <p class="stat-number" id="activeGames">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Players</h3>
+                <p class="stat-number" id="totalPlayers">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Votes</h3>
+                <p class="stat-number" id="totalVotes">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Wheel Spins</h3>
+                <p class="stat-number" id="totalSpins">0</p>
+            </div>
+        </div>
+
+        <div class="games-section">
+            <h2>All Games & Answers</h2>
+            <div id="gamesList"></div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

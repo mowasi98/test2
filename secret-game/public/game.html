@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Game - Secret</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1 class="logo">🎭 Secret</h1>
+            <div class="game-code">
+                <span>Game Code:</span>
+                <strong id="displayGameCode"></strong>
+            </div>
+        </div>
+
+        <!-- Waiting Room -->
+        <div id="waitingRoom" class="waiting-room">
+            <h2 style="font-size: clamp(1.5rem, 5vw, 2rem); margin-bottom: 15px;">Play with your friends</h2>
+            
+            <div class="game-pin-display">
+                <span style="opacity: 0.8; font-size: clamp(1rem, 3vw, 1.2rem);">🔑 GAME PIN</span>
+                <div id="displayGameCodeBig" style="font-size: clamp(2rem, 7vw, 3rem); font-weight: 900; letter-spacing: 8px; color: #fff; margin: 10px 0;"></div>
+            </div>
+            
+            <div class="players-circle" id="playersCircle"></div>
+            
+            <!-- Admin Controls -->
+            <div id="adminControls" style="display: none; margin-top: 30px;">
+                <!-- Anonymous Category -->
+                <div id="anonymousAdminControls" style="display: none;">
+                    <button class="btn btn-secondary" onclick="showAddQuestionModal()" style="margin-bottom: 15px; width: 100%;">➕ Add Questions First</button>
+                    <button class="start-btn" onclick="startGame()">Start</button>
+                </div>
+                
+                <!-- Other Categories -->
+                <div id="normalAdminControls" style="display: none;">
+                    <button class="start-btn" onclick="startGame()">Start</button>
+                </div>
+            </div>
+            
+            <!-- Non-Admin Message -->
+            <div id="waitingMessage" style="display: none; margin-top: 30px; text-align: center; opacity: 0.8;">
+                <p style="font-size: clamp(1rem, 3vw, 1.2rem);">Waiting for host to start the game...</p>
+            </div>
+        </div>
+
+        <!-- Add Question Modal -->
+        <div id="addQuestionModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeQuestionModal()">&times;</span>
+                <h2 style="text-align: center; margin-bottom: 25px;">✍️ Add Your Question</h2>
+                
+                <div class="question-type-selector">
+                    <button class="question-type-btn active" data-type="gossip" onclick="selectQuestionType('gossip')">
+                        💬 Gossip
+                    </button>
+                    <button class="question-type-btn" data-type="question" onclick="selectQuestionType('question')">
+                        ❓ Question
+                    </button>
+                    <button class="question-type-btn" data-type="dare" onclick="selectQuestionType('dare')">
+                        🔥 Dare
+                    </button>
+                </div>
+                
+                <textarea id="customQuestionInput" placeholder="Write your question here..." rows="4" style="width: 100%; padding: 16px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 14px; font-size: 1.05rem; background: rgba(255, 255, 255, 0.05); color: white; margin: 20px 0; font-family: inherit; resize: vertical;"></textarea>
+                
+                <button class="btn btn-primary" onclick="submitCustomQuestion()" style="width: 100%;">✅ Add Question</button>
+                
+                <div id="questionsPreview" style="margin-top: 25px;">
+                    <h3 style="font-size: 1.1rem; margin-bottom: 15px; opacity: 0.9;">Questions in this game:</h3>
+                    <div id="questionsList" style="max-height: 200px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Question Phase -->
+        <div id="questionPhase" style="display: none;">
+            <div class="question-card">
+                <h2 id="questionText"></h2>
+            </div>
+            <div class="instruction">Select 2 players who fit this question best:</div>
+            <div class="players-grid" id="votingPlayers"></div>
+            <button class="btn btn-primary" id="submitVoteBtn" onclick="submitVote()" disabled>Submit Vote</button>
+        </div>
+
+        <!-- Results Phase -->
+        <div id="resultsPhase" style="display: none;">
+            <h2>🏆 Results</h2>
+            <div class="results-list" id="resultsList"></div>
+            <button class="btn btn-primary" onclick="playAgain()" style="margin: 0 auto; display: block;">🎰 Play Again</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

@@ -1,6 +1,53 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+const envPath = path.join(__dirname, '.env');
+console.log('🔍 Loading .env from:', envPath);
+const dotenvResult = require('dotenv').config({ path: envPath });
+if (dotenvResult.error) {
+  console.log('❌ Dotenv error:', dotenvResult.error.message);
+} else {
+  console.log('✅ Dotenv loaded!');
+  console.log('📋 Channel IDs:',{
+    SPARX_MATHS: process.env.CHANNEL_SPARX_MATHS ? 'SET' : 'MISSING',
+    SPARX_READER: process.env.CHANNEL_SPARX_READER ? 'SET' : 'MISSING',
+    EDUCATE: process.env.CHANNEL_EDUCATE ? 'SET' : 'MISSING',
+    SENECA: process.env.CHANNEL_SENECA ? 'SET' : 'MISSING'
+  });
+}
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+// Queue config file path
+const QUEUE_CONFIG_FILE = path.join(__dirname, 'queue-config.json');
+
+// Load queue config from file
+function loadQueueConfig() {
+  try {
+    if (fs.existsSync(QUEUE_CONFIG_FILE)) {
+      const data = fs.readFileSync(QUEUE_CONFIG_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error loading queue config:', error.message);
+  }
+  // Return defaults if file doesn't exist or has errors
+  return {
+    globalWaitMinutes: 5,
+    sameProductWaitMinutes: 60
+  };
+}
+
+// Save queue config to file
+function saveQueueConfig(config) {
+  try {
+    fs.writeFileSync(QUEUE_CONFIG_FILE, JSON.stringify(config, null, 2));
+    console.log('✅ Queue config saved:', config);
+    return true;
+  } catch (error) {
+    console.error('❌ Error saving queue config:', error.message);
+    return false;
+  }
+}
 
 // Use stealth plugin to avoid detection
 puppeteer.use(StealthPlugin());
@@ -15,42 +62,55 @@ const CONFIG = {
   discordEmail: process.env.DISCORD_EMAIL || '',
   discordPassword: process.env.DISCORD_PASSWORD || '',
   channels: {
-    'Sparx Maths': process.env.CHANNEL_SPARX_MATHS,
-    'Sparx Reader': process.env.CHANNEL_SPARX_READER,
-    'Educate': process.env.CHANNEL_EDUCATE,
-    'Seneca': process.env.CHANNEL_SENECA
+    'Sparx Maths': '1412167942564741301',
+    'Sparx Reader': '1418691540401914088',
+    'Educate': '1434847317147521177',
+    'Seneca': '1442158660712403006'
   }
 };
 
 let browser = null;
-let page = null; // Main page (for Discord navigation and login checks)
+let page = null; // Single tab for all products
 
 /**
- * MULTI-TAB SYSTEM
- * ================
- * Each product gets its own dedicated browser tab for parallel processing.
+ * QUEUE SYSTEM WITH BATCH DETECTION
+ * ==================================
+ * Detects when multiple orders come in at once (batch purchases) and uses shorter wait times.
  * 
- * How it works:
- * 1. Main tab (page): Used for Discord login and status checks
- * 2. Product tabs: Separate tabs for each product (Sparx Maths, Sparx Reader, Educate, Seneca)
+ * Batch Purchase (orders within 30 seconds):
+ * - Different products: 2 minutes wait
+ * - Same product: 12 minutes wait (2 min base + 10 min penalty)
  * 
- * Benefits:
- * - Multiple products can run simultaneously (e.g., Sparx Maths AND Sparx Reader at the same time)
- * - If the same product is requested again, it reuses its existing tab (no need to recreate)
- * - Each tab maintains its own state and position in Discord channels
- * - Busy flag prevents tab conflicts (only 1 job per product at a time)
+ * Separate Purchases (orders more than 30 seconds apart):
+ * - Different products: 5 minutes wait (configurable)
+ * - Same product: 1 hour wait (configurable)
  * 
- * Example:
- * - User 1 buys Sparx Reader → Opens Tab 1 for Sparx Reader
- * - User 2 buys Sparx Maths → Opens Tab 2 for Sparx Maths (runs in parallel!)
- * - User 3 buys Sparx Reader → Waits for Tab 1 to finish (tab is busy)
+ * Example Batch:
+ * - 0:00 - User buys Sparx Maths (starts immediately)
+ * - 0:05 - User buys Sparx Reader (within 30s = batch) → WAITS 2 minutes → starts at 2:00
+ * - 0:10 - User buys Educate (within 30s = batch) → WAITS 2 minutes → starts at 4:00
+ * - 0:15 - User buys Sparx Maths again (within 30s = batch, SAME product) → WAITS 12 minutes → starts at 16:00
+ * 
+ * Example Separate:
+ * - 1:00 - Different user buys Seneca (more than 30s from last order = separate) → WAITS 5 minutes → starts at 6:00
  */
-const productTabs = {
-  'Sparx Maths': { page: null, busy: false, lastUsed: null },
-  'Sparx Reader': { page: null, busy: false, lastUsed: null },
-  'Educate': { page: null, busy: false, lastUsed: null },
-  'Seneca': { page: null, busy: false, lastUsed: null }
+let globalLastSubmissionTime = 0; // Track ANY product submission
+let lastOrderReceivedTime = 0; // Track when orders are RECEIVED (not processed)
+const lastSubmissionTime = {
+  'Sparx Maths': 0,
+  'Sparx Reader': 0,
+  'Educate': 0,
+  'Seneca': 0
 };
+
+// Queue wait times (loaded from config file, updated by admin panel)
+function getQueueWaitTimes() {
+  const config = loadQueueConfig();
+  return {
+    global: config.globalWaitMinutes * 60 * 1000, // Convert minutes to milliseconds
+    sameProduct: config.sameProductWaitMinutes * 60 * 1000
+  };
+}
 
 // Reset daily counter if new day
 function checkDailyReset() {
@@ -173,7 +233,8 @@ async function initBrowser() {
     return;
   }
 
-  console.log('🌐 Launching Chrome browser with multi-tab support...');
+  console.log('🌐 Launching Chrome browser...');
+  console.log('📋 Queue: BATCH=2min, SEPARATE=5min any/1hr same');
   console.log(`📺 DISPLAY environment: ${process.env.DISPLAY || 'NOT SET'}`);
   
   browser = await puppeteer.launch({
@@ -214,37 +275,24 @@ async function initBrowser() {
   console.log(`📍 Current URL after waiting: ${currentUrl}`);
   
   if (currentUrl.includes('discord.com/login') || currentUrl.includes('discord.com/register')) {
-    console.log('🔐 Discord login page detected - auto-logging in...');
+    console.log('⚠️ Discord is at login page - please log in manually via VNC!');
+    console.log('📺 VNC: Connect to 13.60.26.180:5900 and log in');
+    console.log('⏳ Bot will wait here. Once you log in, the session will persist forever!');
     
-    // Wait for email input
-    await page.waitForSelector('input[name="email"]', { timeout: 10000 });
-    console.log('✅ Found email input');
+    // Wait indefinitely for manual login (check every 5 seconds)
+    let loggedIn = false;
+    while (!loggedIn) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const newUrl = await page.evaluate(() => window.location.href);
+      if (!newUrl.includes('/login') && !newUrl.includes('/register')) {
+        loggedIn = true;
+        console.log('✅ Manual login detected - Discord session is now active!');
+      }
+    }
     
-    // Fill in email
-    await page.type('input[name="email"]', CONFIG.discordEmail, { delay: 50 });
-    console.log('✅ Email entered');
-    
-    // Fill in password
-    await page.type('input[name="password"]', CONFIG.discordPassword, { delay: 50 });
-    console.log('✅ Password entered');
-    
-      // Click login button
-      await page.click('button[type="submit"]');
-      console.log('✅ Login button clicked');
-      
-      // Wait for login to complete (URL will change from /login)
-      console.log('⏳ Waiting 1-2 minutes for Discord to log in and load...');
-      
-      // Wait for URL to change away from login page
-      await page.waitForFunction(
-        () => !window.location.href.includes('/login') && !window.location.href.includes('/register'),
-        { timeout: 120000 } // 2 minutes
-      );
-      console.log('✅ Login page navigation completed!');
-      
-      // Give Discord extra time to fully load
-      console.log('⏳ Giving Discord extra time to load...');
-      await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+    // Give Discord extra time to fully load
+    console.log('⏳ Giving Discord extra time to load...');
+    await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
   } else {
     console.log('✅ Already logged into Discord (session saved)');
   }
@@ -255,172 +303,185 @@ async function initBrowser() {
   
   console.log('✅ Discord login detected!');
   console.log('🎯 Browser bot is now ready to automate submissions!');
-  console.log('📑 Multi-tab system initialized - each product gets its own tab!');
+  console.log('📋 Queue system active with SMART BATCH DETECTION:');
+  console.log('   📦 BATCH (orders within 30s): 2 min different products, 12 min same product');
+  console.log('   📋 SEPARATE (orders >30s apart): 5 min any product, 1 hour same product');
+  console.log('');
+  console.log('📦 Available products:');
+  Object.keys(CONFIG.channels).forEach(product => {
+    console.log(`   ✅ ${product}: ${CONFIG.channels[product] ? 'Channel ID loaded' : '❌ MISSING'}`);
+  });
   console.log('');
 }
 
-// Get or create a dedicated tab for a specific product
-async function getProductTab(productName) {
-  if (!productTabs[productName]) {
-    throw new Error(`Unknown product: ${productName}`);
-  }
+// Check if we need to wait for a product (with batch purchase detection)
+async function waitForProductQueue(productName) {
+  const now = Date.now();
+  const timeSinceLastAnyProduct = now - globalLastSubmissionTime;
+  const timeSinceLastSameProduct = now - (lastSubmissionTime[productName] || 0);
   
-  const tabInfo = productTabs[productName];
+  // Detect if this is a batch purchase (order received within 30 seconds of last order)
+  const timeSinceLastOrderReceived = now - lastOrderReceivedTime;
+  const isBatchPurchase = lastOrderReceivedTime > 0 && timeSinceLastOrderReceived < 30000; // 30 seconds
   
-  // If tab doesn't exist yet, create it
-  if (!tabInfo.page) {
-    console.log(`📑 Creating new tab for "${productName}"...`);
-    const newPage = await browser.newPage();
-    await newPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  // Update last order received time
+  lastOrderReceivedTime = now;
+  
+  // Load current queue wait times from config
+  const queueTimes = getQueueWaitTimes();
+  const config = loadQueueConfig();
+  
+  // Determine wait times based on batch vs separate purchase
+  let waitTime = 0;
+  let waitReason = '';
+  
+  if (isBatchPurchase) {
+    // BATCH PURCHASE - shorter wait times
+    console.log(`📦 BATCH PURCHASE DETECTED (order within 30s of previous order)`);
     
-    // Start navigation to Discord but DON'T WAIT for it to complete
-    // This allows other tabs to be created in parallel!
-    newPage.goto('https://discord.com/app', { waitUntil: 'domcontentloaded', timeout: 120000 }).catch(err => {
-      console.error(`⚠️ Tab navigation error for ${productName}:`, err.message);
-    });
-    console.log(`✅ Tab created for "${productName}" (loading in background...)`);
-    
-    tabInfo.page = newPage;
+    // Check if same product in batch
+    const timeSinceSameProductInBatch = now - (lastSubmissionTime[productName] || 0);
+    if (timeSinceSameProductInBatch < queueTimes.sameProduct) {
+      // Same product in batch: 2 min base + 10 min penalty = 12 min total
+      const BATCH_SAME_PRODUCT_WAIT = 12 * 60 * 1000; // 12 minutes
+      waitTime = Math.max(0, BATCH_SAME_PRODUCT_WAIT - timeSinceSameProductInBatch);
+      waitReason = `same product ("${productName}") in BATCH - 12 min required (2 min + 10 min penalty)`;
+    } else if (timeSinceLastAnyProduct < 2 * 60 * 1000) {
+      // Different product in batch: 2 minutes
+      waitTime = (2 * 60 * 1000) - timeSinceLastAnyProduct;
+      waitReason = `different product in BATCH - 2 min required`;
+    }
   } else {
-    console.log(`♻️ Reusing existing tab for "${productName}"`);
+    // SEPARATE PURCHASE - use configured wait times
+    console.log(`📋 SEPARATE PURCHASE (order more than 30s from previous)`);
+    
+    // Check if we need to wait for the same product
+    if (timeSinceLastSameProduct < queueTimes.sameProduct) {
+      waitTime = queueTimes.sameProduct - timeSinceLastSameProduct;
+      const displayTime = config.sameProductWaitMinutes >= 60 
+        ? `${Math.floor(config.sameProductWaitMinutes / 60)} hour(s) ${config.sameProductWaitMinutes % 60} min` 
+        : `${config.sameProductWaitMinutes} min`;
+      waitReason = `same product ("${productName}") - ${displayTime} required`;
+    }
+    
+    // Check if we need to wait for ANY product - use this if it's LONGER
+    if (timeSinceLastAnyProduct < queueTimes.global) {
+      const globalWaitTime = queueTimes.global - timeSinceLastAnyProduct;
+      if (globalWaitTime > waitTime) {
+        waitTime = globalWaitTime;
+        waitReason = `any product - ${config.globalWaitMinutes} min required between all orders`;
+      }
+    }
   }
   
-  tabInfo.lastUsed = Date.now();
-  return tabInfo.page;
-}
-
-// Mark a product tab as busy or free
-function setTabBusy(productName, isBusy) {
-  if (productTabs[productName]) {
-    productTabs[productName].busy = isBusy;
-    console.log(`🔒 Tab for "${productName}" is now ${isBusy ? 'BUSY' : 'FREE'}`);
-  }
-}
-
-// Check if a product tab is busy
-function isTabBusy(productName) {
-  return productTabs[productName] ? productTabs[productName].busy : false;
-}
-
-// Get status of all tabs
-function getTabsStatus() {
-  const status = {};
-  Object.keys(productTabs).forEach(product => {
-    const tab = productTabs[product];
-    status[product] = {
-      exists: tab.page !== null,
-      busy: tab.busy,
-      lastUsed: tab.lastUsed ? new Date(tab.lastUsed).toISOString() : null
-    };
-  });
-  return status;
-}
-
-// Main function: Submit homework to SparxNow (with retry logic for detached frames)
-async function submitToSparxNow(productName, username, password, school = '') {
-  const MAX_RETRIES = 2;
-  let lastError = null;
-  
-  // Check if this product's tab is currently busy
-  if (isTabBusy(productName)) {
-    console.log(`⚠️ Tab for "${productName}" is currently busy with another job!`);
-    return {
-      success: false,
-      error: `Tab for ${productName} is busy. Please wait and try again.`
-    };
-  }
-  
-  // Mark tab as busy
-  setTabBusy(productName, true);
-  
-  try {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log('\n' + '='.repeat(60));
-        console.log(`🚀 SUBMISSION ATTEMPT ${attempt}/${MAX_RETRIES} for "${productName}"`);
-        console.log('='.repeat(60));
-        
-        const result = await submitToSparxNowInternal(productName, username, password, school);
-        
-        // Check if the result indicates failure (Internal function returns {success: false} instead of throwing)
-        if (result.success === false) {
-          throw new Error(result.error || 'Submission failed');
-        }
-        
-        console.log(`\n✅ SUBMISSION SUCCESSFUL ON ATTEMPT ${attempt} for "${productName}"!\n`);
-        return result;
-        
-      } catch (error) {
-        lastError = error;
-        const errorMsg = error.message || String(error);
-        
-        console.log(`\n❌ ATTEMPT ${attempt} FAILED for "${productName}": ${errorMsg}\n`);
-        
-        // Check if it's a retryable error (detached frame, connection closed, etc.)
-        if (errorMsg.includes('detached Frame') || 
-            errorMsg.includes('Execution context was destroyed') ||
-            errorMsg.includes('Protocol error') ||
-            errorMsg.includes('Connection closed') ||
-            errorMsg.includes('Target closed')) {
-          
-          if (attempt < MAX_RETRIES) {
-            const waitTime = 3000;
-            console.log(`⏳ ${errorMsg.includes('Connection closed') ? 'Browser connection lost' : 'Detached frame detected'}. Waiting ${waitTime/1000}s before retry...\n`);
-            
-            // If connection closed or target closed, recreate this product's tab
-            if (errorMsg.includes('Connection closed') || errorMsg.includes('Target closed')) {
-              console.log(`🔄 Recreating tab for "${productName}"...\n`);
-              try {
-                if (productTabs[productName].page) {
-                  await productTabs[productName].page.close();
-                }
-              } catch (e) {
-                // Tab already closed, that's fine
-              }
-              productTabs[productName].page = null;
-              
-              // If main page is also dead, reinitialize entire browser
-              if (!page || page.isClosed()) {
-                console.log('🔄 Main page also dead - reinitializing entire browser...\n');
-                try {
-                  if (browser) {
-                    await browser.close();
-                  }
-                } catch (e) {
-                  // Browser already closed, that's fine
-                }
-                browser = null;
-                page = null;
-              }
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          } else {
-            console.log(`❌ All ${MAX_RETRIES} attempts failed for "${productName}".\n`);
-          }
-        } else {
-          // Non-retryable error, throw immediately
-          console.log(`❌ Non-retryable error for "${productName}". Stopping attempts.\n`);
-          throw error;
-        }
+  if (waitTime > 0) {
+    const waitMinutes = Math.floor(waitTime / 60000);
+    const waitSeconds = Math.floor((waitTime % 60000) / 1000);
+    
+    console.log(`⏰ QUEUE: Waiting for ${waitReason}`);
+    console.log(`⏳ QUEUE: Need to wait ${waitMinutes} min ${waitSeconds} sec before processing "${productName}"...`);
+    
+    // Wait in 30-second intervals to show progress
+    let remainingWait = waitTime;
+    while (remainingWait > 0) {
+      const chunk = Math.min(30000, remainingWait); // 30 seconds max
+      await new Promise(resolve => setTimeout(resolve, chunk));
+      remainingWait -= chunk;
+      
+      if (remainingWait > 0) {
+        const remainingMin = Math.ceil(remainingWait / 60000);
+        console.log(`⏳ QUEUE: ${remainingMin} minute(s) remaining...`);
       }
     }
     
-    // All retries exhausted
-    console.log(`❌ SUBMISSION FAILED AFTER ${MAX_RETRIES} ATTEMPTS for "${productName}"\n`);
-    throw lastError;
-  } finally {
-    // Always mark tab as free when done (success or failure)
-    setTabBusy(productName, false);
-    console.log(`🔓 Tab for "${productName}" is now FREE\n`);
+    console.log(`✅ QUEUE: Wait complete for "${productName}"!`);
+  } else {
+    console.log(`✅ QUEUE: "${productName}" is ready - no wait needed`);
   }
+  
+  // Update the last submission times
+  globalLastSubmissionTime = Date.now();
+  lastSubmissionTime[productName] = Date.now();
+}
+
+// Main function: Submit homework to SparxNow (with retry logic for detached frames)
+async function submitToSparxNow(productName, username, password, school = '', loginType = 'Google') {
+  const MAX_RETRIES = 2;
+  let lastError = null;
+  
+  // Wait for queue (5-minute gap between same product)
+  await waitForProductQueue(productName);
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log('\n' + '='.repeat(60));
+      console.log(`🚀 SUBMISSION ATTEMPT ${attempt}/${MAX_RETRIES} for "${productName}"`);
+      console.log('='.repeat(60));
+      
+      const result = await submitToSparxNowInternal(productName, username, password, school, loginType);
+      
+      // Check if the result indicates failure (Internal function returns {success: false} instead of throwing)
+      if (result.success === false) {
+        throw new Error(result.error || 'Submission failed');
+      }
+      
+      console.log(`\n✅ SUBMISSION SUCCESSFUL ON ATTEMPT ${attempt} for "${productName}"!\n`);
+      return result;
+      
+    } catch (error) {
+      lastError = error;
+      const errorMsg = error.message || String(error);
+      
+      console.log(`\n❌ ATTEMPT ${attempt} FAILED for "${productName}": ${errorMsg}\n`);
+      
+      // Check if it's a retryable error (detached frame, connection closed, etc.)
+      if (errorMsg.includes('detached Frame') || 
+          errorMsg.includes('Execution context was destroyed') ||
+          errorMsg.includes('Protocol error') ||
+          errorMsg.includes('Connection closed') ||
+          errorMsg.includes('Target closed')) {
+        
+        if (attempt < MAX_RETRIES) {
+          const waitTime = 3000;
+          console.log(`⏳ ${errorMsg.includes('Connection closed') ? 'Browser connection lost' : 'Detached frame detected'}. Waiting ${waitTime/1000}s before retry...\n`);
+          
+          // If connection closed or target closed, reinitialize browser
+          if (errorMsg.includes('Connection closed') || errorMsg.includes('Target closed')) {
+            console.log(`🔄 Reinitializing browser...\n`);
+            try {
+              if (browser) {
+                await browser.close();
+              }
+            } catch (e) {
+              // Browser already closed, that's fine
+            }
+            browser = null;
+            page = null;
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        } else {
+          console.log(`❌ All ${MAX_RETRIES} attempts failed for "${productName}".\n`);
+        }
+      } else {
+        // Non-retryable error, throw immediately
+        console.log(`❌ Non-retryable error for "${productName}". Stopping attempts.\n`);
+        throw error;
+      }
+    }
+  }
+  
+  // All retries exhausted
+  console.log(`❌ SUBMISSION FAILED AFTER ${MAX_RETRIES} ATTEMPTS for "${productName}"\n`);
+  throw lastError;
 }
 
 // Internal submission function (can retry if frame detaches)
-async function submitToSparxNowInternal(productName, username, password, school = '') {
+async function submitToSparxNowInternal(productName, username, password, school = '', loginType = 'Google') {
   console.log(`\n📋 Attempting to submit job for: ${productName}`);
   console.log(`📧 Username: ${username}`);
   console.log(`🏫 School: ${school || '(not provided)'}`);
+  console.log(`🔑 Login Type: ${loginType}`);
   
   // Check daily limit
   if (!canSubmitJob()) {
@@ -450,39 +511,11 @@ async function submitToSparxNowInternal(productName, username, password, school 
       await initBrowser();
     }
     
-    // Get or create the product-specific tab
-    console.log(`📑 Getting dedicated tab for "${productName}"...`);
-    const productPage = await getProductTab(productName);
-    
-    // Check if product page is still valid before navigation
-    try {
-      await productPage.evaluate(() => true);
-    } catch (e) {
-      // Page is detached, recreate it
-      console.log(`⚠️ Tab for "${productName}" was detached, recreating...`);
-      try {
-        await productPage.close();
-      } catch (closeErr) {
-        // Already closed
-      }
-      productTabs[productName].page = null;
-      const productPage = await getProductTab(productName);
-    }
-    
-    // Wait a bit for the tab to finish loading Discord (if it's a new tab)
-    console.log(`⏳ Waiting for Discord to load in "${productName}" tab...`);
-    try {
-      await productPage.waitForSelector('[class*="app"]', { timeout: 30000 });
-      console.log(`✅ Discord loaded in "${productName}" tab`);
-    } catch (e) {
-      console.log(`⚠️ Discord app selector not found, continuing anyway...`);
-    }
-    
     console.log(`🔍 Navigating "${productName}" tab to channel...`);
     
     // Navigate to the specific channel in the product-specific tab
     const channelUrl = `https://discord.com/channels/${process.env.SPARXNOW_SERVER_ID}/${channelId}`;
-    await productPage.goto(channelUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(channelUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     console.log('✅ Channel loaded in product tab');
     console.log('⏳ Waiting 10 seconds for Discord messages to fully load...');
@@ -494,7 +527,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     // Find the Login button (look for button with text containing "Login")
     // Discord buttons are typically in a div with role="button"
-    const loginButtonFound = await productPage.evaluate(() => {
+    const loginButtonFound = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('[role="button"]'));
       const loginButton = buttons.find(btn => 
         btn.textContent.includes('🔐') && btn.textContent.includes('Login')
@@ -521,7 +554,15 @@ async function submitToSparxNowInternal(productName, username, password, school 
     if (productName.toLowerCase().includes('seneca')) {
       console.log('🎓 Seneca detected - looking for Login button next to Saved Accounts...');
       
-      const senecaLoginClicked = await productPage.evaluate(() => {
+      // Retry up to 3 times for login button click
+      let senecaLoginClicked = false;
+      for (let retry = 0; retry < 3 && !senecaLoginClicked; retry++) {
+        if (retry > 0) {
+          console.log(`🔄 Retry ${retry}/3 for Seneca login button...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+      senecaLoginClicked = await page.evaluate(() => {
         console.log('=== SENECA LOGIN BUTTON SEARCH ===');
         
         const allButtons = Array.from(document.querySelectorAll('button, [role="button"]'));
@@ -572,9 +613,10 @@ async function submitToSparxNowInternal(productName, username, password, school 
         console.log('❌ Could not find Login button to the left of Saved Accounts');
         return false;
       });
+      } // End retry loop
       
       if (!senecaLoginClicked) {
-        throw new Error('Could not find Seneca Login button next to Saved Accounts');
+        throw new Error('Could not find Seneca Login button next to Saved Accounts after 3 attempts');
       }
       
       console.log('✅ Clicked Seneca Login button (next to Saved Accounts)!');
@@ -583,15 +625,19 @@ async function submitToSparxNowInternal(productName, username, password, school 
       // Wait for modal to appear
       await new Promise(resolve => setTimeout(resolve, 4000));
       
-      // SENECA: Select Google from dropdown FIRST (EXACT same method as Sparx Maths!)
-      console.log('📋 Step 1: Selecting Login Type: Google FIRST...');
-      console.log('⚠️ Selecting dropdown first to prevent field clearing');
+      // SENECA: Select login type from dropdown FIRST (EXACT same method as Sparx Maths!)
+      // Skip dropdown if loginType is "Normal" (no @ symbol)
+      if (loginType === 'Normal') {
+        console.log('📋 Step 1: Login Type is "Normal" - SKIPPING dropdown selection');
+      } else {
+        console.log(`📋 Step 1: Selecting Login Type: ${loginType} FIRST...`);
+        console.log('⚠️ Selecting dropdown first to prevent field clearing');
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Step 1: Click the dropdown to open it
       console.log('🖱️ Step 1: Clicking Login Type dropdown...');
-      const dropdownClicked = await productPage.evaluate(() => {
+      const dropdownClicked = await page.evaluate(() => {
         console.log('=== DROPDOWN SEARCH ===');
         
         // Find ALL elements that might be the dropdown
@@ -655,7 +701,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('🖱️ Also trying Puppeteer native click...');
       try {
         // Find the dropdown element and click with Puppeteer
-        const dropdownElement = await productPage.evaluateHandle(() => {
+        const dropdownElement = await page.evaluateHandle(() => {
           const allElements = Array.from(document.querySelectorAll('*'));
           const candidates = allElements.filter(el => {
             const text = el.textContent?.trim() || '';
@@ -681,12 +727,12 @@ async function submitToSparxNowInternal(productName, username, password, school 
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Take a screenshot to see what's happening
-      await productPage.screenshot({ path: 'seneca-dropdown-debug.png' });
+      await page.screenshot({ path: 'seneca-dropdown-debug.png' });
       console.log('📸 Screenshot saved: seneca-dropdown-debug.png');
       
       // Step 3: Click "Google" from the list
       console.log('🖱️ Step 2: Clicking "Google" option...');
-      const googleClicked = await productPage.evaluate(() => {
+      const googleClicked = await page.evaluate(() => {
         console.log('=== DROPDOWN DEBUG ===');
         
         // Find all elements with "Google", "Normal", or "Microsoft"
@@ -725,7 +771,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
         console.log('⚠️ Could not click Google, trying keyboard navigation...');
         
         // Focus back on the dropdown first
-        await productPage.evaluate(() => {
+        await page.evaluate(() => {
           const allElements = Array.from(document.querySelectorAll('*'));
           const dropdown = allElements.find(el => {
             const text = el.textContent?.trim() || '';
@@ -741,20 +787,20 @@ async function submitToSparxNowInternal(productName, username, password, school 
         
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Now use keyboard (Down arrow x3 to get to Google, then Enter)
-        console.log('⌨️ Pressing Arrow Down 3 times...');
-        await productPage.keyboard.press('ArrowDown'); // Go to Normal
-        await new Promise(resolve => setTimeout(resolve, 200));
-        await productPage.keyboard.press('ArrowDown'); // Go to Microsoft
-        await new Promise(resolve => setTimeout(resolve, 200));
-        await productPage.keyboard.press('ArrowDown'); // Go to Google
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Now use keyboard (Down arrow to select based on loginType)
+        const arrowPresses = loginType === 'Normal' ? 1 : loginType === 'Microsoft' ? 2 : 3;
+        console.log(`⌨️ Pressing Arrow Down ${arrowPresses} times to select ${loginType}...`);
+        for (let i = 0; i < arrowPresses; i++) {
+          await page.keyboard.press('ArrowDown');
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
         console.log('⌨️ Pressing Enter...');
-        await productPage.keyboard.press('Enter'); // Select Google
+        await page.keyboard.press('Enter');
         
-        console.log('✅ Selected Google using keyboard!');
+        console.log(`✅ Selected ${loginType} using keyboard!`);
         await new Promise(resolve => setTimeout(resolve, 500));
       }
+      } // Close the if (loginType !== 'Normal') block
       
       // NOW fill form fields (NO SCHOOL for Seneca!)
       console.log('📝 NOW filling Seneca form fields (Email, Password - NO SCHOOL)...');
@@ -762,7 +808,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       // Click Email field (input 0) and type
       console.log('📝 Filling Email field...');
-      const senecaEmailClicked = await productPage.evaluate(() => {
+      const senecaEmailClicked = await page.evaluate(() => {
         const inputs = Array.from(document.querySelectorAll('input'));
         if (inputs[0]) {
           inputs[0].value = '';
@@ -775,13 +821,13 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       if (senecaEmailClicked) {
         await new Promise(resolve => setTimeout(resolve, 300));
-        await productPage.keyboard.type(username, { delay: 30 });
+        await page.keyboard.type(username, { delay: 30 });
         console.log('✅ Email typed:', username);
       }
       
       // Click Password field (input 1) and type
       console.log('📝 Filling Password field...');
-      const senecaPasswordClicked = await productPage.evaluate(() => {
+      const senecaPasswordClicked = await page.evaluate(() => {
         const inputs = Array.from(document.querySelectorAll('input'));
         if (inputs[1]) {
           inputs[1].value = '';
@@ -794,7 +840,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       if (senecaPasswordClicked) {
         await new Promise(resolve => setTimeout(resolve, 300));
-        await productPage.keyboard.type(password, { delay: 30 });
+        await page.keyboard.type(password, { delay: 30 });
         console.log('✅ Password typed');
       }
       
@@ -805,7 +851,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('🔘 Clicking Submit button...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const senecaSubmitClicked = await productPage.evaluate(() => {
+      const senecaSubmitClicked = await page.evaluate(() => {
         console.log('🔍 Looking for Submit button...');
         const buttons = Array.from(document.querySelectorAll('button'));
         
@@ -836,7 +882,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('✅ Seneca Submit button clicked!');
       
       // Take screenshot
-      await productPage.screenshot({ path: 'seneca-submit-result.png' });
+      await page.screenshot({ path: 'seneca-submit-result.png' });
       console.log('📸 Screenshot saved: seneca-submit-result.png');
       
       // Skip the rest of the form filling for non-Seneca products
@@ -845,7 +891,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('🔍 Looking for "Login with Cookies" button...');
       
       // Strategy: Find "Login with Cookies", then click the button to its LEFT
-      const secondButtonClicked = await productPage.evaluate(() => {
+      const secondButtonClicked = await page.evaluate(() => {
         // Get ALL buttons on the page
         const allButtons = Array.from(document.querySelectorAll('button, [role="button"]'));
         
@@ -900,15 +946,19 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     // Skip form filling for Seneca (it handles login automatically)
     if (!productName.toLowerCase().includes('seneca')) {
-      // FIRST: Select Google from dropdown (do this BEFORE filling fields!)
-      console.log('📋 Step 1: Selecting Login Type: Google FIRST...');
-      console.log('⚠️ Selecting dropdown first to prevent field clearing');
+      // FIRST: Select login type from dropdown (do this BEFORE filling fields!)
+      // Skip dropdown if loginType is "Normal" (no @ symbol)
+      if (loginType === 'Normal') {
+        console.log('📋 Step 1: Login Type is "Normal" - SKIPPING dropdown selection');
+      } else {
+        console.log(`📋 Step 1: Selecting Login Type: ${loginType} FIRST...`);
+        console.log('⚠️ Selecting dropdown first to prevent field clearing');
     
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Step 1: Click the dropdown to open it
     console.log('🖱️ Step 1: Clicking Login Type dropdown...');
-    const dropdownClicked = await productPage.evaluate(() => {
+    const dropdownClicked = await page.evaluate(() => {
       console.log('=== DROPDOWN SEARCH ===');
       
       // Find ALL elements that might be the dropdown
@@ -972,7 +1022,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     console.log('🖱️ Also trying Puppeteer native click...');
     try {
       // Find the dropdown element and click with Puppeteer
-      const dropdownElement = await productPage.evaluateHandle(() => {
+      const dropdownElement = await page.evaluateHandle(() => {
         const allElements = Array.from(document.querySelectorAll('*'));
         const candidates = allElements.filter(el => {
           const text = el.textContent?.trim() || '';
@@ -998,12 +1048,12 @@ async function submitToSparxNowInternal(productName, username, password, school 
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Take a screenshot to see what's happening
-    await productPage.screenshot({ path: 'dropdown-debug.png' });
+    await page.screenshot({ path: 'dropdown-debug.png' });
     console.log('📸 Screenshot saved: dropdown-debug.png');
     
     // Step 3: Click "Google" from the list
     console.log('🖱️ Step 2: Clicking "Google" option...');
-    const googleClicked = await productPage.evaluate(() => {
+    const googleClicked = await page.evaluate(() => {
       console.log('=== DROPDOWN DEBUG ===');
       
       // Find all elements with "Google", "Normal", or "Microsoft"
@@ -1042,7 +1092,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('⚠️ Could not click Google, trying keyboard navigation...');
       
       // Focus back on the dropdown first
-      await productPage.evaluate(() => {
+      await page.evaluate(() => {
         const allElements = Array.from(document.querySelectorAll('*'));
         const dropdown = allElements.find(el => {
           const text = el.textContent?.trim() || '';
@@ -1058,20 +1108,20 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Now use keyboard (Down arrow x3 to get to Google, then Enter)
-      console.log('⌨️ Pressing Arrow Down 3 times...');
-      await productPage.keyboard.press('ArrowDown'); // Go to Normal
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await productPage.keyboard.press('ArrowDown'); // Go to Microsoft
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await productPage.keyboard.press('ArrowDown'); // Go to Google
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Now use keyboard (Down arrow to select based on loginType)
+      const arrowPresses = loginType === 'Normal' ? 1 : loginType === 'Microsoft' ? 2 : 3;
+      console.log(`⌨️ Pressing Arrow Down ${arrowPresses} times to select ${loginType}...`);
+      for (let i = 0; i < arrowPresses; i++) {
+        await page.keyboard.press('ArrowDown');
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
       console.log('⌨️ Pressing Enter...');
-      await productPage.keyboard.press('Enter'); // Select Google
+      await page.keyboard.press('Enter');
       
-      console.log('✅ Selected Google using keyboard!');
+      console.log(`✅ Selected ${loginType} using keyboard!`);
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+    } // Close the if (loginType !== 'Normal') block
     
     // NOW fill the form fields using Puppeteer typing (AFTER Google is selected)
     console.log('📝 Step 2: NOW filling form fields by clicking each one...');
@@ -1079,7 +1129,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     // Click School field (input 0) and type
     console.log('📝 Filling School field...');
-    const schoolClicked = await productPage.evaluate(() => {
+    const schoolClicked = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input'));
       if (inputs[0]) {
         inputs[0].value = ''; // Clear first
@@ -1092,13 +1142,13 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     if (schoolClicked) {
       await new Promise(resolve => setTimeout(resolve, 300));
-      await productPage.keyboard.type(school, { delay: 30 });
+      await page.keyboard.type(school, { delay: 30 });
       console.log('✅ School typed:', school);
     }
     
     // Click Email field (input 1) and type
     console.log('📝 Filling Email field...');
-    const emailClicked = await productPage.evaluate(() => {
+    const emailClicked = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input'));
       if (inputs[1]) {
         inputs[1].value = ''; // Clear first
@@ -1111,13 +1161,13 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     if (emailClicked) {
       await new Promise(resolve => setTimeout(resolve, 300));
-      await productPage.keyboard.type(username, { delay: 30 });
+      await page.keyboard.type(username, { delay: 30 });
       console.log('✅ Email typed:', username);
     }
     
     // Click Password field (input 2) and type
     console.log('📝 Filling Password field...');
-    const passwordClicked = await productPage.evaluate(() => {
+    const passwordClicked = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input'));
       if (inputs[2]) {
         inputs[2].value = ''; // Clear first
@@ -1130,7 +1180,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     if (passwordClicked) {
       await new Promise(resolve => setTimeout(resolve, 300));
-      await productPage.keyboard.type(password, { delay: 30 });
+      await page.keyboard.type(password, { delay: 30 });
       console.log('✅ Password typed');
     }
     
@@ -1144,7 +1194,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     // VERIFY all fields before submitting
     console.log('🔍 Verifying all fields are filled...');
-    const fieldCheck = await productPage.evaluate(() => {
+    const fieldCheck = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input'));
       console.log('=== FIELD VERIFICATION ===');
       inputs.forEach((inp, i) => {
@@ -1166,7 +1216,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     });
     
     // Click Submit button
-    const submitClicked = await productPage.evaluate(() => {
+    const submitClicked = await page.evaluate(() => {
       console.log('🔍 Looking for Submit button...');
       const buttons = Array.from(document.querySelectorAll('button'));
       console.log(`Found ${buttons.length} buttons`);
@@ -1202,14 +1252,14 @@ async function submitToSparxNowInternal(productName, username, password, school 
     await new Promise(resolve => setTimeout(resolve, 3000));
     
       // Take screenshot of result
-      await productPage.screenshot({ path: 'submit-result.png' });
+      await page.screenshot({ path: 'submit-result.png' });
       console.log('📸 Screenshot saved: submit-result.png');
     } // End of non-Seneca form filling
     
     // Check for errors (applies to non-Seneca products only)
     if (!productName.toLowerCase().includes('seneca')) {
       console.log('🔍 Checking for errors...');
-    const errorCheck = await productPage.evaluate(() => {
+    const errorCheck = await page.evaluate(() => {
       // Check if modal is still open (indicates error)
       const modals = document.querySelectorAll('[role="dialog"], .modal');
       
@@ -1271,7 +1321,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Check if "Welcome" message appears
-      loginSuccess = await productPage.evaluate((productName) => {
+      loginSuccess = await page.evaluate((productName) => {
         const allText = Array.from(document.querySelectorAll('*'))
           .map(el => el.textContent?.trim() || '');
         
@@ -1330,7 +1380,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Take screenshot to see what's loaded
-    await productPage.screenshot({ path: 'homework-interface.png' });
+    await page.screenshot({ path: 'homework-interface.png' });
     console.log('📸 Screenshot saved: homework-interface.png');
     
     // Different flow based on product type
@@ -1342,11 +1392,11 @@ async function submitToSparxNowInternal(productName, username, password, school 
       await new Promise(resolve => setTimeout(resolve, 5000));
       
       // Take screenshot to see what's on screen
-      await productPage.screenshot({ path: 'seneca-homework-screen.png' });
+      await page.screenshot({ path: 'seneca-homework-screen.png' });
       console.log('📸 Screenshot saved: seneca-homework-screen.png');
       
       // Debug: Check what text is on the page
-      await productPage.evaluate(() => {
+      await page.evaluate(() => {
         const allText = Array.from(document.querySelectorAll('*'))
           .map(el => el.textContent?.trim() || '')
           .filter(text => text.length > 5 && text.length < 100);
@@ -1358,7 +1408,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       // Click "Choose a homework" dropdown (EXACT same method as Sparx Maths!)
       console.log('📋 Looking for "Choose a homework" dropdown...');
-      const dropdownClicked = await productPage.evaluate(() => {
+      const dropdownClicked = await page.evaluate(() => {
         console.log('=== SENECA HOMEWORK DROPDOWN SEARCH ===');
         
         // Find ALL elements that might be the dropdown
@@ -1422,7 +1472,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('🖱️ Also trying Puppeteer native click...');
       try {
         // Find the dropdown element and click with Puppeteer
-        const dropdownElement = await productPage.evaluateHandle(() => {
+        const dropdownElement = await page.evaluateHandle(() => {
           const allElements = Array.from(document.querySelectorAll('*'));
           const candidates = allElements.filter(el => {
             const text = el.textContent?.trim() || '';
@@ -1455,7 +1505,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       // Select the TOP homework (SAME method as Sparx Maths - aggressive clicking!)
       console.log('📝 Selecting TOP homework (most recent)...');
-      const homeworkSelected = await productPage.evaluate(() => {
+      const homeworkSelected = await page.evaluate(() => {
         console.log('=== SENECA HOMEWORK SELECTION ===');
         
         // Find all homework options - they contain "Due"
@@ -1522,7 +1572,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       // Also try Puppeteer's native click as backup (SAME as Sparx Maths!)
       console.log('🖱️ Also trying Puppeteer native click on homework...');
       try {
-        const homeworkElement = await productPage.evaluateHandle(() => {
+        const homeworkElement = await page.evaluateHandle(() => {
           const allElements = Array.from(document.querySelectorAll('*'));
           const homeworkOptions = allElements.filter(el => {
             const text = el.textContent?.trim() || '';
@@ -1566,7 +1616,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       // Click the green "Start" button
       console.log('🔘 Looking for Start button...');
-      const startButtonClicked = await productPage.evaluate(() => {
+      const startButtonClicked = await page.evaluate(() => {
         console.log('=== START BUTTON SEARCH ===');
         
         // Find the Start button
@@ -1612,7 +1662,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       // Also try Puppeteer's native click as backup
       console.log('🖱️ Also trying Puppeteer native click...');
       try {
-        const startButtonElement = await productPage.evaluateHandle(() => {
+        const startButtonElement = await page.evaluateHandle(() => {
           const allButtons = Array.from(document.querySelectorAll('button'));
           return allButtons.find(btn => {
             const text = btn.textContent?.trim() || '';
@@ -1640,7 +1690,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       
       // Step: Click "Choose a homework task" dropdown (SAME method as Google dropdown!)
     console.log('📋 Looking for "Choose a homework task" dropdown...');
-    const dropdownFound = await productPage.evaluate(() => {
+    const dropdownFound = await page.evaluate(() => {
       console.log('=== HOMEWORK DROPDOWN SEARCH ===');
       
       // Find ALL elements that might be the dropdown
@@ -1697,7 +1747,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     // Also try Puppeteer's native click as backup (SAME as Google dropdown)
     console.log('🖱️ Also trying Puppeteer native click...');
     try {
-      const dropdownElement = await productPage.evaluateHandle(() => {
+      const dropdownElement = await page.evaluateHandle(() => {
         const allElements = Array.from(document.querySelectorAll('*'));
         const candidates = allElements.filter(el => {
           const text = el.textContent?.trim() || '';
@@ -1723,7 +1773,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('🔍 Debugging: Looking for all text on page...');
       
       // Debug: show what text exists
-      await productPage.evaluate(() => {
+      await page.evaluate(() => {
         const allText = Array.from(document.querySelectorAll('*'))
           .map(el => el.textContent?.trim() || '')
           .filter(text => text.length > 0 && text.length < 100);
@@ -1743,7 +1793,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     
     // Step: Select the TOP homework (most recent) - SAME aggressive clicking method!
     console.log('📝 Selecting TOP homework (most recent)...');
-    const homeworkSelected = await productPage.evaluate(() => {
+    const homeworkSelected = await page.evaluate(() => {
       console.log('=== HOMEWORK SELECTION ===');
       
       // Find all homework options - they contain "Homework due"
@@ -1802,7 +1852,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     // Also try Puppeteer's native click as backup
     console.log('🖱️ Also trying Puppeteer native click on homework...');
     try {
-      const homeworkElement = await productPage.evaluateHandle(() => {
+      const homeworkElement = await page.evaluateHandle(() => {
         const allElements = Array.from(document.querySelectorAll('*'));
         const homeworkOptions = allElements.filter(el => {
           const text = el.textContent?.trim() || '';
@@ -1847,7 +1897,7 @@ async function submitToSparxNowInternal(productName, username, password, school 
     const dmUrl = 'https://discord.com/channels/@me/1461137151008706685';
     
     try {
-      await productPage.goto(dmUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.goto(dmUrl, { waitUntil: 'networkidle2', timeout: 30000 });
       console.log('✅ Navigated to Discord DM');
     } catch (err) {
       console.log('⚠️ Navigation to DM failed:', err.message);
@@ -1864,66 +1914,8 @@ async function submitToSparxNowInternal(productName, username, password, school 
       productType = 'Educate';
     }
     
-    console.log(`👀 Watching for "${productType}" confirmation message...`);
-    console.log('⏳ This can take a few minutes depending on queue...');
-    
-    let messageFound = false;
-    let checkAttempts = 0;
-    const maxWaitAttempts = 60; // 60 attempts x 5 seconds = 5 minutes max wait
-    
-    while (!messageFound && checkAttempts < maxWaitAttempts) {
-      checkAttempts++;
-      
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Check every 5 seconds
-      
-      // Check for the message
-      messageFound = await productPage.evaluate((productName) => {
-        const allText = Array.from(document.querySelectorAll('*'))
-          .map(el => el.textContent?.trim() || '');
-        
-        // Look for product-specific confirmation
-        const hasConfirmation = allText.some(text => {
-          if (productName.toLowerCase().includes('reader')) {
-            return text.includes('Sparx Reader') || 
-                   text.includes('reading') ||
-                   text.includes('Reading');
-          } else if (productName.toLowerCase().includes('seneca')) {
-            return text.includes('Seneca') ||
-                   text.includes('homework') ||
-                   text.includes('completed');
-          } else if (productName.toLowerCase().includes('educate')) {
-            return text.includes('Educate') ||
-                   text.includes('starting') ||
-                   text.includes('Starting');
-          } else {
-            return text.includes('Sparx Maths Autocompleter') ||
-                   text.includes('starting') ||
-                   text.includes('Starting');
-          }
-        });
-        
-        if (hasConfirmation) {
-          console.log('✅ Confirmation message found!');
-          return true;
-        }
-        
-        return false;
-      }, productName);
-      
-      if (messageFound) {
-        console.log(`✅ Homework started! (confirmed after ${checkAttempts * 5} seconds)`);
-        break;
-      }
-      
-      if (checkAttempts % 6 === 0) { // Every 30 seconds
-        console.log(`⏳ Still waiting for confirmation... (${checkAttempts * 5}s elapsed)`);
-      }
-    }
-    
-    if (!messageFound) {
-      console.log('⚠️ Timeout waiting for Discord confirmation');
-      console.log('⚠️ Homework may still be processing - check Discord manually');
-    }
+    console.log(`✅ Homework submitted for "${productType}"!`);
+    console.log('📝 No confirmation wait - moving to next order immediately');
     
     // Increment counter
     dailySubmissions++;
@@ -1985,7 +1977,5 @@ module.exports = {
   submitToSparxNow,
   getStatus,
   canSubmitJob,
-  resetDailyCounter,
-  getTabsStatus,
-  isTabBusy
+  resetDailyCounter
 };

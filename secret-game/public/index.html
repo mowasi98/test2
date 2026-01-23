@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Secret - Anonymous Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- User Info Bar at Top -->
+        <div class="user-bar">
+            <div class="user-profile" onclick="showProfileOptions()">
+                <img id="userProfilePic" src="" alt="Profile" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; display: none;">
+                <div id="userProfilePlaceholder" style="width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, #ff0080, #7928ca); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 900; color: white; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; display: none;"></div>
+                <span id="userName" style="font-size: 1.1rem; font-weight: 700; margin-left: 12px;"></span>
+            </div>
+            <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+        </div>
+
+        <div class="hero">
+            <h1 class="logo">🎭 Secret</h1>
+            <p class="tagline">Anonymous. Spicy. Fun.</p>
+        </div>
+
+        <div class="action-buttons">
+            <button class="action-btn" onclick="showJoinGame()">
+                <span class="action-icon">🔑</span>
+                Join a game
+            </button>
+        </div>
+        
+        <h2 style="text-align: center; font-size: clamp(1.8rem, 5vw, 2.5rem); margin: 40px 0 30px 0; font-weight: 800;">GAME MODE</h2>
+        
+        <div class="game-modes">
+            <div class="mode-card mode-get-started" onclick="createGameMode('classic')">
+                <div class="mode-icon">⭐😊</div>
+                <h3>GET STARTED</h3>
+                <p>A demo is the best way to introduce your friends to the game. A set of cool questions and dares, ideal to warm-up.</p>
+            </div>
+
+            <div class="mode-card mode-gossip" onclick="createGameMode('anonymous')">
+                <div class="mode-icon">🎯</div>
+                <h3>GOSSIP WHEEL</h3>
+                <p>Anonymously, each player will write a gossip, a target question and a challenge. The wheel will take care of the rest.</p>
+            </div>
+
+            <div class="mode-card mode-spicy" onclick="createGameMode('spicy')">
+                <div class="mode-icon-side">😈</div>
+                <div class="mode-icon-side-right">🍑</div>
+                <h3>SPICY</h3>
+                <p>With crazy dares and personal questions, this day will be one to remember. It's mad how this kind of game can bring us closer together.</p>
+            </div>
+
+            <div class="mode-card mode-party" onclick="createGameMode('cheeky')">
+                <div class="mode-icon-side">🤪</div>
+                <div class="mode-icon-side-right">🔥</div>
+                <h3>FOR PARTY</h3>
+                <p>On the agenda tonight are questions and dares designed to create a maximum tension. Arguments likely.</p>
+            </div>
+        </div>
+
+
+        <!-- Join Game Modal -->
+        <div id="joinGameModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModals()">&times;</span>
+                <h2>Join Game</h2>
+                <input type="text" id="gameCodeInput" placeholder="Enter Game Code" maxlength="6">
+                <button class="btn btn-primary" onclick="joinGame()">Join</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="/admin" style="color: white; text-decoration: none; font-weight: 600;">🔐 Admin Panel</a>
+        </div>
+        
+        <!-- Profile Options Modal -->
+        <div id="profileOptionsModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 400px;">
+                <span class="close" onclick="closeProfileOptions()">&times;</span>
+                <h2 style="text-align: center; margin-bottom: 25px;">Profile Options</h2>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <button class="btn btn-primary" onclick="changePhoto()">
+                        📷 Change Photo
+                    </button>
+                    <button class="btn btn-primary" onclick="changeUsername()">
+                        ✏️ Change Username
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeProfileOptions()">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Change Photo Modal -->
+        <div id="changePhotoModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 500px;">
+                <span class="close" onclick="closeChangePhoto()">&times;</span>
+                <h2 style="text-align: center; margin-bottom: 25px;">📸 Change Your Photo</h2>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <button class="btn btn-primary" onclick="openCameraForChange()">
+                        📷 Take a New Photo
+                    </button>
+                    <button class="btn btn-secondary" onclick="selectFromGalleryForChange()">
+                        🖼️ Choose from Gallery
+                    </button>
+                </div>
+                
+                <input type="file" id="cameraInputChange" accept="image/*" capture="user" style="display: none;" onchange="handlePhotoChange(event)">
+                <input type="file" id="galleryInputChange" accept="image/*" style="display: none;" onchange="handlePhotoChange(event)">
+                
+                <div id="photoPreviewChange" style="display: none; margin-top: 25px;">
+                    <img id="previewImageChange" style="width: 100%; max-width: 300px; border-radius: 20px; margin: 20px auto; display: block; border: 3px solid rgba(255, 0, 128, 0.5);">
+                    <button class="btn btn-primary" onclick="confirmPhotoChange()" style="width: 100%;">✅ Confirm & Save</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Change Username Modal -->
+        <div id="changeUsernameModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 450px;">
+                <span class="close" onclick="closeChangeUsername()">&times;</span>
+                <h2 style="text-align: center; margin-bottom: 25px;">✏️ Change Username</h2>
+                
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <p style="opacity: 0.8; font-size: 1rem;">Current username: <strong id="currentUsername"></strong></p>
+                </div>
+                
+                <input type="text" id="newUsernameInput" placeholder="Enter new username" style="width: 100%; padding: 18px; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 14px; font-size: 1.05rem; background: rgba(255, 255, 255, 0.05); color: white; margin-bottom: 20px;">
+                
+                <button class="btn btn-primary" onclick="confirmUsernameChange()" style="width: 100%;">✅ Save Username</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

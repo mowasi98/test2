@@ -307,13 +307,24 @@
       </div>
       
       <div class="form-group">
-        <label>School Email / Username *</label>
-        <input type="email" id="username" required placeholder="Your SCHOOL email (e.g., for Sparx, Educate, etc.)" autocomplete="username" 
-               pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.(com|co\.uk|edu|org|net|ac\.uk)"
-               title="Please enter a valid school email address (must contain @ and a valid domain like .com, .co.uk, .edu, etc.)">
+        <label>Login Type *</label>
+        <select id="loginType" required style="width: 100%; padding: 0.9rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; box-sizing: border-box; transition: border 0.2s; background: white; cursor: pointer; min-height: 44px;">
+          <option value="">Select how you login...</option>
+          <option value="Normal">Normal (Username only - no @ symbol)</option>
+          <option value="Google">Google (Email with @ symbol)</option>
+          <option value="Microsoft">Microsoft (Email with @ symbol)</option>
+        </select>
         <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
-          ⚠️ Use your <strong>SCHOOL EMAIL</strong>, not your personal email!<br>
-          (The email you use for Sparx / Educate / Seneca / etc.)
+          ℹ️ Choose how you login to your school homework platform
+        </small>
+      </div>
+      
+      <div class="form-group">
+        <label>School Email / Username *</label>
+        <input type="text" id="username" required placeholder="Your SCHOOL email or username" autocomplete="username">
+        <small style="color: #666; display: block; margin-top: 0.5rem; font-size: 0.9rem;">
+          ⚠️ Use your <strong>SCHOOL EMAIL/USERNAME</strong>, not your personal one!<br>
+          (The email/username you use for Sparx / Educate / Seneca / etc.)
         </small>
       </div>
       
@@ -608,10 +619,13 @@
         console.log(`✅ Auto-login: ${isExtraSlot ? 'Extra' : 'Regular'} slot reserved:`, reservationData.reservationId);
         
         // Store login info in sessionStorage for payment page
-        // Retrieve school from localStorage if available
+        // Retrieve school and loginType from localStorage if available
         const savedSchool = localStorage.getItem('savedSchool') || '';
+        const savedLoginType = localStorage.getItem('savedLoginType') || 'Google'; // Default to Google for backwards compatibility
         sessionStorage.setItem('school', savedSchool);
+        sessionStorage.setItem('loginType', savedLoginType);
         console.log(`📝 AUTO-LOGIN: Retrieved school from localStorage: "${savedSchool}"`);
+        console.log(`📝 AUTO-LOGIN: Retrieved loginType from localStorage: "${savedLoginType}"`);
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
         sessionStorage.setItem('productName', productName); // Keep original display name
@@ -651,6 +665,7 @@
       const school = document.getElementById('school').value;
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
+      const loginType = document.getElementById('loginType').value;
       
       console.log('📝 LOGIN FORM DATA:', {
         school,
@@ -668,24 +683,35 @@
       const stripeLink = decodeURIComponent(urlParams.get('stripe') || '');
       
       // Validate inputs
-      if (!school || !username || !password) {
-        errorDiv.textContent = 'Please fill in all required fields (School, Username, and Password).';
+      if (!school || !username || !password || !loginType) {
+        errorDiv.textContent = 'Please fill in all required fields (School, Login Type, Username, and Password).';
         errorDiv.style.display = 'block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Continue to Login';
         return;
       }
       
-      // Validate email format (must contain @ and .com or other valid extensions)
-      if (!username.includes('@')) {
-        errorDiv.textContent = '❌ Invalid email! Your school email must contain an @ symbol.';
+      // Validate login type matches username format
+      const hasAtSymbol = username.includes('@');
+      const hasComExtension = username.includes('.com') || username.includes('.co.uk') || username.includes('.edu') || username.includes('.org') || username.includes('.net') || username.includes('.ac.uk');
+      
+      if (loginType === 'Normal' && hasAtSymbol) {
+        errorDiv.textContent = '❌ You selected "Normal" login but your username contains @ symbol. Please select "Google" or "Microsoft" instead.';
         errorDiv.style.display = 'block';
         submitBtn.disabled = false;
         submitBtn.textContent = 'Continue to Login';
         return;
       }
       
-      if (!username.includes('.com') && !username.includes('.co.uk') && !username.includes('.edu') && !username.includes('.org') && !username.includes('.net') && !username.includes('.ac.uk')) {
+      if ((loginType === 'Google' || loginType === 'Microsoft') && !hasAtSymbol) {
+        errorDiv.textContent = '❌ You selected "' + loginType + '" but your username has no @ symbol. Please select "Normal" or add @ to your email.';
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continue to Login';
+        return;
+      }
+      
+      if ((loginType === 'Google' || loginType === 'Microsoft') && !hasComExtension) {
         errorDiv.textContent = '❌ Invalid email! Your school email must end with a valid domain (e.g., .com, .co.uk, .edu).';
         errorDiv.style.display = 'block';
         submitBtn.disabled = false;
@@ -703,6 +729,7 @@
       localStorage.setItem('savedUsername', username);
       localStorage.setItem('savedPassword', password);
       localStorage.setItem('savedSchool', school); // Save school info too!
+      localStorage.setItem('savedLoginType', loginType); // Save login type too!
       localStorage.setItem('appVersion', '2.1'); // Save version number
 
       // Product info is optional - if missing, redirect to homepage to select a product
@@ -758,6 +785,7 @@
         sessionStorage.setItem('school', school);
         sessionStorage.setItem('loginUsername', username);
         sessionStorage.setItem('loginPassword', password);
+        sessionStorage.setItem('loginType', loginType); // Store login type
         sessionStorage.setItem('productName', productName); // Keep original display name
         sessionStorage.setItem('productPrice', productPrice);
         sessionStorage.setItem('stripeLink', stripeLink);

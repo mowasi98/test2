@@ -2211,32 +2211,68 @@
         const savedSchool = localStorage.getItem('savedSchool') || '';
         
         if (savedUsername && savedPassword && savedLoginType) {
-          // USER IS LOGGED IN - Skip login page and go straight to payment!
+          // USER IS LOGGED IN - Reserve slot and go straight to payment!
           e.preventDefault(); // Stop default navigation to login.html
           
-          console.log('✅ User already logged in - going straight to payment!');
+          console.log('✅ User already logged in - reserving slot and going to payment!');
           console.log(`   Username: ${savedUsername}, LoginType: ${savedLoginType}`);
-          
-          // Store credentials in sessionStorage for payment page
-          sessionStorage.setItem('school', savedSchool);
-          sessionStorage.setItem('loginType', savedLoginType);
-          sessionStorage.setItem('loginUsername', savedUsername);
-          sessionStorage.setItem('loginPassword', savedPassword);
           
           // Get product info from the button's href
           const urlParams = new URLSearchParams(this.href.split('?')[1]);
           const productDisplayName = urlParams.get('product');
           const productPrice = urlParams.get('price');
           const stripeLink = urlParams.get('stripe');
+          const isExtraSlot = urlParams.get('isExtraSlot') === 'true';
           
-          sessionStorage.setItem('productName', productDisplayName);
-          sessionStorage.setItem('productPrice', productPrice);
-          sessionStorage.setItem('stripeLink', stripeLink);
+          // Clean product name (remove " - Extra Slot" suffix if present)
+          const cleanProductName = productDisplayName.replace(' - Extra Slot', '').trim();
           
-          console.log(`📦 Product: ${productDisplayName}, Price: £${productPrice}`);
+          console.log(`📦 Product: ${productDisplayName}, Price: £${productPrice}, Extra: ${isExtraSlot}`);
           
-          // Redirect to payment page
-          window.location.href = 'payment.html';
+          try {
+            // Reserve a slot FIRST
+            console.log(`🔒 Reserving ${isExtraSlot ? 'EXTRA' : 'regular'} slot for: ${cleanProductName}`);
+            const reservationResponse = await fetch('https://test2-adsw.onrender.com/reserve-slot', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                productName: cleanProductName,
+                isExtraSlot: isExtraSlot,
+                username: savedUsername
+              })
+            });
+            
+            const reservationData = await reservationResponse.json();
+            
+            if (!reservationData.success || !reservationData.reserved) {
+              console.error('❌ Slot reservation failed:', reservationData);
+              alert('Sorry, no slots available! Please try again later.');
+              return;
+            }
+            
+            console.log(`✅ Slot reserved:`, reservationData.reservationId);
+            
+            // NOW store everything in sessionStorage
+            sessionStorage.setItem('school', savedSchool);
+            sessionStorage.setItem('loginType', savedLoginType);
+            sessionStorage.setItem('loginUsername', savedUsername);
+            sessionStorage.setItem('loginPassword', savedPassword);
+            sessionStorage.setItem('productName', productDisplayName);
+            sessionStorage.setItem('productPrice', productPrice);
+            sessionStorage.setItem('stripeLink', stripeLink);
+            sessionStorage.setItem('slotReserved', 'true');
+            sessionStorage.setItem('reservedProduct', cleanProductName);
+            sessionStorage.setItem('reservationId', reservationData.reservationId);
+            sessionStorage.setItem('isExtraSlot', isExtraSlot ? 'true' : 'false');
+            
+            // Redirect to payment page
+            window.location.href = 'payment.html';
+          } catch (error) {
+            console.error('❌ Error reserving slot:', error);
+            alert('Error reserving slot. Please try again.');
+          }
           return;
         }
         

@@ -3555,20 +3555,22 @@ async function sendCashPaymentNotification(data) {
                 <p style="margin: 0 0 20px 0; color: rgba(255,255,255,0.9); font-size: 14px;">The bot will start automatically after queue wait time.</p>
                 <div style="display: inline-block;">
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue & Do NOW</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/redo-order?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(23,162,184,0.4);">🔄 REDO</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Click "Skip Queue" to bypass wait time instantly</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Skip Queue | 🔄 REDO if bot failed | 👤 Manual</p>
               </div>
               ` : `
-              <!-- Email Confirmation Mode with Skip Queue -->
+              <!-- Email Confirmation Mode with Skip Queue & REDO -->
               <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
                 <p style="margin: 0 0 15px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Choose How to Process:</p>
                 <div style="display: inline-block;">
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-bot?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">🤖 Bot Does It</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/redo-order?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(23,162,184,0.4);">🔄 REDO</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ "Skip Queue" = Bot does it immediately | 🤖 "Bot Does It" = Normal queue wait</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Skip Queue | 🔄 REDO if bot failed | 👤 Manual</p>
               </div>
               `) : ''}
 
@@ -3704,26 +3706,28 @@ async function sendLoginDetailsNotification(data) {
               </div>
 
               ${orderId ? (botMode === 'auto' ? `
-              <!-- Auto Mode with Skip Queue Option -->
+              <!-- Auto Mode with Skip Queue & REDO Option -->
               <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
                 <p style="margin: 0 0 10px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Bot is Processing (In Queue...)</p>
                 <p style="margin: 0 0 20px 0; color: rgba(255,255,255,0.9); font-size: 14px;">The bot will start automatically after queue wait time.</p>
                 <div style="display: inline-block;">
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue & Do NOW</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/redo-order?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(23,162,184,0.4);">🔄 REDO</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Click "Skip Queue" to bypass wait time instantly</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Skip Queue | 🔄 REDO if bot failed | 👤 Manual</p>
               </div>
               ` : `
-              <!-- Email Confirmation Mode with Skip Queue -->
+              <!-- Email Confirmation Mode with Skip Queue & REDO -->
               <div style="background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); padding: 25px; border-radius: 12px; border: 3px solid #28a745; margin-bottom: 25px; box-shadow: 0 6px 20px rgba(40,167,69,0.3); text-align: center;">
                 <p style="margin: 0 0 15px 0; color: #fff; font-size: 18px; font-weight: 700;">🤖 Choose How to Process:</p>
                 <div style="display: inline-block;">
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-bot?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(108,99,255,0.3);">🤖 Bot Does It</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-skip-queue?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #ff9800 0%, #ff6f00 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(255,152,0,0.4);">⚡ Skip Queue</a>
+                  <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/redo-order?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: #fff; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 10px 15px 0; box-shadow: 0 4px 12px rgba(23,162,184,0.4);">🔄 REDO</a>
                   <a href="${process.env.BACKEND_URL || 'https://test2-adsw.onrender.com'}/process-order-manual?orderId=${orderId}" style="display: inline-block; background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%); color: #333; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 16px; margin: 0 0 15px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">👤 I'll Do It</a>
                 </div>
-                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ "Skip Queue" = Bot does it immediately | 🤖 "Bot Does It" = Normal queue wait</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">⚡ Skip Queue | 🔄 REDO if bot failed | 👤 Manual</p>
               </div>
               `) : `
               <!-- No Buttons -->
@@ -4306,6 +4310,179 @@ app.get('/process-order-manual', (req, res) => {
     </body>
     </html>
   `);
+});
+
+// Email Button Endpoint: REDO - Reprocess homework (clicked from email)
+app.get('/redo-order', async (req, res) => {
+  const { orderId } = req.query;
+  
+  console.log(`🔄 EMAIL BUTTON: REDO clicked - Order ID: ${orderId}`);
+  
+  if (!orderId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Error</h1>
+          <p>Missing order ID</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  // Check if order exists
+  if (!pendingOrders[orderId]) {
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Order Not Found - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>⚠️ Order Not Found</h1>
+          <p>This order doesn't exist or is too old.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+  
+  const order = pendingOrders[orderId];
+  
+  // Reset processed status to allow reprocessing
+  pendingOrders[orderId].processed = false;
+  pendingOrders[orderId].redoCount = (pendingOrders[orderId].redoCount || 0) + 1;
+  pendingOrders[orderId].lastRedoAt = new Date().toISOString();
+  
+  console.log(`🔄 EMAIL BUTTON: REDO - Reprocessing order: ${orderId} (Redo #${pendingOrders[orderId].redoCount})`);
+  console.log(`   Product: ${order.productName}`);
+  console.log(`   Username: ${order.username}`);
+  
+  // Trigger the bot with skipQueue flag (skip queue for redo attempts)
+  try {
+    console.log(`📡 REDO: Calling bot API: ${DISCORD_BOT_API_URL}/submit-homework`);
+    const botResponse = await fetch(`${DISCORD_BOT_API_URL}/submit-homework`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productName: order.productName,
+        username: order.username,
+        password: order.password,
+        loginType: order.loginType || 'Google',
+        school: order.school,
+        skipQueue: true // Skip queue for redo attempts
+      })
+    });
+    
+    console.log(`📥 REDO: Bot API response status: ${botResponse.status}`);
+    const botResult = await botResponse.json();
+    console.log(`📥 REDO: Bot API response:`, botResult);
+    
+    if (botResult.success) {
+      console.log(`✅ REDO: Bot successfully triggered for ${order.productName}!`);
+      
+      // Show success page
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Homework Resubmitted! - hwplug</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+            .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            h1 { color: #28a745; }
+            .emoji { font-size: 80px; margin: 20px 0; }
+            .warning { background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 20px; color: #856404; }
+            .info { background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="emoji">🔄</div>
+            <h1>Homework Resubmitted!</h1>
+            <p style="font-size: 18px; color: #28a745; font-weight: 600;">Bot is reprocessing your homework now!</p>
+            <div class="info">
+              <p style="margin: 5px 0;"><strong>Product:</strong> ${order.productName}</p>
+              <p style="margin: 5px 0;"><strong>Username:</strong> ${order.username}</p>
+              <p style="margin: 5px 0;"><strong>Redo Attempt:</strong> #${pendingOrders[orderId].redoCount}</p>
+            </div>
+            <p style="color: #666;">The bot has started working on your homework again, bypassing queue wait times.</p>
+            <div class="warning">
+              <p style="margin: 0; font-weight: 600;">📱 Check your Discord DM for progress updates!</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      console.error(`❌ REDO: Bot trigger failed: ${botResult.error}`);
+      
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Error - hwplug</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+            .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+            h1 { color: #d9534f; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>❌ Error</h1>
+            <p style="color: #666;">${botResult.error || 'Failed to trigger bot'}</p>
+            <p style="font-size: 14px; color: #999; margin-top: 20px;">Please contact support if this persists.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  } catch (error) {
+    console.error(`❌ REDO: Error calling bot API:`, error.message);
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Error - hwplug</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
+          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          h1 { color: #d9534f; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Connection Error</h1>
+          <p style="color: #666;">Failed to connect to bot. Please try again later.</p>
+          <p style="font-size: 14px; color: #999; margin-top: 20px;">Error: ${error.message}</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
 });
 
 // Endpoint: Trigger bot to do homework (clicked from email)

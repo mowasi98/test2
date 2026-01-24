@@ -1620,42 +1620,12 @@ async function submitToSparxNowInternal(productName, username, password, school 
       console.log('⏳ Waiting for homework list to appear...');
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Select homework with LATEST due date!
-      console.log('📝 Selecting homework with LATEST due date...');
+      // Select TOP homework (by visual position on screen)
+      console.log('📝 Selecting TOP homework (by screen position)...');
       const homeworkSelected = await page.evaluate(() => {
-        console.log('=== SMART SENECA HOMEWORK SELECTION (LATEST DUE DATE) ===');
+        console.log('=== TOP SENECA HOMEWORK SELECTION (BY VISUAL POSITION) ===');
         
-        // Helper: Parse date from Seneca format "Due 26 Jan" or "Due Jan 26"
-        function parseSenecaDate(text) {
-          try {
-            const currentYear = new Date().getFullYear();
-            
-            // Match: "Due 26 Jan" or "Due 26 January"
-            const match1 = text.match(/due\s+(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i);
-            if (match1) {
-              const day = parseInt(match1[1]);
-              const monthStr = match1[2].toLowerCase();
-              const monthMap = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11};
-              const month = monthMap[monthStr.substring(0,3)];
-              return new Date(currentYear, month, day);
-            }
-            
-            // Match: "Due Jan 26" or "Due January 26"
-            const match2 = text.match(/due\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})/i);
-            if (match2) {
-              const monthStr = match2[1].toLowerCase();
-              const day = parseInt(match2[2]);
-              const monthMap = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11};
-              const month = monthMap[monthStr.substring(0,3)];
-              return new Date(currentYear, month, day);
-            }
-          } catch (e) {
-            console.log('⚠️ Failed to parse Seneca date from:', text);
-          }
-          return null;
-        }
-        
-        // Find all homework options - they contain "Due"
+        // Find all potential homework elements
         const allElements = Array.from(document.querySelectorAll('*'));
         const homeworkOptions = allElements.filter(el => {
           const text = el.textContent?.trim() || '';
@@ -1663,139 +1633,109 @@ async function submitToSparxNowInternal(productName, username, password, school 
           return text.includes('Due') && text.length > 10 && text.length < 300;
         });
         
-        console.log(`Found ${homeworkOptions.length} homework options`);
+        console.log(`Found ${homeworkOptions.length} potential homework elements`);
         
-        // Group homework by date for better selection
-        const homeworkByDate = new Map();
-        let latestHomework = null;
-        let latestDate = null;
-        let latestDateStr = '';
-        
-        homeworkOptions.forEach((opt, i) => {
-          const text = opt.textContent?.trim();
-          const parsedDate = parseSenecaDate(text);
+        // Filter for valid homework items
+        const validHomework = homeworkOptions.filter(el => {
+          const text = el.textContent?.trim() || '';
+          const textLength = text.length;
           
-          console.log(`  [${i}] "${text.substring(0, 60)}"`);
-          if (parsedDate) {
-            console.log(`       📅 Parsed date: ${parsedDate.toLocaleDateString('en-GB')}`);
-            
-            const dateKey = parsedDate.getTime();
-            if (!homeworkByDate.has(dateKey)) {
-              homeworkByDate.set(dateKey, []);
-            }
-            homeworkByDate.get(dateKey).push(opt);
-          } else {
-            console.log(`       ⚠️ Could not parse date from this option`);
-          }
+          // Check visibility
+          const isVisible = (
+            el.offsetWidth > 0 && 
+            el.offsetHeight > 0 && 
+            window.getComputedStyle(el).display !== 'none' &&
+            window.getComputedStyle(el).visibility !== 'hidden'
+          );
+          
+          // Text should be reasonable length
+          const isReasonableLength = textLength > 15 && textLength < 250;
+          
+          return isVisible && isReasonableLength;
         });
         
-        // Find the latest date
-        if (homeworkByDate.size > 0) {
-          const sortedDates = Array.from(homeworkByDate.keys()).sort((a, b) => b - a); // Sort descending (latest first)
-          const latestDateTimestamp = sortedDates[0];
-          latestDate = new Date(latestDateTimestamp);
-          latestDateStr = latestDate.toLocaleDateString('en-GB');
-          
-          // Get all homework with the latest date, pick the shortest text (most specific element)
-          const latestOptions = homeworkByDate.get(latestDateTimestamp);
-          latestHomework = latestOptions.sort((a, b) => {
-            const aLen = a.textContent?.trim().length || 9999;
-            const bLen = b.textContent?.trim().length || 9999;
-            return aLen - bLen;
-          })[0];
-          
-          console.log(`🎯 Found ${latestOptions.length} homework option(s) with latest date: ${latestDateStr}`);
+        console.log(`Filtered to ${validHomework.length} valid homework items`);
+        
+        if (validHomework.length === 0) {
+          console.log('❌ No valid homework items found!');
+          console.log('Available text on page (first 30):');
+          const allText = allElements
+            .map(el => el.textContent?.trim() || '')
+            .filter(text => text.length > 5 && text.length < 100);
+          const uniqueText = [...new Set(allText)];
+          console.log(uniqueText.slice(0, 30));
+          return { success: false, homework: 'No homework found' };
         }
         
-        if (homeworkOptions.length > 0 && latestHomework) {
-          const homeworkText = latestHomework.textContent?.trim();
-          
-          console.log(`✅ SMART PICK: Homework with LATEST due date (${latestDateStr})`);
-          console.log(`   Text: ${homeworkText.substring(0, 80)}`);
-          console.log(`   Tag: ${latestHomework.tagName}, ID: ${latestHomework.id}, Class: ${latestHomework.className}`);
-          
-          // Scroll into view
-          latestHomework.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          console.log('📜 Scrolled into view');
-          
-          // Try MULTIPLE click methods (SAME as Google and Sparx Maths!)
-          console.log('🖱️ Attempting click method 1: element.click()');
-          latestHomework.click();
-          
-          console.log('🖱️ Attempting click method 2: dispatchEvent');
-          latestHomework.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-          
-          console.log('🖱️ Attempting click method 3: mousedown + mouseup');
-          latestHomework.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-          latestHomework.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-          
-          console.log('✅ Tried all click methods!');
-          
-          return { success: true, homework: homeworkText.substring(0, 80) };
-        }
+        // Get visual position for each element
+        const elementsWithPosition = validHomework.map((el, i) => {
+          const rect = el.getBoundingClientRect();
+          const text = el.textContent?.trim();
+          console.log(`  [${i}] Y=${Math.round(rect.top)} "${text.substring(0, 60)}"`);
+          return {
+            element: el,
+            y: rect.top,
+            text: text
+          };
+        });
         
-        console.log('❌ No homework options found');
-        console.log('Available text on page (first 30):');
-        const allText = allElements
-          .map(el => el.textContent?.trim() || '')
-          .filter(text => text.length > 5 && text.length < 100);
-        const uniqueText = [...new Set(allText)];
-        console.log(uniqueText.slice(0, 30));
+        // Sort by Y position (smallest = highest on screen = TOP)
+        elementsWithPosition.sort((a, b) => a.y - b.y);
         
-        return { success: false, homework: 'Unknown' };
+        // Pick the first one (smallest Y = top on screen)
+        const topHomework = elementsWithPosition[0];
+        const homeworkText = topHomework.text;
+        
+        console.log(`✅ TOP PICK: Element with smallest Y position (${Math.round(topHomework.y)}px)`);
+        console.log(`   Text: ${homeworkText.substring(0, 80)}`);
+        console.log(`   Tag: ${topHomework.element.tagName}, ID: ${topHomework.element.id}, Class: ${topHomework.element.className}`);
+        
+        // Try MULTIPLE click methods
+        console.log('🖱️ Attempting click method 1: element.click()');
+        topHomework.element.click();
+        
+        console.log('🖱️ Attempting click method 2: dispatchEvent');
+        topHomework.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        
+        console.log('🖱️ Attempting click method 3: mousedown + mouseup');
+        topHomework.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+        topHomework.element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+        
+        console.log('✅ Tried all click methods on TOP homework!');
+        
+        return { success: true, homework: homeworkText.substring(0, 80) };
       });
       
-      // Also try Puppeteer's native click as backup (SAME as Sparx Maths!)
-      console.log('🖱️ Also trying Puppeteer native click on homework...');
+      // Also try Puppeteer's native click as backup
+      console.log('🖱️ Also trying Puppeteer native click on TOP homework...');
       try {
         const homeworkElement = await page.evaluateHandle(() => {
-          // Helper: Parse date from Seneca format
-          function parseSenecaDate(text) {
-            try {
-              const currentYear = new Date().getFullYear();
-              const match1 = text.match(/due\s+(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i);
-              if (match1) {
-                const day = parseInt(match1[1]);
-                const monthStr = match1[2].toLowerCase();
-                const monthMap = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11};
-                const month = monthMap[monthStr.substring(0,3)];
-                return new Date(currentYear, month, day);
-              }
-              const match2 = text.match(/due\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})/i);
-              if (match2) {
-                const monthStr = match2[1].toLowerCase();
-                const day = parseInt(match2[2]);
-                const monthMap = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11};
-                const month = monthMap[monthStr.substring(0,3)];
-                return new Date(currentYear, month, day);
-              }
-            } catch (e) {}
-            return null;
-          }
-          
           const allElements = Array.from(document.querySelectorAll('*'));
           const homeworkOptions = allElements.filter(el => {
             const text = el.textContent?.trim() || '';
             return text.includes('Due') && text.length > 10 && text.length < 300;
           });
           
-          // Find homework with latest due date
-          let latestHomework = null;
-          let latestDate = null;
-          
-          homeworkOptions.forEach(opt => {
-            const text = opt.textContent?.trim();
-            const parsedDate = parseSenecaDate(text);
-            
-            if (parsedDate && (!latestDate || parsedDate > latestDate)) {
-              latestDate = parsedDate;
-              if (!latestHomework || text.length < latestHomework.textContent?.trim().length) {
-                latestHomework = opt;
-              }
-            }
+          // Filter for valid items
+          const validHomework = homeworkOptions.filter(el => {
+            const text = el.textContent?.trim() || '';
+            const isVisible = el.offsetWidth > 0 && el.offsetHeight > 0;
+            const isReasonableLength = text.length > 15 && text.length < 250;
+            return isVisible && isReasonableLength;
           });
           
-          return latestHomework || homeworkOptions[0]; // Fallback to first if no dates
+          if (validHomework.length === 0) return null;
+          
+          // Get visual position and sort by Y (top to bottom)
+          const elementsWithPosition = validHomework.map(el => ({
+            element: el,
+            y: el.getBoundingClientRect().top
+          }));
+          
+          elementsWithPosition.sort((a, b) => a.y - b.y);
+          
+          // Return TOP element (smallest Y)
+          return elementsWithPosition[0].element;
         });
         
         if (homeworkElement) {
@@ -2000,154 +1940,116 @@ async function submitToSparxNowInternal(productName, username, password, school 
     console.log('⏳ Waiting for homework list to appear...');
     await new Promise(resolve => setTimeout(resolve, 3000));
     
-    // Step: Select homework with LATEST due date!
-    console.log('📝 Selecting homework with LATEST due date...');
+    // Step: Select TOP homework (by visual position on screen)
+    console.log('📝 Selecting TOP homework (by screen position)...');
     const homeworkSelected = await page.evaluate(() => {
-      console.log('=== SMART HOMEWORK SELECTION (LATEST DUE DATE) ===');
+      console.log('=== TOP HOMEWORK SELECTION (BY VISUAL POSITION) ===');
       
-      // Helper: Parse date from "Homework due 26/01/2026" format
-      function parseSparxDate(text) {
-        try {
-          // Match: "due 26/01/2026" or "due: 26/01/2026"
-          const match = text.match(/due:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
-          if (match) {
-            const day = parseInt(match[1]);
-            const month = parseInt(match[2]);
-            const year = parseInt(match[3]);
-            // Create date (month is 0-indexed in JS)
-            return new Date(year, month - 1, day);
-          }
-        } catch (e) {
-          console.log('⚠️ Failed to parse date from:', text);
-        }
-        return null;
-      }
-      
-      // Find all homework options - they contain "Homework due"
+      // Find all potential homework elements
       const allElements = Array.from(document.querySelectorAll('*'));
       const homeworkOptions = allElements.filter(el => {
         const text = el.textContent?.trim() || '';
+        // Must start with "Homework due" and contain a percentage
         return text.startsWith('Homework due') && text.includes('%');
       });
       
-      console.log(`Found ${homeworkOptions.length} homework options`);
+      console.log(`Found ${homeworkOptions.length} potential homework elements`);
       
-      // Parse dates and find latest
-      let latestHomework = null;
-      let latestDate = null;
-      let latestDateStr = '';
-      
-      // Group homework by date for better selection
-      const homeworkByDate = new Map();
-      
-      homeworkOptions.forEach((opt, i) => {
-        const text = opt.textContent?.trim();
-        const parsedDate = parseSparxDate(text);
+      // Filter for valid homework items (avoid parent containers)
+      const validHomework = homeworkOptions.filter(el => {
+        const text = el.textContent?.trim() || '';
+        const textLength = text.length;
         
-        console.log(`  [${i}] "${text.substring(0, 60)}"`);
-        if (parsedDate) {
-          console.log(`       📅 Parsed date: ${parsedDate.toLocaleDateString('en-GB')}`);
-          
-          const dateKey = parsedDate.getTime();
-          if (!homeworkByDate.has(dateKey)) {
-            homeworkByDate.set(dateKey, []);
-          }
-          homeworkByDate.get(dateKey).push(opt);
-        } else {
-          console.log(`       ⚠️ Could not parse date from this option`);
-        }
+        // Check visibility
+        const isVisible = (
+          el.offsetWidth > 0 && 
+          el.offsetHeight > 0 && 
+          window.getComputedStyle(el).display !== 'none' &&
+          window.getComputedStyle(el).visibility !== 'hidden'
+        );
+        
+        // Text should be reasonable length (not too short = child element, not too long = parent container)
+        const isReasonableLength = textLength > 30 && textLength < 250;
+        
+        return isVisible && isReasonableLength;
       });
       
-      // Find the latest date
-      if (homeworkByDate.size > 0) {
-        const sortedDates = Array.from(homeworkByDate.keys()).sort((a, b) => b - a); // Sort descending (latest first)
-        const latestDateTimestamp = sortedDates[0];
-        latestDate = new Date(latestDateTimestamp);
-        latestDateStr = latestDate.toLocaleDateString('en-GB');
-        
-        // Get all homework with the latest date, pick the shortest text (most specific element)
-        const latestOptions = homeworkByDate.get(latestDateTimestamp);
-        latestHomework = latestOptions.sort((a, b) => {
-          const aLen = a.textContent?.trim().length || 9999;
-          const bLen = b.textContent?.trim().length || 9999;
-          return aLen - bLen;
-        })[0];
-        
-        console.log(`🎯 Found ${latestOptions.length} homework option(s) with latest date: ${latestDateStr}`);
+      console.log(`Filtered to ${validHomework.length} valid homework items`);
+      
+      if (validHomework.length === 0) {
+        console.log('❌ No valid homework items found!');
+        return { success: false, homework: 'No homework found' };
       }
       
-      if (homeworkOptions.length > 0 && latestHomework) {
-        const homeworkText = latestHomework.textContent?.trim();
+      // Get visual position for each element
+      const elementsWithPosition = validHomework.map((el, i) => {
+        const rect = el.getBoundingClientRect();
+        const text = el.textContent?.trim();
+        console.log(`  [${i}] Y=${Math.round(rect.top)} "${text.substring(0, 60)}"`);
+        return {
+          element: el,
+          y: rect.top,
+          text: text
+        };
+      });
+      
+      // Sort by Y position (smallest = highest on screen = TOP)
+      elementsWithPosition.sort((a, b) => a.y - b.y);
+      
+      // Pick the first one (smallest Y = top on screen)
+      const topHomework = elementsWithPosition[0];
+      const homeworkText = topHomework.text;
+      
+      console.log(`✅ TOP PICK: Element with smallest Y position (${Math.round(topHomework.y)}px)`);
+      console.log(`   Text: ${homeworkText.substring(0, 80)}`);
+        console.log(`   Tag: ${topHomework.element.tagName}, ID: ${topHomework.element.id}, Class: ${topHomework.element.className}`);
         
-        console.log(`✅ SMART PICK: Homework with LATEST due date (${latestDateStr})`);
-        console.log(`   Text: ${homeworkText.substring(0, 80)}`);
-        console.log(`   Tag: ${latestHomework.tagName}, ID: ${latestHomework.id}, Class: ${latestHomework.className}`);
-        
-        // Scroll into view
-        latestHomework.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        console.log('📜 Scrolled into view');
-        
-        // Try MULTIPLE click methods (SAME as Google!)
+        // Try MULTIPLE click methods
         console.log('🖱️ Attempting click method 1: element.click()');
-        latestHomework.click();
+        topHomework.element.click();
         
         console.log('🖱️ Attempting click method 2: dispatchEvent');
-        latestHomework.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        topHomework.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
         
         console.log('🖱️ Attempting click method 3: mousedown + mouseup');
-        latestHomework.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-        latestHomework.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+        topHomework.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+        topHomework.element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
         
-        console.log('✅ Tried all click methods!');
+        console.log('✅ Tried all click methods on TOP homework!');
         
         return { success: true, homework: homeworkText };
-      }
-      
-      console.log('❌ No homework options found');
-      return { success: false, homework: 'Unknown' };
     });
     
     // Also try Puppeteer's native click as backup
-    console.log('🖱️ Also trying Puppeteer native click on homework...');
+    console.log('🖱️ Also trying Puppeteer native click on TOP homework...');
     try {
       const homeworkElement = await page.evaluateHandle(() => {
-        // Helper: Parse date from "Homework due 26/01/2026" format
-        function parseSparxDate(text) {
-          try {
-            const match = text.match(/due:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
-            if (match) {
-              const day = parseInt(match[1]);
-              const month = parseInt(match[2]);
-              const year = parseInt(match[3]);
-              return new Date(year, month - 1, day);
-            }
-          } catch (e) {}
-          return null;
-        }
-        
         const allElements = Array.from(document.querySelectorAll('*'));
         const homeworkOptions = allElements.filter(el => {
           const text = el.textContent?.trim() || '';
           return text.startsWith('Homework due') && text.includes('%');
         });
         
-        // Find homework with latest due date
-        let latestHomework = null;
-        let latestDate = null;
-        
-        homeworkOptions.forEach(opt => {
-          const text = opt.textContent?.trim();
-          const parsedDate = parseSparxDate(text);
-          
-          if (parsedDate && (!latestDate || parsedDate > latestDate)) {
-            latestDate = parsedDate;
-            if (!latestHomework || text.length < latestHomework.textContent?.trim().length) {
-              latestHomework = opt;
-            }
-          }
+        // Filter for valid items
+        const validHomework = homeworkOptions.filter(el => {
+          const text = el.textContent?.trim() || '';
+          const isVisible = el.offsetWidth > 0 && el.offsetHeight > 0;
+          const isReasonableLength = text.length > 30 && text.length < 250;
+          return isVisible && isReasonableLength;
         });
         
-        return latestHomework || homeworkOptions[0]; // Fallback to first if no dates
+        if (validHomework.length === 0) return null;
+        
+        // Get visual position and sort by Y (top to bottom)
+        const elementsWithPosition = validHomework.map(el => ({
+          element: el,
+          y: el.getBoundingClientRect().top
+        }));
+        
+        elementsWithPosition.sort((a, b) => a.y - b.y);
+        
+        // Return TOP element (smallest Y)
+        return elementsWithPosition[0].element;
       });
       
       if (homeworkElement) {

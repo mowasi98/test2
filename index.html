@@ -1637,31 +1637,8 @@
     window.addEventListener('DOMContentLoaded', async function() {
       console.log('✅ Homepage loaded - index.html');
       
-      // VERSION CHECK: Force everyone to re-login with new validation rules
-      const CURRENT_VERSION = '2.1'; // Increment this to force logout
-      const savedVersion = localStorage.getItem('appVersion');
-      
-      if (savedVersion !== CURRENT_VERSION) {
-        console.log('🔄 VERSION UPDATE DETECTED - Clearing old credentials');
-        console.log(`   Old version: ${savedVersion || 'none'}, New version: ${CURRENT_VERSION}`);
-        
-        // Clear all saved credentials
-        localStorage.removeItem('savedUsername');
-        localStorage.removeItem('savedPassword');
-        localStorage.removeItem('savedSchool');
-        
-        // Save new version
-        localStorage.setItem('appVersion', CURRENT_VERSION);
-        
-        console.log('✅ All users must re-login with valid email addresses!');
-        
-        // Update UI to show logged out state
-        document.getElementById('userInfo').style.display = 'none';
-        document.getElementById('logoutBtn').style.display = 'none';
-        document.getElementById('loginBtn').textContent = 'Login';
-      } else {
-        console.log(`✅ Version ${CURRENT_VERSION} - credentials still valid`);
-      }
+      // VERSION CHECK REMOVED - Credentials are now only cleared by admin "Force Re-login" button
+      // This prevents automatic credential clearing on every page load
       
       // Check test mode FIRST
       const testModeActive = await checkTestMode();

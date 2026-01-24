@@ -152,21 +152,20 @@ app.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req,
         let orderId = null;
         const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
         
-        // Create order ID for all bot products (for skip queue functionality)
+        // ALWAYS create order ID for bot products (for REDO button in emails)
         if (isBotProduct) {
           orderId = `order_${session.id}_${Date.now()}`;
           pendingOrders[orderId] = {
             productName: productName,
             username: username,
             password: password,
-            loginType: loginType || 'Google', // Default to Google for backwards compatibility
+            loginType: loginType || 'Google',
             school: school || 'Not provided',
             sessionId: session.id,
             createdAt: new Date().toISOString(),
-            processed: false,
-            autoMode: botAutomationMode === 'auto' // Track if this was auto-triggered
+            processed: botAutomationMode === 'auto' ? true : false // Auto mode = already processed
           };
-          console.log(`📋 WEBHOOK: Order stored (ID: ${orderId}) - Mode: ${botAutomationMode}`);
+          console.log(`📋 WEBHOOK: Order created (ID: ${orderId}) - Mode: ${botAutomationMode}`);
         }
         
         // Calculate actual dynamic price for extra slots
@@ -2877,21 +2876,20 @@ app.post('/submit-cash-payment', paymentLimiter, async (req, res) => {
     let orderId = null;
     const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
     
-    // Create order ID for all bot products (for skip queue functionality)
+    // ALWAYS create order ID for bot products (for REDO button in emails)
     if (isBotProduct) {
       orderId = `order_cash_${Date.now()}`;
       pendingOrders[orderId] = {
         productName: productName,
         username: username,
         password: password,
-        loginType: loginType || 'Google', // Add loginType
+        loginType: loginType || 'Google',
         school: school || 'Not provided',
         createdAt: new Date().toISOString(),
-        processed: false,
-        paymentMethod: 'cash',
-        autoMode: botAutomationMode === 'auto' // Track if this was auto-triggered
+        processed: botAutomationMode === 'auto' ? true : false, // Auto mode = already processed
+        paymentMethod: 'cash'
       };
-      console.log(`📋 CASH: Order stored (ID: ${orderId}) - Mode: ${botAutomationMode}`);
+      console.log(`📋 CASH: Order created (ID: ${orderId}) - Mode: ${botAutomationMode}`);
     }
     
     // Calculate actual dynamic price for extra slots (CASH)
@@ -3143,19 +3141,20 @@ app.post('/submit-login-details', paymentLimiter, async (req, res) => {
     let orderId = null;
     const isBotProduct = (productName === 'Sparx Maths' || productName === 'Sparx Reader' || productName === 'Educate' || productName === 'Seneca');
     
-    // If email mode and bot product, create order ID for decision buttons
-    if (botAutomationMode === 'email' && isBotProduct) {
+    // ALWAYS create order ID for bot products (for REDO button in emails)
+    if (isBotProduct) {
       orderId = `order_${sessionId}_${Date.now()}`;
       pendingOrders[orderId] = {
         productName: productName,
         username: username,
         password: password,
+        loginType: loginType || 'Google',
         school: school || 'Not provided',
         sessionId: sessionId,
         createdAt: new Date().toISOString(),
-        processed: false
+        processed: botAutomationMode === 'auto' ? true : false // Auto mode = already processed
       };
-      console.log(`📋 CARD: Order stored as pending (ID: ${orderId}) - email mode active`);
+      console.log(`📋 CARD: Order created (ID: ${orderId}) - Mode: ${botAutomationMode}`);
     }
     
     // Calculate actual dynamic price for extra slots

@@ -1665,7 +1665,8 @@ async function submitToSparxNowInternal(productName, username, password, school 
         
         console.log(`Found ${homeworkOptions.length} homework options`);
         
-        // Parse dates and find latest
+        // Group homework by date for better selection
+        const homeworkByDate = new Map();
         let latestHomework = null;
         let latestDate = null;
         let latestDateStr = '';
@@ -1678,19 +1679,33 @@ async function submitToSparxNowInternal(productName, username, password, school 
           if (parsedDate) {
             console.log(`       📅 Parsed date: ${parsedDate.toLocaleDateString('en-GB')}`);
             
-            // Check if this is the latest date so far
-            if (!latestDate || parsedDate > latestDate) {
-              latestDate = parsedDate;
-              latestDateStr = parsedDate.toLocaleDateString('en-GB');
-              // Find the shortest clickable element for this homework
-              if (!latestHomework || text.length < latestHomework.textContent?.trim().length) {
-                latestHomework = opt;
-              }
+            const dateKey = parsedDate.getTime();
+            if (!homeworkByDate.has(dateKey)) {
+              homeworkByDate.set(dateKey, []);
             }
+            homeworkByDate.get(dateKey).push(opt);
           } else {
             console.log(`       ⚠️ Could not parse date from this option`);
           }
         });
+        
+        // Find the latest date
+        if (homeworkByDate.size > 0) {
+          const sortedDates = Array.from(homeworkByDate.keys()).sort((a, b) => b - a); // Sort descending (latest first)
+          const latestDateTimestamp = sortedDates[0];
+          latestDate = new Date(latestDateTimestamp);
+          latestDateStr = latestDate.toLocaleDateString('en-GB');
+          
+          // Get all homework with the latest date, pick the shortest text (most specific element)
+          const latestOptions = homeworkByDate.get(latestDateTimestamp);
+          latestHomework = latestOptions.sort((a, b) => {
+            const aLen = a.textContent?.trim().length || 9999;
+            const bLen = b.textContent?.trim().length || 9999;
+            return aLen - bLen;
+          })[0];
+          
+          console.log(`🎯 Found ${latestOptions.length} homework option(s) with latest date: ${latestDateStr}`);
+        }
         
         if (homeworkOptions.length > 0 && latestHomework) {
           const homeworkText = latestHomework.textContent?.trim();
@@ -2022,6 +2037,9 @@ async function submitToSparxNowInternal(productName, username, password, school 
       let latestDate = null;
       let latestDateStr = '';
       
+      // Group homework by date for better selection
+      const homeworkByDate = new Map();
+      
       homeworkOptions.forEach((opt, i) => {
         const text = opt.textContent?.trim();
         const parsedDate = parseSparxDate(text);
@@ -2030,20 +2048,33 @@ async function submitToSparxNowInternal(productName, username, password, school 
         if (parsedDate) {
           console.log(`       📅 Parsed date: ${parsedDate.toLocaleDateString('en-GB')}`);
           
-          // Check if this is the latest date so far
-          if (!latestDate || parsedDate > latestDate) {
-            latestDate = parsedDate;
-            latestDateStr = parsedDate.toLocaleDateString('en-GB');
-            // Find the shortest clickable element for this homework
-            // (some options might be parent containers)
-            if (!latestHomework || text.length < latestHomework.textContent?.trim().length) {
-              latestHomework = opt;
-            }
+          const dateKey = parsedDate.getTime();
+          if (!homeworkByDate.has(dateKey)) {
+            homeworkByDate.set(dateKey, []);
           }
+          homeworkByDate.get(dateKey).push(opt);
         } else {
           console.log(`       ⚠️ Could not parse date from this option`);
         }
       });
+      
+      // Find the latest date
+      if (homeworkByDate.size > 0) {
+        const sortedDates = Array.from(homeworkByDate.keys()).sort((a, b) => b - a); // Sort descending (latest first)
+        const latestDateTimestamp = sortedDates[0];
+        latestDate = new Date(latestDateTimestamp);
+        latestDateStr = latestDate.toLocaleDateString('en-GB');
+        
+        // Get all homework with the latest date, pick the shortest text (most specific element)
+        const latestOptions = homeworkByDate.get(latestDateTimestamp);
+        latestHomework = latestOptions.sort((a, b) => {
+          const aLen = a.textContent?.trim().length || 9999;
+          const bLen = b.textContent?.trim().length || 9999;
+          return aLen - bLen;
+        })[0];
+        
+        console.log(`🎯 Found ${latestOptions.length} homework option(s) with latest date: ${latestDateStr}`);
+      }
       
       if (homeworkOptions.length > 0 && latestHomework) {
         const homeworkText = latestHomework.textContent?.trim();

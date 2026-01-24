@@ -1977,14 +1977,10 @@ app.post('/admin/force-relogin', (req, res) => {
       }
     }
     
-    // Increment version (e.g., 2.2 -> 2.3)
-    const currentVersion = config.requiredVersion || '2.2';
-    const versionParts = currentVersion.split('.');
-    const majorVersion = parseInt(versionParts[0]) || 2;
-    const minorVersion = parseInt(versionParts[1]) || 2;
-    const newVersion = `${majorVersion}.${minorVersion + 1}`;
-    
-    config.requiredVersion = newVersion;
+    // Set a timestamp for when force re-login was triggered
+    const clearTimestamp = Date.now();
+    config.forceClearTimestamp = clearTimestamp;
+    config.requiredVersion = '2.2'; // Keep version stable
     
     // Save to file
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
@@ -1992,15 +1988,15 @@ app.post('/admin/force-relogin', (req, res) => {
     console.log(`\n${'='.repeat(60)}`);
     console.log('🔄 FORCE RE-LOGIN ACTIVATED');
     console.log(`${'='.repeat(60)}`);
-    console.log(`Version updated: ${currentVersion} → ${newVersion}`);
+    console.log(`Force clear timestamp: ${clearTimestamp}`);
     console.log(`All users will be required to re-login on next visit`);
     console.log(`File location: ${configPath}`);
     console.log(`${'='.repeat(60)}\n`);
     
     res.json({
       success: true,
-      message: `All users will be forced to re-login (version ${newVersion})`,
-      newVersion: newVersion
+      message: `All users will be forced to re-login`,
+      forceClearTimestamp: clearTimestamp
     });
   } catch (error) {
     console.error('Error forcing re-login:', error);
@@ -2008,34 +2004,36 @@ app.post('/admin/force-relogin', (req, res) => {
   }
 });
 
-// Endpoint to get the required version for force re-login
+// Endpoint to check if force clear is needed
 app.get('/get-required-version', (req, res) => {
   try {
     const fs = require('fs');
     const path = require('path');
     const configPath = path.join(__dirname, 'queue-config.json');
     
-    let requiredVersion = '2.2'; // Default version
+    let forceClearTimestamp = null;
     
     if (fs.existsSync(configPath)) {
       try {
         const data = fs.readFileSync(configPath, 'utf8');
         const config = JSON.parse(data);
-        requiredVersion = config.requiredVersion || '2.2';
+        forceClearTimestamp = config.forceClearTimestamp || null;
       } catch (e) {
-        console.error('Error reading version from queue config:', e.message);
+        console.error('Error reading force clear timestamp from queue config:', e.message);
       }
     }
     
     res.json({
       success: true,
-      requiredVersion: requiredVersion
+      requiredVersion: '2.2', // Always return stable version
+      forceClearTimestamp: forceClearTimestamp
     });
   } catch (error) {
-    console.error('Error getting required version:', error);
+    console.error('Error getting force clear timestamp:', error);
     res.json({
       success: true,
-      requiredVersion: '2.2' // Return default on error
+      requiredVersion: '2.2',
+      forceClearTimestamp: null
     });
   }
 });

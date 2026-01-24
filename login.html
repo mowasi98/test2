@@ -515,64 +515,42 @@
       console.log('📍 Current pathname:', window.location.pathname);
       console.log('🔍 URL search params:', window.location.search);
       
-      // VERSION CHECK: Force everyone to re-login when admin triggers it
+      // FORCE RE-LOGIN CHECK: Only clear credentials if admin explicitly triggers it
       const BACKEND_URL = 'https://test2-adsw.onrender.com';
+      window.REQUIRED_VERSION = '2.2'; // Stable version
       
-      // Store required version globally so handleLogin can access it
-      window.REQUIRED_VERSION = '2.2'; // Default fallback
-      
-      // Only do version check ONCE on first load (don't repeat on every refresh)
-      const versionCheckDone = sessionStorage.getItem('versionCheckDone');
-      
-      if (!versionCheckDone) {
-        try {
-          const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
-          const versionData = await versionResponse.json();
-          const requiredVersion = versionData.requiredVersion || '2.2';
-          window.REQUIRED_VERSION = requiredVersion; // Store globally
-          const savedVersion = localStorage.getItem('appVersion');
+      try {
+        const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
+        const versionData = await versionResponse.json();
+        const forceClearTimestamp = versionData.forceClearTimestamp;
+        const lastClearCheck = localStorage.getItem('lastClearCheck');
+        
+        console.log('═══════════════════════════════════════════════════');
+        console.log('🔍 FORCE RE-LOGIN CHECK');
+        console.log(`Server force clear timestamp: ${forceClearTimestamp || 'none'}`);
+        console.log(`User last check: ${lastClearCheck || 'none'}`);
+        
+        // Only clear credentials if admin triggered force clear AND we haven't cleared yet
+        if (forceClearTimestamp && (!lastClearCheck || parseInt(lastClearCheck) < forceClearTimestamp)) {
+          console.log('🔄 ADMIN TRIGGERED FORCE RE-LOGIN - Clearing credentials');
           
-          console.log('═══════════════════════════════════════════════════');
-          console.log('🔍 VERSION CHECK (First load only)');
-          console.log('═══════════════════════════════════════════════════');
-          console.log(`Server requires: ${requiredVersion}`);
-          console.log(`User has: ${savedVersion || 'none'}`);
+          // Clear all saved credentials
+          localStorage.removeItem('savedUsername');
+          localStorage.removeItem('savedPassword');
+          localStorage.removeItem('savedSchool');
+          localStorage.removeItem('savedLoginType');
           
-          if (savedVersion !== requiredVersion) {
-            console.log('🔄 VERSION MISMATCH - Forcing re-login');
-            
-            // Clear all saved credentials
-            localStorage.removeItem('savedUsername');
-            localStorage.removeItem('savedPassword');
-            localStorage.removeItem('savedSchool');
-            localStorage.removeItem('savedLoginType');
-            
-            // Don't save version yet - only save it when user logs in
-            // This prevents loops where version gets saved but credentials don't
-            
-            console.log('✅ Credentials cleared - user must login');
-            console.log('═══════════════════════════════════════════════════');
-          } else {
-            console.log(`✅ Version ${requiredVersion} - credentials valid`);
-            console.log('═══════════════════════════════════════════════════');
-          }
+          // Remember we checked this timestamp
+          localStorage.setItem('lastClearCheck', forceClearTimestamp.toString());
           
-          // Mark version check as done for this session
-          sessionStorage.setItem('versionCheckDone', 'true');
-        } catch (error) {
-          console.error('❌ Error checking version:', error.message);
-          console.log('Continuing with default version...');
-          sessionStorage.setItem('versionCheckDone', 'true'); // Don't retry on error
+          console.log('✅ Credentials cleared - user must login');
+        } else {
+          console.log('✅ No force clear needed - credentials safe');
         }
-      } else {
-        // Version check already done this session - fetch required version but don't clear credentials
-        try {
-          const versionResponse = await fetch(`${BACKEND_URL}/get-required-version`);
-          const versionData = await versionResponse.json();
-          window.REQUIRED_VERSION = versionData.requiredVersion || '2.2';
-        } catch (error) {
-          console.log('Using default version 2.2');
-        }
+        console.log('═══════════════════════════════════════════════════');
+        
+      } catch (error) {
+        console.error('❌ Error checking force clear:', error.message);
       }
       
       // Setup school autocomplete

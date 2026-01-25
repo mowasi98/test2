@@ -4054,38 +4054,21 @@ app.get('/process-order-skip-queue', async (req, res) => {
     `);
   }
   
-  // Check if already processed
-  if (pendingOrders[orderId].processed) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Already Processed - hwplug</title>
-        <style>
-          body { font-family: Arial, sans-serif; background: #f6f7fb; padding: 50px; text-align: center; }
-          .container { background: white; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-          h1 { color: #ffc107; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>⚠️ Already Processed</h1>
-          <p>This order has already been handled.</p>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-  
   const order = pendingOrders[orderId];
   
-  // Mark as processed
+  // Skip Queue button should ALWAYS work, even if already processed
+  // This is intentional - user wants to reprocess immediately
+  if (pendingOrders[orderId].processed) {
+    console.log(`⚡ EMAIL BUTTON: Order was already processed, but SKIP QUEUE clicked - reprocessing anyway!`);
+  }
+  
+  // Mark as processed and track skip queue usage
   pendingOrders[orderId].processed = true;
   pendingOrders[orderId].processedAt = new Date().toISOString();
   pendingOrders[orderId].processedBy = 'bot-skip-queue';
+  pendingOrders[orderId].skipQueueCount = (pendingOrders[orderId].skipQueueCount || 0) + 1;
   
-  console.log(`⚡ EMAIL BUTTON: SKIP QUEUE - Triggering bot IMMEDIATELY for order: ${orderId}`);
+  console.log(`⚡ EMAIL BUTTON: SKIP QUEUE - Triggering bot IMMEDIATELY for order: ${orderId} (Skip #${pendingOrders[orderId].skipQueueCount})`);
   console.log(`   Product: ${order.productName}`);
   console.log(`   Username: ${order.username}`);
   
